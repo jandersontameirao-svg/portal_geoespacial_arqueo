@@ -419,6 +419,20 @@ const projectsRouter = router({
 
       return { success: true };
     }),
+
+  // Listar membros do projeto
+  listMembers: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      return await db.getProjectMembers(input.projectId);
+    }),
+
+  // Obter atividades do projeto (logs de auditoria)
+  getActivities: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      return await db.getProjectAuditLogs(input.projectId);
+    }),
 });
 
 // ============================================================================

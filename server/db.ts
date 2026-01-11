@@ -508,7 +508,14 @@ export async function getRecentAuditLogs(limit: number = 100) {
   const db = await getDb();
   if (!db) return [];
 
+  return await db.select().from(auditLogs).orderBy(desc(auditLogs.timestamp)).limit(limit);
+}
+
+export async function getProjectAuditLogs(projectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
   return await db.select().from(auditLogs)
-    .orderBy(desc(auditLogs.timestamp))
-    .limit(limit);
+    .where(eq(auditLogs.projectId, projectId))
+    .orderBy(desc(auditLogs.timestamp));
 }

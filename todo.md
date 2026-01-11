@@ -165,3 +165,25 @@
 - [ ] Criar listagem de arquivos por projeto
 - [ ] Implementar download de arquivos
 - [ ] Implementar exclusão (soft delete) de arquivos
+
+### 17. Página de Detalhes do Projeto
+- [x] Criar página /projects/:id
+- [x] Implementar aba de visão geral do projeto
+- [x] Implementar aba de membros da equipe
+- [x] Implementar aba de arquivos
+- [x] Implementar aba de histórico de atividades
+- [x] Adicionar breadcrumb de navegação
+
+### 18. Sistema de Upload de Arquivos
+- [ ] Criar componente de upload com drag-and-drop
+- [ ] Implementar validação de tipo de arquivo
+- [ ] Implementar preview de arquivos
+- [ ] Criar listagem de arquivos com filtros
+- [ ] Implementar download de arquivos
+
+### 19. Gerenciamento de Membros do Projeto
+- [x] Criar interface para adicionar membros
+- [x] Implementar seleção de usuários existentes
+- [x] Implementar remoção de membros
+- [x] Mostrar lista de membros com roles
+- [x] Adicionar procedures listMembers e getActivities ao tRPC
