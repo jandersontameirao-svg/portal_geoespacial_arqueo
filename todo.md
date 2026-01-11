@@ -230,3 +230,26 @@
 - [ ] Implementar preview de arquivos KML/KMZ
 - [ ] Adicionar controles de zoom
 - [ ] Implementar alternância de camadas
+
+### 26. Visualizador de Mapas KML/KMZ com Leaflet
+- [x] Instalar Leaflet e dependências
+- [x] Criar componente MapViewer
+- [x] Implementar carregamento de arquivos KML/KMZ
+- [x] Adicionar controles de zoom e pan
+- [x] Criar modal para visualização
+- [x] Integrar com FileList
+
+### 27. Pipeline de Processamento de Shapefiles
+- [ ] Criar procedure tRPC files.processShapefile
+- [ ] Implementar extração de ZIP
+- [ ] Validar CRS com GDAL/ogr2ogr
+- [ ] Converter para EPSG:4674
+- [ ] Inserir geometrias no PostGIS
+- [ ] Registrar camada para visualização
+
+### 28. Página de Gerenciamento de Convites
+- [x] Criar página /invitations
+- [x] Implementar formulário de envio de convites
+- [x] Criar listagem de convites pendentes/aceitos/expirados
+- [ ] Adicionar botão para reenviar convite (backend pendente)
+- [ ] Adicionar botão para cancelar convite (backend pendente)

@@ -12,8 +12,10 @@ import {
   FileArchive 
 } from "lucide-react";
 import { toast } from "sonner";
+import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import MapViewer from "@/components/MapViewer";
 
 interface FileListProps {
   projectId: number;
@@ -21,6 +23,8 @@ interface FileListProps {
 }
 
 export default function FileList({ projectId, canEdit = false }: FileListProps) {
+  const [viewerFile, setViewerFile] = useState<{ url: string; name: string; type: "kml" | "kmz" } | null>(null);
+
   const { data: files, isLoading, refetch } = trpc.files.list.useQuery(
     { projectId },
     { enabled: projectId > 0 }
@@ -104,7 +108,18 @@ export default function FileList({ projectId, canEdit = false }: FileListProps) 
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <>
+      {viewerFile && (
+        <MapViewer
+          fileUrl={viewerFile.url}
+          fileName={viewerFile.name}
+          fileType={viewerFile.type}
+          isOpen={true}
+          onClose={() => setViewerFile(null)}
+        />
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {files.map((file) => (
         <Card key={file.id} className="hover:shadow-md transition-shadow">
           <CardContent className="p-4">
@@ -148,11 +163,12 @@ export default function FileList({ projectId, canEdit = false }: FileListProps) 
                 Download
               </Button>
 
-              {file.isGeospatial && (
+              {file.isGeospatial && (file.fileType === "kml" || file.fileType === "kmz") && (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => toast.info("Visualizador será implementado em breve")}
+                  onClick={() => setViewerFile({ url: file.s3Url, name: file.name, type: file.fileType as "kml" | "kmz" })}
+                  title="Visualizar no mapa"
                 >
                   <Eye className="w-3 h-3" />
                 </Button>
@@ -173,6 +189,7 @@ export default function FileList({ projectId, canEdit = false }: FileListProps) 
           </CardContent>
         </Card>
       ))}
-    </div>
+      </div>
+    </>
   );
 }
