@@ -345,3 +345,33 @@
 - [x] Implementar medição de áreas (km²/ha)
 - [x] Adicionar tooltip com valores em tempo real
 - [x] Adicionar botões de medição nos controles
+
+### 37. Carregar e Renderizar Geometrias Salvas
+- [ ] Buscar geometrias do projeto via tRPC
+- [ ] Renderizar geometrias no mapa 2D automaticamente
+- [ ] Aplicar cores e opacidade configuradas
+- [ ] Sincronizar com painel de camadas
+- [ ] Adicionar popups com informações ao clicar
+
+### 38. Exportação de Geometrias
+- [ ] Criar procedure tRPC geometries.export
+- [ ] Implementar exportação para KML
+- [ ] Implementar exportação para GeoJSON
+- [ ] Implementar exportação para Shapefile
+- [ ] Adicionar botão de exportação no painel de camadas
+- [ ] Permitir seleção de geometrias para exportar
+
+### 39. Edição Avançada e Snapping
+- [ ] Implementar snap-to-grid
+- [ ] Implementar snap-to-vertex
+- [ ] Adicionar ferramenta de mover vértices
+- [ ] Adicionar ferramenta de adicionar/remover pontos
+- [ ] Implementar dividir polígonos
+- [ ] Implementar unir polígonos
+
+### 40. Ferramenta de Mão (Pan)
+- [ ] Adicionar botão de ferramenta de mão nos controles
+- [ ] Implementar modo de arrasto (pan) no mapa 2D
+- [ ] Implementar modo de arrasto (pan) no globo 3D
+- [ ] Adicionar cursor de mão ao ativar ferramenta
+- [ ] Desativar outras ferramentas ao ativar pan

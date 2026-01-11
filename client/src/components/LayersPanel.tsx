@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
 import { Slider } from "./ui/slider";
-import { ChevronRight, ChevronLeft, Layers, MapPin, Route, Square, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, Layers, MapPin, Route, Square, Trash2, Download } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -30,6 +30,24 @@ export default function LayersPanel({ projectId }: LayersPanelProps) {
   const updateOpacityMutation = trpc.geometries.updateOpacity.useMutation({
     onSuccess: () => {
       refetch();
+    },
+  });
+  
+  const exportMutation = trpc.geometries.export.useMutation({
+    onSuccess: (data) => {
+      const blob = new Blob([data.data], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Exportação concluída!");
+    },
+    onError: () => {
+      toast.error("Erro ao exportar geometrias");
     },
   });
   
@@ -93,10 +111,40 @@ export default function LayersPanel({ projectId }: LayersPanelProps) {
         <div className="p-4 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Layers className="w-5 h-5" />
-                Camadas
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Layers className="w-5 h-5" />
+                  Camadas
+                </CardTitle>
+                {geometries && geometries.length > 0 && (
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const ids = geometries.map(g => g.id);
+                        exportMutation.mutate({ geometryIds: ids, format: "geojson" });
+                      }}
+                      title="Exportar como GeoJSON"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      GeoJSON
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const ids = geometries.map(g => g.id);
+                        exportMutation.mutate({ geometryIds: ids, format: "kml" });
+                      }}
+                      title="Exportar como KML"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      KML
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {!geometries || geometries.length === 0 ? (

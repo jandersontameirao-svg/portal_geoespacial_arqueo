@@ -582,3 +582,11 @@ export async function updateGeometryOpacity(id: number, opacity: number) {
   
   await db.update(geometries).set({ opacity }).where(eq(geometries.id, id));
 }
+
+export async function getGeometryById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(geometries).where(eq(geometries.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}

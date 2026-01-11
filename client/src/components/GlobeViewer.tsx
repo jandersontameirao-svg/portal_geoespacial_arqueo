@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, FeatureGroup
 import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { Button } from "./ui/button";
-import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save } from "lucide-react";
+import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save, Hand } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -50,9 +50,16 @@ export default function GlobeViewer({
   const [shapeColor, setShapeColor] = useState("#3b82f6");
   const [isLoading, setIsLoading] = useState(true);
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
+  const [isPanMode, setIsPanMode] = useState(false);
   
   // Buscar projetos do banco
   const { data: projects } = trpc.projects.list.useQuery();
+  
+  // Buscar geometrias do projeto
+  const { data: savedGeometries } = trpc.geometries.list.useQuery(
+    { projectId: projectId! },
+    { enabled: !!projectId }
+  );
   
   // Mutation para salvar geometria
   const createGeometryMutation = trpc.geometries.create.useMutation({
@@ -275,6 +282,77 @@ export default function GlobeViewer({
             </Marker>
           ))}
 
+          {/* Geometrias Salvas do Projeto */}
+          {savedGeometries?.filter(g => g.visible === 1).map((geometry) => {
+            try {
+              const coords = JSON.parse(geometry.coordinates);
+              const opacity = geometry.opacity / 100;
+              const color = geometry.color || "#3b82f6";
+              
+              if (geometry.type === "marker") {
+                return (
+                  <Marker key={`geom-${geometry.id}`} position={[coords[0], coords[1]]}>
+                    <Popup>
+                      <div>
+                        <strong>{geometry.name}</strong><br/>
+                        {geometry.description && (
+                          <span style={{ fontSize: "12px" }}>{geometry.description}</span>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              } else if (geometry.type === "polyline") {
+                const positions = coords.map((c: number[]) => [c[0], c[1]]);
+                return (
+                  <Polyline
+                    key={`geom-${geometry.id}`}
+                    positions={positions}
+                    color={color}
+                    opacity={opacity}
+                    weight={3}
+                  >
+                    <Popup>
+                      <div>
+                        <strong>{geometry.name}</strong><br/>
+                        {geometry.description && (
+                          <span style={{ fontSize: "12px" }}>{geometry.description}</span>
+                        )}
+                      </div>
+                    </Popup>
+                  </Polyline>
+                );
+              } else if (geometry.type === "polygon") {
+                const positions = coords.map((c: number[]) => [c[0], c[1]]);
+                return (
+                  <Polygon
+                    key={`geom-${geometry.id}`}
+                    positions={positions}
+                    pathOptions={{
+                      color: color,
+                      fillColor: color,
+                      fillOpacity: opacity * 0.5,
+                      opacity: opacity,
+                      weight: 2,
+                    }}
+                  >
+                    <Popup>
+                      <div>
+                        <strong>{geometry.name}</strong><br/>
+                        {geometry.description && (
+                          <span style={{ fontSize: "12px" }}>{geometry.description}</span>
+                        )}
+                      </div>
+                    </Popup>
+                  </Polygon>
+                );
+              }
+            } catch (e) {
+              console.error("Erro ao renderizar geometria:", e);
+            }
+            return null;
+          })}
+          
           {/* Polígonos de AOI dos Projetos */}
           {markersData.map((marker) => {
             if (marker.aoiBounds) {
@@ -357,7 +435,7 @@ export default function GlobeViewer({
           <Home className="w-5 h-5" />
         </Button>
 
-        {/* Fullscreen (placeholder) */}
+        {/* Fullscreen */}
         <Button
           variant="secondary"
           size="icon"
@@ -373,6 +451,19 @@ export default function GlobeViewer({
         >
           <Maximize2 className="w-5 h-5" />
         </Button>
+        
+        {/* Ferramenta de Mão (Pan) */}
+        {viewMode === "2d" && (
+          <Button
+            variant={isPanMode ? "default" : "secondary"}
+            size="icon"
+            onClick={() => setIsPanMode(!isPanMode)}
+            className={isPanMode ? "bg-blue-500 hover:bg-blue-600 shadow-lg" : "bg-white/90 hover:bg-white shadow-lg"}
+            title="Ferramenta de Mão (Arrastar)"
+          >
+            <Hand className="w-5 h-5" />
+          </Button>
+        )}
       </div>
 
       {/* Painel de Camadas */}
