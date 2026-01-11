@@ -12,7 +12,9 @@ import {
   Users,
   LogOut,
   Settings,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -24,6 +26,7 @@ import { Separator } from "@/components/ui/separator";
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Queries
   const { data: projects, isLoading: projectsLoading } = trpc.projects.list.useQuery(
@@ -96,8 +99,23 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Main Content */}
       <div className="flex-1 relative">
+        {/* Botão Toggle Sidebar */}
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute top-4 left-4 z-20 bg-white/90 hover:bg-white shadow-lg"
+          title={sidebarOpen ? "Recolher painel" : "Expandir painel"}
+        >
+          {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+        </Button>
+
         {/* Sidebar Retrátil com Painéis */}
-        <aside className="absolute top-0 left-0 bottom-0 w-96 border-r border-border bg-card/95 backdrop-blur-sm overflow-y-auto scrollbar-thin z-10 transition-transform duration-300">
+        <aside 
+          className={`absolute top-0 left-0 bottom-0 w-96 border-r border-border bg-card/95 backdrop-blur-sm overflow-y-auto scrollbar-thin z-10 transition-transform duration-300 ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
           <div className="p-6 space-y-6">
             {/* Painel: Meus Projetos */}
             <Card>

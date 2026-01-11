@@ -292,3 +292,35 @@
 - [x] Criar visualizador 2D com Leaflet
 - [x] Implementar alternância fluida entre 2D e 3D
 - [x] Manter posição e zoom ao alternar modos
+
+### 33. Botão Toggle para Sidebar (Em Progresso)
+- [ ] Adicionar botão no canto superior esquerdo
+- [ ] Implementar estado de sidebar (aberta/fechada)
+- [ ] Adicionar animação suave de transição
+- [ ] Ajustar layout do globo quando sidebar fecha
+- [ ] Adicionar ícone apropriado (ChevronLeft/ChevronRight)
+
+### 34. Ferramentas de Desenho no Mapa (Em Progresso)
+- [ ] Instalar leaflet-draw ou react-leaflet-draw
+- [ ] Adicionar barra de ferramentas de desenho
+- [ ] Implementar ferramenta de desenho de pontos (markers)
+- [ ] Implementar ferramenta de desenho de linhas (polylines)
+- [ ] Implementar ferramenta de desenho de polígonos
+- [ ] Implementar ferramenta de edição de geometrias
+- [ ] Implementar ferramenta de exclusão de geometrias
+- [ ] Salvar geometrias desenhadas no banco de dados
+- [ ] Criar procedure tRPC para salvar/atualizar/deletar geometrias
+- [ ] Adicionar metadados (nome, descrição, cor) às geometrias
+
+### 35. Visualização de AOI no Mapa (Em Progresso)
+- [ ] Adicionar polígonos de AOI ao globo 3D
+- [ ] Adicionar polígonos de AOI ao mapa 2D
+- [ ] Implementar cores diferentes por status do projeto
+- [ ] Adicionar tooltip ao passar mouse sobre polígono
+- [ ] Implementar clique no polígono para ver detalhes
+- [ ] Sincronizar visualização entre modos 2D e 3D
+
+### 33. Toggle Sidebar + Desenho + AOI
+- [x] Botão toggle sidebar
+- [x] Ferramentas desenho (pontos, linhas, polígonos)
+- [x] Visualização AOI

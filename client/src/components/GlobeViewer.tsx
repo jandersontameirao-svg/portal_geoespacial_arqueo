@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import Globe from "react-globe.gl";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, FeatureGroup } from "react-leaflet";
+import { EditControl } from "react-leaflet-draw";
+import "leaflet-draw/dist/leaflet.draw.css";
 import { Button } from "./ui/button";
 import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -33,6 +35,7 @@ export default function GlobeViewer({
 }: GlobeViewerProps) {
   const globeEl = useRef<any>(null);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("3d");
+  const [drawnShapes, setDrawnShapes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
   
@@ -44,6 +47,19 @@ export default function GlobeViewer({
     const bounds = p.aoiBounds!;
     const lat = (bounds.north + bounds.south) / 2;
     const lng = (bounds.east + bounds.west) / 2;
+    
+    // Criar GeoJSON do polígono AOI
+    const aoiGeoJSON = JSON.stringify({
+      type: "Polygon",
+      coordinates: [[
+        [bounds.west, bounds.north],
+        [bounds.east, bounds.north],
+        [bounds.east, bounds.south],
+        [bounds.west, bounds.south],
+        [bounds.west, bounds.north]
+      ]]
+    });
+    
     return {
       lat,
       lng,
@@ -51,7 +67,8 @@ export default function GlobeViewer({
       color: "#3b82f6",
       label: p.name,
       id: p.id,
-      code: p.code
+      code: p.code,
+      aoiBounds: aoiGeoJSON
     };
   }) || [];
 
@@ -156,6 +173,42 @@ export default function GlobeViewer({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          {/* Ferramentas de Desenho */}
+          <FeatureGroup>
+            <EditControl
+              position="topleft"
+              onCreated={(e: any) => {
+                const { layerType, layer } = e;
+                const shape = {
+                  type: layerType,
+                  coordinates: layerType === "marker" 
+                    ? [layer.getLatLng().lat, layer.getLatLng().lng]
+                    : layerType === "polyline"
+                    ? layer.getLatLngs().map((ll: any) => [ll.lat, ll.lng])
+                    : layer.getLatLngs()[0].map((ll: any) => [ll.lat, ll.lng]),
+                  id: Date.now()
+                };
+                setDrawnShapes([...drawnShapes, shape]);
+                console.log("Forma desenhada:", shape);
+              }}
+              onEdited={(e: any) => {
+                console.log("Formas editadas:", e);
+              }}
+              onDeleted={(e: any) => {
+                console.log("Formas deletadas:", e);
+              }}
+              draw={{
+                rectangle: false,
+                circle: false,
+                circlemarker: false,
+                marker: true,
+                polyline: true,
+                polygon: true
+              }}
+            />
+          </FeatureGroup>
+
+          {/* Marcadores de Projetos */}
           {markersData.map((marker) => (
             <Marker key={marker.id} position={[marker.lat, marker.lng]}>
               <Popup>
@@ -169,6 +222,40 @@ export default function GlobeViewer({
               </Popup>
             </Marker>
           ))}
+
+          {/* Polígonos de AOI dos Projetos */}
+          {markersData.map((marker) => {
+            if (marker.aoiBounds) {
+              try {
+                const bounds = JSON.parse(marker.aoiBounds);
+                if (bounds.type === "Polygon" && bounds.coordinates) {
+                  const coords = bounds.coordinates[0].map((coord: number[]) => [coord[1], coord[0]]);
+                  return (
+                    <Polygon
+                      key={`aoi-${marker.id}`}
+                      positions={coords}
+                      pathOptions={{
+                        color: "#3b82f6",
+                        fillColor: "#3b82f6",
+                        fillOpacity: 0.2,
+                        weight: 2
+                      }}
+                    >
+                      <Popup>
+                        <div>
+                          <strong>AOI: {marker.label}</strong><br/>
+                          <span style={{ color: "#64748b", fontSize: "12px" }}>Área de Interesse do Projeto</span>
+                        </div>
+                      </Popup>
+                    </Polygon>
+                  );
+                }
+              } catch (e) {
+                console.error("Erro ao parsear AOI:", e);
+              }
+            }
+            return null;
+          })}
         </MapContainer>
       )}
 
