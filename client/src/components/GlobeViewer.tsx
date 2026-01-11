@@ -16,6 +16,8 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import LayersPanel from "./LayersPanel";
 import MeasurementTools from "./MeasurementTools";
+import { CoordinatesDisplay } from "./CoordinatesDisplay";
+import { MapEventsHandler } from "./MapEventsHandler";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -51,6 +53,7 @@ export default function GlobeViewer({
   const [isLoading, setIsLoading] = useState(true);
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
   const [isPanMode, setIsPanMode] = useState(false);
+  const [mouseCoords, setMouseCoords] = useState<{ lat: number; lng: number } | null>(null);
   
   // Buscar projetos do banco
   const { data: projects } = trpc.projects.list.useQuery();
@@ -224,6 +227,8 @@ export default function GlobeViewer({
           style={{ width: "100%", height: "calc(100vh - 64px)" }}
           zoomControl={false}
         >
+          {/* Capturar eventos do mouse */}
+          <MapEventsHandler onMouseMove={(lat, lng) => setMouseCoords({ lat, lng })} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -544,6 +549,11 @@ export default function GlobeViewer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Exibir coordenadas UTM quando em modo 2D */}
+      {viewMode === "2d" && mouseCoords && (
+        <CoordinatesDisplay lat={mouseCoords.lat} lng={mouseCoords.lng} />
+      )}
     </div>
   );
 }

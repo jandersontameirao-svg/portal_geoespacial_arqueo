@@ -401,3 +401,13 @@
 - [ ] Adicionar dropdown "Histórico" nos controles
 - [ ] Implementar navegação para posições anteriores
 - [ ] Limitar histórico a últimas 20 posições
+
+### 44. Sistema de Coordenadas UTM Padrão
+- [x] Instalar biblioteca utm (conversão lat/long <-> UTM)
+- [x] Criar componente de exibição de coordenadas UTM
+- [x] Adicionar cursor com coordenadas UTM ao mover mouse
+- [x] Implementar auto-detecção de zona UTM
+- [ ] Atualizar ferramentas de medição para exibir em metros UTM
+- [ ] Adicionar campo de busca por coordenadas UTM
+- [ ] Salvar zona UTM preferida nas configurações do projeto
+- [ ] Exibir coordenadas UTM nos popups de geometrias
