@@ -18,6 +18,8 @@ import LayersPanel from "./LayersPanel";
 import MeasurementTools from "./MeasurementTools";
 import { CoordinatesDisplay } from "./CoordinatesDisplay";
 import { MapEventsHandler } from "./MapEventsHandler";
+import { CoordinateSearch } from "./CoordinateSearch";
+import { formatUTMCoordinates } from "@/lib/utmHelper";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -273,19 +275,27 @@ export default function GlobeViewer({
           </FeatureGroup>
 
           {/* Marcadores de Projetos */}
-          {markersData.map((marker) => (
-            <Marker key={marker.id} position={[marker.lat, marker.lng]}>
-              <Popup>
-                <div>
-                  <strong>{marker.label}</strong><br/>
-                  <span style={{ color: "#64748b", fontSize: "12px" }}>{marker.code}</span><br/>
-                  <Link href={`/projects/${marker.id}`}>
-                    <a style={{ color: "#3b82f6", textDecoration: "underline" }}>Ver projeto</a>
-                  </Link>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          {markersData.map((marker) => {
+            const utmCoords = formatUTMCoordinates(marker.lat, marker.lng);
+            return (
+              <Marker key={marker.id} position={[marker.lat, marker.lng]}>
+                <Popup>
+                  <div>
+                    <strong>{marker.label}</strong><br/>
+                    <span style={{ color: "#64748b", fontSize: "12px" }}>{marker.code}</span><br/>
+                    <Link href={`/projects/${marker.id}`}>
+                      <a style={{ color: "#3b82f6", textDecoration: "underline" }}>Ver projeto</a>
+                    </Link>
+                    <div style={{ marginTop: "8px", padding: "6px", background: "#f3f4f6", borderRadius: "4px" }}>
+                      <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "600" }}>COORDENADAS UTM</div>
+                      <div style={{ fontSize: "12px", fontFamily: "monospace", marginTop: "2px" }}>{utmCoords}</div>
+                      <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "4px" }}>Lat: {marker.lat.toFixed(6)}°, Lng: {marker.lng.toFixed(6)}°</div>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
 
           {/* Geometrias Salvas do Projeto */}
           {savedGeometries?.filter(g => g.visible === 1).map((geometry) => {
@@ -295,20 +305,28 @@ export default function GlobeViewer({
               const color = geometry.color || "#3b82f6";
               
               if (geometry.type === "marker") {
+                const utmCoords = formatUTMCoordinates(coords[0], coords[1]);
                 return (
                   <Marker key={`geom-${geometry.id}`} position={[coords[0], coords[1]]}>
                     <Popup>
                       <div>
                         <strong>{geometry.name}</strong><br/>
                         {geometry.description && (
-                          <span style={{ fontSize: "12px" }}>{geometry.description}</span>
+                          <><span style={{ fontSize: "12px" }}>{geometry.description}</span><br/></>
                         )}
+                        <div style={{ marginTop: "8px", padding: "6px", background: "#f3f4f6", borderRadius: "4px" }}>
+                          <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "600" }}>COORDENADAS UTM</div>
+                          <div style={{ fontSize: "12px", fontFamily: "monospace", marginTop: "2px" }}>{utmCoords}</div>
+                          <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "4px" }}>Lat: {coords[0].toFixed(6)}°, Lng: {coords[1].toFixed(6)}°</div>
+                        </div>
                       </div>
                     </Popup>
                   </Marker>
                 );
               } else if (geometry.type === "polyline") {
                 const positions = coords.map((c: number[]) => [c[0], c[1]]);
+                const firstPoint = positions[0];
+                const utmCoords = formatUTMCoordinates(firstPoint[0], firstPoint[1]);
                 return (
                   <Polyline
                     key={`geom-${geometry.id}`}
@@ -321,14 +339,20 @@ export default function GlobeViewer({
                       <div>
                         <strong>{geometry.name}</strong><br/>
                         {geometry.description && (
-                          <span style={{ fontSize: "12px" }}>{geometry.description}</span>
+                          <><span style={{ fontSize: "12px" }}>{geometry.description}</span><br/></>
                         )}
+                        <div style={{ marginTop: "8px", padding: "6px", background: "#f3f4f6", borderRadius: "4px" }}>
+                          <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "600" }}>PONTO INICIAL (UTM)</div>
+                          <div style={{ fontSize: "12px", fontFamily: "monospace", marginTop: "2px" }}>{utmCoords}</div>
+                        </div>
                       </div>
                     </Popup>
                   </Polyline>
                 );
               } else if (geometry.type === "polygon") {
                 const positions = coords.map((c: number[]) => [c[0], c[1]]);
+                const firstPoint = positions[0];
+                const utmCoords = formatUTMCoordinates(firstPoint[0], firstPoint[1]);
                 return (
                   <Polygon
                     key={`geom-${geometry.id}`}
@@ -345,8 +369,12 @@ export default function GlobeViewer({
                       <div>
                         <strong>{geometry.name}</strong><br/>
                         {geometry.description && (
-                          <span style={{ fontSize: "12px" }}>{geometry.description}</span>
+                          <><span style={{ fontSize: "12px" }}>{geometry.description}</span><br/></>
                         )}
+                        <div style={{ marginTop: "8px", padding: "6px", background: "#f3f4f6", borderRadius: "4px" }}>
+                          <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "600" }}>PONTO INICIAL (UTM)</div>
+                          <div style={{ fontSize: "12px", fontFamily: "monospace", marginTop: "2px" }}>{utmCoords}</div>
+                        </div>
                       </div>
                     </Popup>
                   </Polygon>
@@ -468,6 +496,17 @@ export default function GlobeViewer({
           >
             <Hand className="w-5 h-5" />
           </Button>
+        )}
+        
+        {/* Busca por Coordenadas */}
+        {viewMode === "2d" && (
+          <CoordinateSearch
+            onNavigate={(lat, lng) => {
+              setCurrentPosition({ latitude: lat, longitude: lng, altitude: 0.5 });
+              // Forçar re-render do mapa com nova posição
+              window.location.hash = `#${lat},${lng}`;
+            }}
+          />
         )}
       </div>
 

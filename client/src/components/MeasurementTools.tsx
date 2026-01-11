@@ -18,10 +18,10 @@ export default function MeasurementTools() {
       
       const control = new Control({
         position: "topleft",
-        primaryLengthUnit: "kilometers",
-        secondaryLengthUnit: "meters",
-        primaryAreaUnit: "hectares",
-        secondaryAreaUnit: "sqmeters",
+        primaryLengthUnit: "meters", // UTM usa metros como padrão
+        secondaryLengthUnit: "kilometers",
+        primaryAreaUnit: "sqmeters", // UTM usa m² como padrão
+        secondaryAreaUnit: "hectares",
         activeColor: "#3b82f6",
         completedColor: "#10b981",
         captureZIndex: 10000,
@@ -29,6 +29,8 @@ export default function MeasurementTools() {
           className: "leaflet-measure-resultpopup",
           autoPanPadding: [10, 10],
         },
+        decPoint: ",", // Padrão brasileiro
+        thousandsSep: ".", // Padrão brasileiro
       });
       
       map.addControl(control);

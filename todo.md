@@ -411,3 +411,26 @@
 - [ ] Adicionar campo de busca por coordenadas UTM
 - [ ] Salvar zona UTM preferida nas configurações do projeto
 - [ ] Exibir coordenadas UTM nos popups de geometrias
+
+### 45. Busca por Coordenadas UTM
+- [x] Criar componente CoordinateSearch
+- [x] Implementar parser de coordenadas UTM (formato: 23K 500000 8000000)
+- [x] Implementar parser de lat/long (formato: -15.7801, -47.9292)
+- [x] Adicionar conversão automática entre formatos
+- [x] Implementar navegação até coordenada com animação
+- [x] Adicionar botão de busca nos controles do mapa
+- [x] Validar entrada e exibir erros
+
+### 46. Ferramentas de Medição em UTM
+- [x] Atualizar MeasurementTools para exibir em metros UTM
+- [x] Configurar metros como unidade primária (padrão UTM)
+- [x] Exibir distâncias em metros (m) e quilômetros (km)
+- [x] Exibir áreas em metros quadrados (m²) e hectares (ha)
+- [x] Adicionar formato brasileiro (vírgula decimal, ponto milhar)
+
+### 47. Coordenadas UTM nos Popups
+- [x] Adicionar coordenadas UTM nos popups de marcadores de projetos
+- [x] Adicionar coordenadas UTM nos popups de geometrias (marker, polyline, polygon)
+- [x] Formatar coordenadas de forma legível com zona, easting, northing
+- [x] Exibir lat/long secundárias para referência
+- [x] Criar helper formatUTMCoordinates para reutilização
