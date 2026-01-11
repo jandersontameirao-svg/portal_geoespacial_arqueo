@@ -375,3 +375,29 @@
 - [ ] Implementar modo de arrasto (pan) no globo 3D
 - [ ] Adicionar cursor de mão ao ativar ferramenta
 - [ ] Desativar outras ferramentas ao ativar pan
+
+### 41. Importação de Arquivos KML/GeoJSON
+- [x] Criar procedure tRPC geometries.importBatch
+- [ ] Implementar parser de KML no frontend
+- [ ] Implementar parser de GeoJSON no frontend
+- [ ] Extrair features e coordenadas
+- [ ] Validar e converter coordenadas
+- [x] Salvar múltiplas geometrias no banco
+- [ ] Adicionar botão de importação no painel de camadas
+- [ ] Criar modal de upload de arquivo
+
+### 42. Busca por Coordenadas com Geocoding
+- [ ] Adicionar campo de busca nos controles
+- [ ] Implementar busca por lat/long
+- [ ] Integrar serviço de geocoding (Nominatim OSM)
+- [ ] Implementar busca por endereço
+- [ ] Animar voo até coordenada encontrada
+- [ ] Adicionar marcador temporário no resultado
+
+### 43. Histórico de Visualizações
+- [ ] Criar tabela view_history no schema
+- [ ] Salvar posições visitadas (lat/long/zoom/timestamp)
+- [ ] Criar procedure tRPC para salvar/listar histórico
+- [ ] Adicionar dropdown "Histórico" nos controles
+- [ ] Implementar navegação para posições anteriores
+- [ ] Limitar histórico a últimas 20 posições

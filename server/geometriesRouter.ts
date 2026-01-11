@@ -150,4 +150,41 @@ export const geometriesRouter = router({
       
       throw new Error("Formato não suportado");
     }),
+    
+  importBatch: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      geometries: z.array(z.object({
+        type: z.enum(["marker", "polyline", "polygon"]),
+        name: z.string(),
+        description: z.string().optional(),
+        coordinates: z.string(), // JSON string
+        color: z.string(),
+      })),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { projectId, geometries } = input;
+      
+      // Salvar todas as geometrias
+      for (const geom of geometries) {
+        await db.createGeometry({
+          ...geom,
+          projectId,
+          userId: ctx.user.id,
+          visible: 1,
+          opacity: 100,
+          description: geom.description || "",
+        });
+      }
+      
+      await createAuditLog({
+        userId: ctx.user.id,
+        action: "geometry.import",
+        entityType: "geometry",
+        entityId: projectId,
+        details: { count: geometries.length },
+      });
+      
+      return { success: true, count: geometries.length };
+    }),
 });
