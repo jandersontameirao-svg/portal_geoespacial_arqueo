@@ -174,4 +174,75 @@
       max-width: 1280px; /* Standard content width */
     }
   }
+
+  /* Scrollbar personalizada */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-muted rounded;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-border rounded hover:bg-muted-foreground/30;
+  }
+
+  /* Glassmorphism para painéis sobre mapas */
+  .glass-panel {
+    @apply bg-background/80 backdrop-blur-md border border-border/50 shadow-lg;
+  }
+
+  /* Gradiente técnico para headers */
+  .gradient-header {
+    background: linear-gradient(135deg, 
+      var(--primary) 0%, 
+      var(--sidebar-primary) 100%
+    );
+  }
+
+  /* Animação suave para transições */
+  .transition-smooth {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  /* CESIUM OVERRIDES */
+  .cesium-viewer {
+    @apply w-full h-full;
+  }
+
+  .cesium-viewer-cesiumWidgetContainer {
+    @apply w-full h-full;
+  }
+
+  .cesium-widget-credits {
+    @apply hidden;
+  }
+
+  /* OPENLAYERS OVERRIDES */
+  .ol-viewport {
+    @apply w-full h-full;
+  }
+
+  .ol-control {
+    @apply bg-background/90 backdrop-blur-sm border border-border rounded shadow-md;
+  }
+
+  .ol-control button {
+    @apply bg-transparent hover:bg-accent/10 text-foreground;
+  }
+
+  /* MAPLIBRE OVERRIDES */
+  .maplibregl-map {
+    @apply w-full h-full;
+  }
+
+  .maplibregl-ctrl-group {
+    @apply bg-background/90 backdrop-blur-sm border border-border rounded shadow-md;
+  }
+
+  .maplibregl-ctrl-group button {
+    @apply bg-transparent hover:bg-accent/10;
+  }
 }
