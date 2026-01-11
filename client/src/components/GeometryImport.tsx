@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "./ui/alert";
 import { MapContainer, TileLayer, Marker, Polyline, Polygon } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import JSZip from "jszip";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -76,6 +77,30 @@ export default function GeometryImport({ projectId, open, onOpenChange }: Geomet
     },
   });
 
+  const extractKMLFromKMZ = async (file: File): Promise<string | null> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      
+      // Procurar arquivo .kml dentro do ZIP
+      const kmlFileName = Object.keys(zip.files).find(name => 
+        name.toLowerCase().endsWith('.kml') && !zip.files[name].dir
+      );
+      
+      if (!kmlFileName) {
+        toast.error('Nenhum arquivo KML encontrado dentro do KMZ');
+        return null;
+      }
+      
+      const kmlContent = await zip.files[kmlFileName].async('string');
+      return kmlContent;
+    } catch (error) {
+      console.error('Erro ao extrair KMZ:', error);
+      toast.error('Erro ao descompactar arquivo KMZ');
+      return null;
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -108,9 +133,14 @@ export default function GeometryImport({ projectId, open, onOpenChange }: Geomet
       } else if (extension === "kml") {
         geometries = parseKML(text);
       } else if (extension === "kmz") {
-        setError("KMZ não suportado ainda. Por favor, extraia o KML manualmente.");
-        setIsProcessing(false);
-        return;
+        // Descompactar KMZ e extrair KML
+        const kmlText = await extractKMLFromKMZ(selectedFile);
+        if (!kmlText) {
+          setError("Não foi possível extrair KML do arquivo KMZ.");
+          setIsProcessing(false);
+          return;
+        }
+        geometries = parseKML(kmlText);
       }
 
       if (geometries.length === 0) {

@@ -448,3 +448,30 @@
 - [x] Exibir contagem e lista de geometrias encontradas
 - [x] Suportar múltiplos tipos: Point, LineString, Polygon
 - [x] Preservar metadados: nome, descrição, cor
+
+### 44. Página de Administração com Dashboard
+- [x] Criar procedures backend para métricas (total de projetos, usuários, arquivos, storage)
+- [x] Criar query para atividades dos últimos 30 dias
+- [x] Criar página /admin restrita a administradores
+- [x] Implementar cards de métricas principais
+- [x] Adicionar gráficos de atividade com biblioteca de charts
+- [x] Criar tabela de logs de auditoria recentes com filtros
+- [x] Adicionar paginação nos logs
+- [x] Integrar com tRPC
+
+### 45. Suporte para Importação de Arquivos KMZ
+- [x] Instalar biblioteca JSZip para descompactação
+- [x] Implementar extração de arquivo KML do KMZ
+- [x] Adicionar validação de estrutura do KMZ
+- [x] Integrar com parser KML existente
+- [x] Atualizar GeometryImport para aceitar KMZ
+- [x] Testar com arquivos KMZ reais
+
+### 46. Aplicar Identidade Visual do Grupo Arqueo
+- [x] Baixar e integrar logo do Grupo Arqueo
+- [x] Atualizar paleta de cores (laranja #FF8C00, azul #0066CC)
+- [x] Atualizar variáveis CSS no index.css
+- [x] Substituir logo no Header
+- [ ] Atualizar favicon
+- [x] Aplicar cores em botões e elementos principais
+- [x] Revisar contraste e acessibilidade

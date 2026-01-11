@@ -590,3 +590,153 @@ export async function getGeometryById(id: number) {
   const result = await db.select().from(geometries).where(eq(geometries.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
+
+// ============================================================================
+// MÉTRICAS ADMINISTRATIVAS
+// ============================================================================
+
+export async function getAdminMetrics() {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    // Total de projetos (sem deleted_at)
+    const projectsResult = await db.select({ count: sql<number>`count(*)` })
+      .from(projects)
+      .where(sql`deleted_at IS NULL`);
+    const totalProjects = Number(projectsResult[0]?.count || 0);
+
+    // Total de usuários ativos
+    const usersResult = await db.select({ count: sql<number>`count(*)` })
+      .from(users);
+    const totalUsers = Number(usersResult[0]?.count || 0);
+
+    // Total de arquivos (sem deleted_at)
+    const filesResult = await db.select({ count: sql<number>`count(*)` })
+      .from(files)
+      .where(sql`deleted_at IS NULL`);
+    const totalFiles = Number(filesResult[0]?.count || 0);
+
+    // Total de geometrias (sem deleted_at)
+    const geometriesResult = await db.select({ count: sql<number>`count(*)` })
+      .from(geometries)
+      .where(sql`deleted_at IS NULL`);
+    const totalGeometries = Number(geometriesResult[0]?.count || 0);
+
+    // Tamanho total de arquivos (sem deleted_at)
+    const storageSizeResult = await db.select({ total: sql<number>`COALESCE(SUM(file_size), 0)` })
+      .from(files)
+      .where(sql`deleted_at IS NULL`);
+    const totalStorageBytes = Number(storageSizeResult[0]?.total || 0);
+
+    return {
+      totalProjects,
+      totalUsers,
+      totalFiles,
+      totalGeometries,
+      totalStorageBytes,
+      totalStorageMB: Math.round(totalStorageBytes / (1024 * 1024) * 100) / 100,
+    };
+  } catch (error) {
+    console.error("[Database] Error getting admin metrics:", error);
+    return null;
+  }
+}
+
+export async function getActivityStats(days: number = 30) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as count,
+        action
+      FROM audit_logs
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL ${days} DAY)
+      GROUP BY DATE(created_at), action
+      ORDER BY date DESC
+    `);
+
+    return result[0] || [];
+  } catch (error) {
+    console.error("[Database] Error getting activity stats:", error);
+    return [];
+  }
+}
+
+export async function getFilteredAuditLogs(limit: number = 50, offset: number = 0, filters?: {
+  action?: string;
+  entityType?: string;
+  userId?: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    // Construir condições de filtro
+    const conditions = [];
+    if (filters?.action) {
+      conditions.push(eq(auditLogs.action, filters.action));
+    }
+    if (filters?.entityType) {
+      conditions.push(eq(auditLogs.entityType, filters.entityType));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(auditLogs.userId, filters.userId));
+    }
+
+    // Construir e executar query
+    const queryBuilder = db.select().from(auditLogs);
+    
+    const results = conditions.length > 0
+      ? await queryBuilder
+          .where(and(...conditions))
+          .orderBy(desc(auditLogs.timestamp))
+          .limit(limit)
+          .offset(offset)
+      : await queryBuilder
+          .orderBy(desc(auditLogs.timestamp))
+          .limit(limit)
+          .offset(offset);
+
+    return results;
+  } catch (error) {
+    console.error("[Database] Error getting filtered audit logs:", error);
+    return [];
+  }
+}
+
+export async function countFilteredAuditLogs(filters?: {
+  action?: string;
+  entityType?: string;
+  userId?: number;
+}) {
+  const db = await getDb();
+  if (!db) return 0;
+
+  try {
+    const conditions = [];
+    if (filters?.action) {
+      conditions.push(eq(auditLogs.action, filters.action));
+    }
+    if (filters?.entityType) {
+      conditions.push(eq(auditLogs.entityType, filters.entityType));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(auditLogs.userId, filters.userId));
+    }
+
+    const queryBuilder = db.select({ count: sql<number>`count(*)` }).from(auditLogs);
+    
+    const result = conditions.length > 0
+      ? await queryBuilder.where(and(...conditions))
+      : await queryBuilder;
+    
+    return Number(result[0]?.count || 0);
+  } catch (error) {
+    console.error("[Database] Error counting filtered audit logs:", error);
+    return 0;
+  }
+}

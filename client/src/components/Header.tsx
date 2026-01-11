@@ -32,11 +32,11 @@ export default function Header() {
     if (path === "/") return location === "/";
     return location.startsWith(path);
   };
-
   const navLinks = [
     { path: "/", label: "Início", show: true },
     { path: "/projects", label: "Projetos", show: isAuthenticated },
     { path: "/invitations", label: "Convites", show: isAuthenticated && user?.role === "admin" },
+    { path: "/admin", label: "Administração", show: isAuthenticated && user?.role === "admin" },
   ];
 
   return (
@@ -45,9 +45,11 @@ export default function Header() {
         {/* Logo e Nome */}
         <Link href="/">
           <a className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
-              <Globe className="w-6 h-6 text-white" />
-            </div>
+            <img 
+              src="/grupo-arqueo-logo.webp" 
+              alt="Grupo Arqueo" 
+              className="w-10 h-10 object-contain"
+            />
             <div className="flex flex-col">
               <span className="font-bold text-lg leading-none text-slate-900 dark:text-white">
                 Portal Geoespacial
