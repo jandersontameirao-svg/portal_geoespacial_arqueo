@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import Header from "./components/Header";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Projects from "./pages/Projects";
@@ -11,15 +12,18 @@ import Invitations from "./pages/Invitations";
 
 function Router() {
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path="/projects" component={Projects} />
-      <Route path="/projects/:id" component={ProjectDetail} />
-      <Route path="/invitations" component={Invitations} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <Header />
+      <Switch>
+        <Route path={"/"} component={Home} />
+        <Route path="/projects" component={Projects} />
+        <Route path="/projects/:id" component={ProjectDetail} />
+        <Route path="/invitations" component={Invitations} />
+        <Route path={"/404"} component={NotFound} />
+        {/* Final fallback route */}
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 

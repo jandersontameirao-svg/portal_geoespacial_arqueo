@@ -253,3 +253,22 @@
 - [x] Criar listagem de convites pendentes/aceitos/expirados
 - [ ] Adicionar botão para reenviar convite (backend pendente)
 - [ ] Adicionar botão para cancelar convite (backend pendente)
+
+### 29. Procedures Backend de Reenvio/Cancelamento de Convites
+- [x] Criar procedure invitations.resend
+- [x] Atualizar token e expiresAt no banco
+- [ ] Enviar novo email via serviço de notificação (TODO)
+- [x] Criar procedure invitations.revoke
+- [x] Marcar convite como cancelado no banco
+- [x] Integrar com frontend (remover placeholders)
+- [x] Adicionar funções getInvitationById e updateInvitation no db.ts
+
+### 30. Menu de Navegação Global
+- [x] Criar componente Header
+- [x] Adicionar links para Home, Projetos, Convites
+- [x] Implementar menu de perfil do usuário
+- [x] Adicionar controle de visibilidade por role
+- [x] Integrar Header em todas as páginas
+- [x] Adicionar indicador de página ativa
+- [x] Adicionar menu mobile responsivo
+- [x] Implementar logout funcional

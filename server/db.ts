@@ -149,6 +149,21 @@ export async function createInvitation(invitation: InsertInvitation) {
   await db.insert(invitations).values(invitation);
 }
 
+export async function getInvitationById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(invitations).where(eq(invitations.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateInvitation(id: number, data: { token?: string; expiresAt?: Date }) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(invitations).set(data).where(eq(invitations.id, id));
+}
+
 export async function getInvitationByToken(token: string) {
   const db = await getDb();
   if (!db) return undefined;

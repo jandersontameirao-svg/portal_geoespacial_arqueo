@@ -146,6 +146,87 @@ const invitationsRouter = router({
     return await db.getInvitationsByInviter(ctx.user.id);
   }),
 
+  // Reenviar convite (apenas admin)
+  resend: adminProcedure
+    .input(z.object({
+      invitationId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const invitation = await db.getInvitationById(input.invitationId);
+      
+      if (!invitation) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Convite não encontrado" });
+      }
+
+      if (invitation.usedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Convite já foi aceito" });
+      }
+
+      // Gerar novo token e nova data de expiração
+      const newToken = nanoid(32);
+      const newExpiresAt = new Date();
+      newExpiresAt.setDate(newExpiresAt.getDate() + 7);
+
+      await db.updateInvitation(input.invitationId, {
+        token: newToken,
+        expiresAt: newExpiresAt,
+      });
+
+      await logAudit(
+        ctx.user.id,
+        ctx.user.email || undefined,
+        ctx.user.name || undefined,
+        "invitations.resend",
+        "invitation",
+        input.invitationId,
+        undefined,
+        { email: invitation.email },
+        ctx.req
+      );
+
+      // TODO: Enviar email com novo link de convite
+      // const inviteLink = `${process.env.FRONTEND_URL}/accept-invite?token=${newToken}`;
+      // await sendEmail(invitation.email, "Convite Reenviado", inviteLink);
+
+      return { success: true, token: newToken };
+    }),
+
+  // Cancelar convite (apenas admin)
+  revoke: adminProcedure
+    .input(z.object({
+      invitationId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const invitation = await db.getInvitationById(input.invitationId);
+      
+      if (!invitation) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Convite não encontrado" });
+      }
+
+      if (invitation.usedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Convite já foi aceito e não pode ser cancelado" });
+      }
+
+      // Marcar como expirado (definir expiresAt para o passado)
+      await db.updateInvitation(input.invitationId, {
+        expiresAt: new Date(0), // 1970-01-01
+      });
+
+      await logAudit(
+        ctx.user.id,
+        ctx.user.email || undefined,
+        ctx.user.name || undefined,
+        "invitations.revoke",
+        "invitation",
+        input.invitationId,
+        undefined,
+        { email: invitation.email },
+        ctx.req
+      );
+
+      return { success: true };
+    }),
+
   // Validar token de convite (público)
   validate: publicProcedure
     .input(z.object({ token: z.string() }))

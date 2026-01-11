@@ -39,7 +39,25 @@ export default function Invitations() {
     },
   });
 
-  // TODO: Implementar mutations de resend e revoke no backend
+  const resendMutation = trpc.invitations.resend.useMutation({
+    onSuccess: () => {
+      toast.success("Convite reenviado com sucesso!");
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao reenviar convite");
+    },
+  });
+
+  const revokeMutation = trpc.invitations.revoke.useMutation({
+    onSuccess: () => {
+      toast.success("Convite cancelado com sucesso!");
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao cancelar convite");
+    },
+  });
 
   const handleCreateInvitation = () => {
     if (!newInvitation.email) {
@@ -61,11 +79,13 @@ export default function Invitations() {
   };
 
   const handleResend = (invitationId: number) => {
-    toast.info("Funcionalidade de reenvio será implementada em breve");
+    resendMutation.mutate({ invitationId });
   };
 
   const handleRevoke = (invitationId: number, email: string) => {
-    toast.info("Funcionalidade de cancelamento será implementada em breve");
+    if (confirm(`Tem certeza que deseja cancelar o convite para "${email}"?`)) {
+      revokeMutation.mutate({ invitationId });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -267,7 +287,7 @@ export default function Invitations() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleResend(invitation.id)}
-                            disabled={false}
+                            disabled={resendMutation.isPending || revokeMutation.isPending}
                             title="Reenviar convite"
                           >
                             <RefreshCw className="w-4 h-4" />
@@ -276,7 +296,7 @@ export default function Invitations() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleRevoke(invitation.id, invitation.email)}
-                            disabled={false}
+                            disabled={resendMutation.isPending || revokeMutation.isPending}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                             title="Cancelar convite"
                           >
