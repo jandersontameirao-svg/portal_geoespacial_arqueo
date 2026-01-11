@@ -434,3 +434,17 @@
 - [x] Formatar coordenadas de forma legível com zona, easting, northing
 - [x] Exibir lat/long secundárias para referência
 - [x] Criar helper formatUTMCoordinates para reutilização
+
+### 43. Sistema de Importação de Geometrias KML/GeoJSON
+- [x] Criar componente GeometryImport com upload de arquivos
+- [x] Implementar parser de arquivos KML
+- [x] Implementar parser de arquivos GeoJSON
+- [x] Adicionar preview visual das geometrias no mapa
+- [x] Calcular centro automático das geometrias para preview
+- [x] Integrar com procedure geometries.importBatch
+- [x] Adicionar botão de importação nos controles do GlobeViewer
+- [x] Criar testes unitários para importBatch e export
+- [x] Validar formatos e tamanhos de arquivo (10MB max)
+- [x] Exibir contagem e lista de geometrias encontradas
+- [x] Suportar múltiplos tipos: Point, LineString, Polygon
+- [x] Preservar metadados: nome, descrição, cor

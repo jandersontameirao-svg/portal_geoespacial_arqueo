@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, FeatureGroup
 import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { Button } from "./ui/button";
-import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save, Hand } from "lucide-react";
+import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save, Hand, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -20,6 +20,7 @@ import { CoordinatesDisplay } from "./CoordinatesDisplay";
 import { MapEventsHandler } from "./MapEventsHandler";
 import { CoordinateSearch } from "./CoordinateSearch";
 import { formatUTMCoordinates } from "@/lib/utmHelper";
+import GeometryImport from "./GeometryImport";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -56,6 +57,7 @@ export default function GlobeViewer({
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
   const [isPanMode, setIsPanMode] = useState(false);
   const [mouseCoords, setMouseCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   
   // Buscar projetos do banco
   const { data: projects } = trpc.projects.list.useQuery();
@@ -498,6 +500,19 @@ export default function GlobeViewer({
           </Button>
         )}
         
+        {/* Importar Geometrias */}
+        {viewMode === "2d" && projectId && (
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setImportDialogOpen(true)}
+            className="bg-white/90 hover:bg-white shadow-lg"
+            title="Importar KML/GeoJSON"
+          >
+            <Upload className="w-5 h-5" />
+          </Button>
+        )}
+        
         {/* Busca por Coordenadas */}
         {viewMode === "2d" && (
           <CoordinateSearch
@@ -592,6 +607,15 @@ export default function GlobeViewer({
       {/* Exibir coordenadas UTM quando em modo 2D */}
       {viewMode === "2d" && mouseCoords && (
         <CoordinatesDisplay lat={mouseCoords.lat} lng={mouseCoords.lng} />
+      )}
+      
+      {/* Modal de Importação de Geometrias */}
+      {projectId && (
+        <GeometryImport
+          projectId={projectId}
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+        />
       )}
     </div>
   );
