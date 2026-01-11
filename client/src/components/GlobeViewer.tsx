@@ -1,187 +1,166 @@
 import { useEffect, useRef, useState } from "react";
-import { Viewer, Ion, Cartesian3, Math as CesiumMath, Terrain } from "cesium";
-import "cesium/Build/Cesium/Widgets/widgets.css";
+import Globe from "react-globe.gl";
 import { Button } from "./ui/button";
-import { Globe, Map, Layers, ZoomIn, ZoomOut, Home } from "lucide-react";
-import { Card } from "./ui/card";
-
-// Configurar token do Cesium Ion (usar token gratuito)
-Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjc5YzciLCJpZCI6NTc3MzMsImlhdCI6MTYyNzg0NTE4Mn0.XcKpgANiY19MC4bdFUXMVEBToBmqS8kuYpUlxJHYZxk";
+import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2 } from "lucide-react";
 
 interface GlobeViewerProps {
   projectId?: number;
   initialPosition?: {
     latitude: number;
     longitude: number;
-    height: number;
+    altitude: number;
   };
   onViewModeChange?: (mode: "2d" | "3d") => void;
 }
 
 export default function GlobeViewer({ 
   projectId, 
-  initialPosition = { latitude: -15.7801, longitude: -47.9292, height: 2000000 }, // Brasília
+  initialPosition = { latitude: -15.7801, longitude: -47.9292, altitude: 2 }, // Brasília
   onViewModeChange 
 }: GlobeViewerProps) {
-  const viewerRef = useRef<HTMLDivElement>(null);
-  const cesiumViewerRef = useRef<Viewer | null>(null);
+  const globeEl = useRef<any>(null);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("3d");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!viewerRef.current) return;
-
-    try {
-      // Criar visualizador Cesium
-      const viewer = new Viewer(viewerRef.current, {
-        terrain: Terrain.fromWorldTerrain(),
-        animation: false,
-        baseLayerPicker: true,
-        fullscreenButton: false,
-        geocoder: false,
-        homeButton: false,
-        infoBox: true,
-        sceneModePicker: false,
-        selectionIndicator: true,
-        timeline: false,
-        navigationHelpButton: false,
-        navigationInstructionsInitiallyVisible: false,
-        scene3DOnly: false,
-        shouldAnimate: false,
-      });
-
-      cesiumViewerRef.current = viewer;
-
-      // Configurar posição inicial
-      viewer.camera.setView({
-        destination: Cartesian3.fromDegrees(
-          initialPosition.longitude,
-          initialPosition.latitude,
-          initialPosition.height
-        ),
-      });
-
-      // Habilitar iluminação baseada no sol
-      viewer.scene.globe.enableLighting = true;
-
-      setIsLoading(false);
-
-      return () => {
-        if (cesiumViewerRef.current) {
-          cesiumViewerRef.current.destroy();
-          cesiumViewerRef.current = null;
-        }
-      };
-    } catch (error) {
-      console.error("Erro ao inicializar Cesium:", error);
+    if (globeEl.current) {
+      // Posicionar câmera inicial
+      globeEl.current.pointOfView({
+        lat: initialPosition.latitude,
+        lng: initialPosition.longitude,
+        altitude: initialPosition.altitude
+      }, 1000);
+      
       setIsLoading(false);
     }
-  }, []);
+  }, [initialPosition]);
 
-  const handleZoomIn = () => {
-    if (!cesiumViewerRef.current) return;
-    const camera = cesiumViewerRef.current.camera;
-    camera.zoomIn(camera.positionCartographic.height * 0.5);
-  };
-
-  const handleZoomOut = () => {
-    if (!cesiumViewerRef.current) return;
-    const camera = cesiumViewerRef.current.camera;
-    camera.zoomOut(camera.positionCartographic.height * 0.5);
-  };
-
-  const handleResetView = () => {
-    if (!cesiumViewerRef.current) return;
-    cesiumViewerRef.current.camera.flyTo({
-      destination: Cartesian3.fromDegrees(
-        initialPosition.longitude,
-        initialPosition.latitude,
-        initialPosition.height
-      ),
-      duration: 2,
-    });
-  };
-
-  const handleToggleViewMode = () => {
+  const handleToggleView = () => {
     const newMode = viewMode === "3d" ? "2d" : "3d";
     setViewMode(newMode);
     onViewModeChange?.(newMode);
+  };
 
-    if (!cesiumViewerRef.current) return;
+  const handleZoomIn = () => {
+    if (globeEl.current) {
+      const pov = globeEl.current.pointOfView();
+      globeEl.current.pointOfView({ altitude: Math.max(pov.altitude - 0.5, 0.5) }, 500);
+    }
+  };
 
-    if (newMode === "2d") {
-      cesiumViewerRef.current.scene.mode = 2; // SceneMode.SCENE2D
-    } else {
-      cesiumViewerRef.current.scene.mode = 3; // SceneMode.SCENE3D
+  const handleZoomOut = () => {
+    if (globeEl.current) {
+      const pov = globeEl.current.pointOfView();
+      globeEl.current.pointOfView({ altitude: Math.min(pov.altitude + 0.5, 5) }, 500);
+    }
+  };
+
+  const handleResetView = () => {
+    if (globeEl.current) {
+      globeEl.current.pointOfView({
+        lat: initialPosition.latitude,
+        lng: initialPosition.longitude,
+        altitude: initialPosition.altitude
+      }, 1000);
     }
   };
 
   return (
-    <div className="relative w-full h-full">
-      {/* Visualizador Cesium */}
-      <div ref={viewerRef} className="w-full h-full" />
-
-      {/* Loading overlay */}
+    <div className="relative w-full h-full bg-slate-950">
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950 z-10">
           <div className="text-center">
-            <Globe className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Carregando visualizador...</p>
+            <GlobeIcon className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+            <p className="text-white">Carregando globo 3D...</p>
           </div>
         </div>
       )}
 
-      {/* Controles personalizados */}
-      <Card className="absolute top-4 right-4 glass-panel p-2 space-y-2">
+      <Globe
+        ref={globeEl}
+        globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+        bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
+        backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
+        width={window.innerWidth - 384} // Subtrair largura do sidebar
+        height={window.innerHeight - 64} // Subtrair altura do header
+        animateIn={true}
+        waitForGlobeReady={true}
+        onGlobeReady={() => setIsLoading(false)}
+      />
+
+      {/* Controles Flutuantes */}
+      <div className="absolute top-4 right-4 flex flex-col gap-2 z-20">
+        {/* Toggle 2D/3D */}
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
-          onClick={handleToggleViewMode}
+          onClick={handleToggleView}
+          className="bg-white/90 hover:bg-white shadow-lg"
           title={viewMode === "3d" ? "Alternar para 2D" : "Alternar para 3D"}
         >
-          {viewMode === "3d" ? <Map className="w-5 h-5" /> : <Globe className="w-5 h-5" />}
+          {viewMode === "3d" ? <Map className="w-5 h-5" /> : <GlobeIcon className="w-5 h-5" />}
         </Button>
-        
-        <div className="border-t border-border" />
-        
+
+        {/* Zoom In */}
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           onClick={handleZoomIn}
-          title="Aumentar zoom"
+          className="bg-white/90 hover:bg-white shadow-lg"
+          title="Aproximar"
         >
           <ZoomIn className="w-5 h-5" />
         </Button>
-        
+
+        {/* Zoom Out */}
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           onClick={handleZoomOut}
-          title="Diminuir zoom"
+          className="bg-white/90 hover:bg-white shadow-lg"
+          title="Afastar"
         >
           <ZoomOut className="w-5 h-5" />
         </Button>
-        
-        <div className="border-t border-border" />
-        
+
+        {/* Reset View */}
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           onClick={handleResetView}
-          title="Resetar visualização"
+          className="bg-white/90 hover:bg-white shadow-lg"
+          title="Resetar Visualização"
         >
           <Home className="w-5 h-5" />
         </Button>
-      </Card>
 
-      {/* Informações do projeto */}
-      {projectId && (
-        <Card className="absolute bottom-4 left-4 glass-panel p-4">
-          <p className="text-sm text-muted-foreground">
-            Projeto ID: <span className="font-mono text-foreground">{projectId}</span>
-          </p>
-        </Card>
-      )}
+        {/* Fullscreen (placeholder) */}
+        <Button
+          variant="secondary"
+          size="icon"
+          className="bg-white/90 hover:bg-white shadow-lg"
+          title="Tela Cheia"
+          onClick={() => {
+            if (document.fullscreenElement) {
+              document.exitFullscreen();
+            } else {
+              document.documentElement.requestFullscreen();
+            }
+          }}
+        >
+          <Maximize2 className="w-5 h-5" />
+        </Button>
+      </div>
+
+      {/* Info Badge */}
+      <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg z-20">
+        <div className="flex items-center gap-2">
+          <Layers className="w-4 h-4 text-blue-600" />
+          <span className="text-sm font-medium">
+            Modo {viewMode === "3d" ? "3D" : "2D"} • {projectId ? `Projeto #${projectId}` : "Visão Global"}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

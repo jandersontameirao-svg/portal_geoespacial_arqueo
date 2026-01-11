@@ -94,56 +94,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Globe className="w-8 h-8 text-primary" />
-              <div>
-                <h1 className="text-xl font-bold">Portal Geoespacial</h1>
-                <p className="text-sm text-muted-foreground">Grupo Arqueo</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              {/* Busca Global */}
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Buscar projetos, mapas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* User Info */}
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className="text-sm font-medium">{user?.name || user?.email}</p>
-                  <Badge variant="outline" className="text-xs">
-                    {user?.role === "admin" ? "Administrador" : 
-                     user?.role === "editor" ? "Editor" : "Cliente"}
-                  </Badge>
-                </div>
-                
-                <Button variant="ghost" size="icon" asChild>
-                  <Link href="/settings">
-                    <Settings className="w-5 h-5" />
-                  </Link>
-                </Button>
-                
-                <Button variant="ghost" size="icon" onClick={handleLogout}>
-                  <LogOut className="w-5 h-5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* Sidebar com Painéis */}

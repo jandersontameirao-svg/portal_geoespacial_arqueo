@@ -48,6 +48,7 @@
     "@trpc/server": "^11.6.0",
     "@types/cesium": "^1.70.4",
     "@types/leaflet": "^1.9.21",
+    "@types/three": "^0.182.0",
     "axios": "^1.12.0",
     "cesium": "^1.137.0",
     "class-variance-authority": "^0.7.1",
@@ -73,6 +74,7 @@
     "react": "^19.2.1",
     "react-day-picker": "^9.11.1",
     "react-dom": "^19.2.1",
+    "react-globe.gl": "^2.37.0",
     "react-hook-form": "^7.64.0",
     "react-resizable-panels": "^3.0.6",
     "recharts": "^2.15.2",
@@ -81,6 +83,7 @@
     "superjson": "^1.13.3",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
+    "three": "^0.182.0",
     "vaul": "^1.1.2",
     "wouter": "^3.3.5",
     "zod": "^4.1.12"

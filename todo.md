@@ -272,3 +272,12 @@
 - [x] Adicionar indicador de página ativa
 - [x] Adicionar menu mobile responsivo
 - [x] Implementar logout funcional
+
+### 31. Correção do Globo 3D na Página Inicial
+- [x] Investigar por que o globo não estava sendo renderizado
+- [x] Substituir CesiumJS por react-globe.gl (mais estável)
+- [x] Remover header duplicado da Home
+- [x] Corrigir problemas de renderização
+- [x] Testar visualização do globo
+- [x] Adicionar controles de zoom e navegação
+- [x] Adicionar badge informativo
