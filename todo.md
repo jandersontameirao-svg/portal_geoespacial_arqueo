@@ -475,3 +475,85 @@
 - [ ] Atualizar favicon
 - [x] Aplicar cores em botões e elementos principais
 - [x] Revisar contraste e acessibilidade
+
+## CHECKLIST DE HOMOLOGAÇÃO - Funcionalidades Faltantes
+
+### 47. Sistema de Perfis Expandido
+- [x] Expandir enum de roles: admin | editor | client
+- [x] Criar middleware editorProcedure e clientProcedure
+- [x] Implementar controle de permissões por perfil
+- [x] Adicionar campo role na tabela users
+- [ ] Criar tela de gerenciamento de perfis
+- [x] Garantir que Cliente só visualiza (sem escrita)
+- [ ] Testar isolamento de dados por perfil
+
+### 48. Segurança Avançada (MFA + Rate Limiting)
+- [x] Implementar MFA com TOTP (autenticador)
+- [x] Adicionar campos mfaEnabled e mfaSecret no banco
+- [x] Criar fluxo de ativação de MFA
+- [x] Tornar MFA obrigatório para admin e editor
+- [x] Instalar e configurar express-rate-limit
+- [x] Aplicar rate limiting em endpoints sensíveis
+- [ ] Criar health checks do sistema
+- [ ] Testar MFA e rate limiting
+
+### 49. Repositório de Arquivos Avançado
+- [x] Adicionar suporte para upload de SHP (ZIP) - parser criado
+- [x] Adicionar suporte para PDF, DOCX, XLSX, imagens - schema pronto
+- [x] Implementar validação de tipo MIME
+- [x] Implementar proteção contra zip bomb
+- [x] Adicionar extração automática de bounding box
+- [x] Implementar versionamento de arquivos - schema pronto
+- [x] Criar tabela file_versions
+- [ ] Adicionar metadados obrigatórios no upload
+- [ ] Integrar fileProcessing.ts no filesRouter
+- [ ] Testar upload de todos os formatos
+
+### 50. Pipeline SHP → PostGIS
+- [ ] Instalar ogr2ogr no servidor
+- [ ] Criar parser de arquivos SHP
+- [ ] Implementar validação de ZIP SHP (shp, shx, dbf, prj)
+- [ ] Implementar validação de CRS
+- [ ] Criar procedure de conversão SHP → GeoJSON
+- [ ] Implementar inserção de geometrias no banco
+- [ ] Criar visualização de camadas SHP no mapa
+- [ ] Registrar metadados da camada
+- [ ] Testar pipeline completo
+
+### 51. Geração de Mapas Técnicos ABNT
+- [ ] Pesquisar alternativas ao QGIS Server (maplibre-gl, sharp, canvas)
+- [ ] Criar template de layout ABNT
+- [ ] Implementar elementos obrigatórios: título, escala, norte, legenda
+- [ ] Adicionar grade UTM com coordenadas
+- [ ] Implementar conversão para SIRGAS 2000 / UTM
+- [ ] Adicionar carimbo técnico
+- [ ] Adicionar logomarca Grupo Arqueo
+- [ ] Gerar PDF com todos os elementos
+- [ ] Criar procedure backend generateMap
+- [ ] Testar geração de mapas
+
+### 52. Atlas Automático
+- [ ] Implementar definição de escala e tamanho de folha
+- [ ] Criar algoritmo de cálculo de grid automático
+- [ ] Implementar geração multipágina
+- [ ] Adicionar numeração sequencial (01/N)
+- [ ] Gerar PDF multipágina
+- [ ] Permitir exportação de páginas individuais
+- [ ] Criar procedure backend generateAtlas
+- [ ] Testar atlas com diferentes configurações
+
+### 53. Scanner Antivírus
+- [ ] Pesquisar alternativas (ClamAV, VirusTotal API)
+- [ ] Implementar integração com scanner
+- [ ] Executar scan em todo upload
+- [ ] Rejeitar arquivos infectados
+- [ ] Registrar resultados em auditoria
+- [ ] Testar com arquivos de teste EICAR
+
+### 54. Backups e Health Checks
+- [ ] Configurar backups automáticos do banco
+- [ ] Testar restauração de backups
+- [ ] Criar endpoint /health com métricas
+- [ ] Monitorar status de serviços externos
+- [ ] Implementar alertas automáticos
+- [ ] Documentar procedimentos de recuperação

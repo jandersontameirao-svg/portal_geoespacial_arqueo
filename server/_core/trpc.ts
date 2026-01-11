@@ -43,3 +43,27 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+// Editor: Admin + Editor podem executar
+export const editorProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+
+    if (!ctx.user || !['admin', 'editor'].includes(ctx.user.role)) {
+      throw new TRPCError({ 
+        code: "FORBIDDEN", 
+        message: "Acesso negado. Apenas administradores e editores podem executar esta ação." 
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  }),
+);
+
+// Client: Qualquer usuário autenticado (admin, editor, client)
+export const clientProcedure = protectedProcedure;

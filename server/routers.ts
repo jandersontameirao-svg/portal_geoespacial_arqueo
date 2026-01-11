@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { filesRouter } from "./filesRouter";
 import { geometriesRouter } from "./geometriesRouter";
 import { adminRouter } from "./adminRouter";
+import { mfaRouter } from "./mfaRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -610,6 +611,7 @@ export const appRouter = router({
   files: filesRouter,
   geometries: geometriesRouter,
   admin: adminRouter,
+  mfa: mfaRouter,
 });
 
 export type AppRouter = typeof appRouter;

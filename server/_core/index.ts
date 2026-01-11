@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { rateLimit } from "express-rate-limit";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -30,12 +31,33 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  
+  // Rate limiting para endpoints sensíveis
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // Máximo 100 requisições por IP
+    message: "Muitas requisições deste IP, tente novamente em 15 minutos.",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 10, // Máximo 10 tentativas de login
+    message: "Muitas tentativas de login, tente novamente em 15 minutos.",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
+  // OAuth callback under /api/oauth/callback (com rate limiting)
+  app.use("/api/oauth", authLimiter);
   registerOAuthRoutes(app);
-  // tRPC API
+  
+  // tRPC API (com rate limiting)
+  app.use("/api/trpc", apiLimiter);
   app.use(
     "/api/trpc",
     createExpressMiddleware({
