@@ -149,3 +149,19 @@
 - [ ] Templates cartográficos (.qpt)
 - [ ] Checklist de homologação (funcional + segurança)
 - [ ] Guia de deploy e operação
+
+### 15. Interface de Gerenciamento de Projetos
+- [x] Criar página de listagem de projetos
+- [x] Implementar formulário de criação de projetos
+- [x] Implementar filtros e busca
+- [x] Adicionar rota /projects no App.tsx
+- [x] Integrar com tRPC para CRUD de projetos
+
+### 16. Sistema de Upload de Arquivos (Próximo)
+- [ ] Criar router tRPC para gerenciamento de arquivos
+- [ ] Implementar função de upload com validação
+- [ ] Criar interface de upload com drag-and-drop
+- [ ] Implementar preview de arquivos
+- [ ] Criar listagem de arquivos por projeto
+- [ ] Implementar download de arquivos
+- [ ] Implementar exclusão (soft delete) de arquivos

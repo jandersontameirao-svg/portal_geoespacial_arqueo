@@ -342,9 +342,22 @@ export async function getLayersByProject(projectId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  return await db.select().from(layers)
-    .where(eq(layers.projectId, projectId))
+  return await db.select().from(layers).where(eq(layers.projectId, projectId))
     .orderBy(desc(layers.createdAt));
+}
+
+export async function updateFile(id: number, data: Partial<InsertFile>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(files).set(data).where(eq(files.id, id));
+}
+
+export async function deleteFile(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(files).set({ deletedAt: new Date() }).where(eq(files.id, id));
 }
 
 // ============================================================================
