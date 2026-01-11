@@ -324,3 +324,24 @@
 - [x] Botão toggle sidebar
 - [x] Ferramentas desenho (pontos, linhas, polígonos)
 - [x] Visualização AOI
+
+### 34. Salvamento de Geometrias no Banco
+- [x] Criar tabela geometries
+- [x] Adicionar procedures tRPC geometries.create/list/delete
+- [x] Implementar botão "Salvar" após desenhar
+- [x] Adicionar modal para nome/descrição/cor
+- [x] Carregar geometrias salvas no mapa
+
+### 35. Painel de Camadas
+- [x] Criar sidebar direito retrátil
+- [x] Listar todas as camadas ativas
+- [x] Adicionar checkboxes mostrar/ocultar
+- [x] Implementar controle de opacidade
+- [x] Adicionar ícones por tipo de camada
+
+### 36. Ferramentas de Medição
+- [x] Instalar leaflet-measure ou similar
+- [x] Implementar medição de distâncias (km)
+- [x] Implementar medição de áreas (km²/ha)
+- [x] Adicionar tooltip com valores em tempo real
+- [x] Adicionar botões de medição nos controles

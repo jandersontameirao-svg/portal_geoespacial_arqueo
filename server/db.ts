@@ -22,7 +22,9 @@ import {
   atlasJobs,
   InsertAtlasJob,
   auditLogs,
-  InsertAuditLog
+  InsertAuditLog,
+  geometries,
+  InsertGeometry
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -540,4 +542,43 @@ export async function getProjectAuditLogs(projectId: number) {
   return await db.select().from(auditLogs)
     .where(eq(auditLogs.projectId, projectId))
     .orderBy(desc(auditLogs.timestamp));
+}
+
+
+// ==================== Geometries ====================
+
+export async function createGeometry(geometry: InsertGeometry) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.insert(geometries).values(geometry);
+}
+
+export async function getGeometriesByProject(projectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db.select().from(geometries).where(eq(geometries.projectId, projectId));
+  return result;
+}
+
+export async function deleteGeometry(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(geometries).where(eq(geometries.id, id));
+}
+
+export async function updateGeometryVisibility(id: number, visible: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(geometries).set({ visible }).where(eq(geometries.id, id));
+}
+
+export async function updateGeometryOpacity(id: number, opacity: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(geometries).set({ opacity }).where(eq(geometries.id, id));
 }

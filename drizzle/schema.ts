@@ -398,3 +398,21 @@ export type InsertAtlasJob = typeof atlasJobs.$inferInsert;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+export const geometries = mysqlTable("geometries", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["marker", "polyline", "polygon"]).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  coordinates: text("coordinates").notNull(), // JSON string
+  color: varchar("color", { length: 7 }).default("#3b82f6"),
+  visible: int("visible").default(1).notNull(),
+  opacity: int("opacity").default(100).notNull(), // 0-100
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Geometry = typeof geometries.$inferSelect;
+export type InsertGeometry = typeof geometries.$inferInsert;

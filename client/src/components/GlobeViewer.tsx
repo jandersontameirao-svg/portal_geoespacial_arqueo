@@ -4,11 +4,18 @@ import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, FeatureGroup
 import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { Button } from "./ui/button";
-import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2 } from "lucide-react";
+import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import LayersPanel from "./LayersPanel";
+import MeasurementTools from "./MeasurementTools";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -36,11 +43,52 @@ export default function GlobeViewer({
   const globeEl = useRef<any>(null);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("3d");
   const [drawnShapes, setDrawnShapes] = useState<any[]>([]);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [currentShape, setCurrentShape] = useState<any>(null);
+  const [shapeName, setShapeName] = useState("");
+  const [shapeDescription, setShapeDescription] = useState("");
+  const [shapeColor, setShapeColor] = useState("#3b82f6");
   const [isLoading, setIsLoading] = useState(true);
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
   
   // Buscar projetos do banco
   const { data: projects } = trpc.projects.list.useQuery();
+  
+  // Mutation para salvar geometria
+  const createGeometryMutation = trpc.geometries.create.useMutation({
+    onSuccess: () => {
+      toast.success("Geometria salva com sucesso!");
+      setSaveDialogOpen(false);
+      setShapeName("");
+      setShapeDescription("");
+      setShapeColor("#3b82f6");
+      setCurrentShape(null);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao salvar: ${error.message}`);
+    },
+  });
+  
+  const handleSaveGeometry = () => {
+    if (!shapeName.trim()) {
+      toast.error("Nome é obrigatório");
+      return;
+    }
+    if (!projectId) {
+      toast.error("Projeto não especificado");
+      return;
+    }
+    if (!currentShape) return;
+    
+    createGeometryMutation.mutate({
+      projectId,
+      type: currentShape.type,
+      name: shapeName,
+      description: shapeDescription,
+      coordinates: JSON.stringify(currentShape.coordinates),
+      color: shapeColor,
+    });
+  };
   
   // Preparar dados dos marcadores (calcular centro do AOI)
   const markersData = projects?.filter(p => p.aoiBounds).map(p => {
@@ -173,6 +221,9 @@ export default function GlobeViewer({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          {/* Ferramentas de Medição */}
+          <MeasurementTools />
+          
           {/* Ferramentas de Desenho */}
           <FeatureGroup>
             <EditControl
@@ -186,10 +237,11 @@ export default function GlobeViewer({
                     : layerType === "polyline"
                     ? layer.getLatLngs().map((ll: any) => [ll.lat, ll.lng])
                     : layer.getLatLngs()[0].map((ll: any) => [ll.lat, ll.lng]),
-                  id: Date.now()
+                  id: Date.now(),
+                  layer // Guardar referência da camada
                 };
-                setDrawnShapes([...drawnShapes, shape]);
-                console.log("Forma desenhada:", shape);
+                setCurrentShape(shape);
+                setSaveDialogOpen(true);
               }}
               onEdited={(e: any) => {
                 console.log("Formas editadas:", e);
@@ -323,6 +375,9 @@ export default function GlobeViewer({
         </Button>
       </div>
 
+      {/* Painel de Camadas */}
+      <LayersPanel projectId={projectId} />
+      
       {/* Info Badge */}
       <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg z-20">
         <div className="flex items-center gap-2">
@@ -332,6 +387,72 @@ export default function GlobeViewer({
           </span>
         </div>
       </div>
+      
+      {/* Modal de Salvamento de Geometria */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar Geometria</DialogTitle>
+            <DialogDescription>
+              Adicione informações sobre a geometria desenhada
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome *</Label>
+              <Input
+                id="name"
+                placeholder="Ex: Área de Escavação 1"
+                value={shapeName}
+                onChange={(e) => setShapeName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                placeholder="Descrição opcional da geometria"
+                value={shapeDescription}
+                onChange={(e) => setShapeDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="color">Cor</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="color"
+                  type="color"
+                  value={shapeColor}
+                  onChange={(e) => setShapeColor(e.target.value)}
+                  className="w-20 h-10"
+                />
+                <Input
+                  type="text"
+                  value={shapeColor}
+                  onChange={(e) => setShapeColor(e.target.value)}
+                  placeholder="#3b82f6"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setSaveDialogOpen(false);
+              setCurrentShape(null);
+              // Remover camada desenhada se cancelar
+              if (currentShape?.layer) {
+                currentShape.layer.remove();
+              }
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveGeometry} disabled={createGeometryMutation.isPending}>
+              {createGeometryMutation.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

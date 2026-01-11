@@ -15,6 +15,13 @@
       "when": 1768102604803,
       "tag": "0001_premium_blockbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1768150900240,
+      "tag": "0002_large_blade",
+      "breakpoints": true
     }
   ]
 }
