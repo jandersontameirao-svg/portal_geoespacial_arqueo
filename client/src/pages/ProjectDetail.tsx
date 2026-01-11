@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye } from "lucide-react";
+import FileUpload from "@/components/FileUpload";
 import { Link, useParams } from "wouter";
 
 export default function ProjectDetail() {
@@ -20,6 +21,8 @@ export default function ProjectDetail() {
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<"viewer" | "editor" | "owner">("viewer");
+
+  const canEdit = user?.role === "admin" || user?.role === "editor";
 
   // Queries
   const { data: project, isLoading: projectLoading, refetch: refetchProject } = trpc.projects.get.useQuery(
@@ -35,6 +38,11 @@ export default function ProjectDetail() {
   const { data: activities, isLoading: activitiesLoading } = trpc.projects.getActivities.useQuery(
     { projectId },
     { enabled: isAuthenticated && projectId > 0 }
+  );
+
+  const { data: availableUsers } = trpc.users.list.useQuery(
+    { search: "" },
+    { enabled: isAuthenticated && canEdit }
   );
 
   // Mutations
@@ -107,8 +115,6 @@ export default function ProjectDetail() {
       </div>
     );
   }
-
-  const canEdit = user?.role === "admin" || user?.role === "editor";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
@@ -260,8 +266,17 @@ export default function ProjectDetail() {
                                 <SelectValue placeholder="Selecione um usuário" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="1">Usuário de Teste</SelectItem>
-                                <SelectItem value="2">Outro Usuário</SelectItem>
+                                {availableUsers && availableUsers.length > 0 ? (
+                                  availableUsers.map((u) => (
+                                    <SelectItem key={u.id} value={u.id.toString()}>
+                                      {u.name || u.email || `Usuário #${u.id}`}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="0" disabled>
+                                    Nenhum usuário disponível
+                                  </SelectItem>
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
@@ -363,14 +378,21 @@ export default function ProjectDetail() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
-                    Sistema de upload de arquivos será implementado em breve
-                  </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-500">
-                    Suporte para KML, KMZ, SHP, PDF, DOCX, XLSX e imagens
-                  </p>
+                <FileUpload
+                  projectId={projectId}
+                  onUploadComplete={() => {
+                    toast.success("Arquivos enviados com sucesso!");
+                  }}
+                />
+
+                <div className="mt-8">
+                  <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-4">Arquivos do Projeto</h3>
+                  <div className="text-center py-8">
+                    <FileText className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+                    <p className="text-slate-600 dark:text-slate-400">
+                      Nenhum arquivo enviado ainda
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

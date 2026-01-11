@@ -488,6 +488,31 @@ const auditRouter = router({
 });
 
 // ============================================================================
+// USERS ROUTER
+// ============================================================================
+
+const usersRouter = router({
+  // Listar usuários disponíveis (admin e editor apenas)
+  list: editorProcedure
+    .input(z.object({ search: z.string().optional() }).optional())
+    .query(async ({ input }) => {
+      const search = input?.search;
+      const users = await db.getAllUsers();
+
+      if (search) {
+        const query = search.toLowerCase();
+        return users.filter(
+          (u) =>
+            u.name?.toLowerCase().includes(query) ||
+            u.email?.toLowerCase().includes(query)
+        );
+      }
+
+      return users;
+    }),
+});
+
+// ============================================================================
 // APP ROUTER
 // ============================================================================
 
@@ -497,6 +522,7 @@ export const appRouter = router({
   invitations: invitationsRouter,
   projects: projectsRouter,
   audit: auditRouter,
+  users: usersRouter,
 });
 
 export type AppRouter = typeof appRouter;

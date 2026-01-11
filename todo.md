@@ -187,3 +187,24 @@
 - [x] Implementar remoção de membros
 - [x] Mostrar lista de membros com roles
 - [x] Adicionar procedures listMembers e getActivities ao tRPC
+
+### 20. Sistema de Upload de Arquivos com Drag-and-Drop
+- [x] Criar componente FileUpload com drag-and-drop
+- [x] Implementar validação de tipos de arquivo
+- [x] Implementar validação de tamanho (100MB max)
+- [x] Criar preview de thumbnails para imagens
+- [ ] Integrar com tRPC para upload real (atualmente simulado)
+- [x] Mostrar progresso de upload
+- [x] Implementar listagem de arquivos na aba
+
+### 21. Busca e Filtros na Listagem de Projetos
+- [x] Adicionar campo de busca por nome/código
+- [x] Implementar filtros por status
+- [x] Adicionar ordenação por data
+- [x] Implementar filtros com useMemo
+
+### 22. Query de Usuários para Adicionar Membros
+- [x] Criar query tRPC para listar usuários
+- [x] Implementar busca por nome/email
+- [x] Substituir valores mockados no diálogo
+- [x] Adicionar função getAllUsers no db.ts

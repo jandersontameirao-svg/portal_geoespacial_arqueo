@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Plus, MapPin, Users, Calendar, FileText, Trash2, Edit } from "lucide-react";
+import { Loader2, Plus, MapPin, Users, Calendar, FileText, Trash2, Edit, Search, Filter } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Projects() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
+  const [sortBy, setSortBy] = useState<"recent" | "name">("recent");
   const [newProject, setNewProject] = useState({
     name: "",
     code: "",
@@ -24,9 +27,41 @@ export default function Projects() {
   });
 
   // Queries
-  const { data: projects, isLoading, refetch } = trpc.projects.list.useQuery(undefined, {
+  const { data: allProjects, isLoading, refetch } = trpc.projects.list.useQuery(undefined, {
     enabled: isAuthenticated,
   });
+
+  // Filtrar e ordenar projetos
+  const projects = useMemo(() => {
+    if (!allProjects) return [];
+
+    let filtered = [...allProjects];
+
+    // Aplicar busca
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(query) ||
+          p.code.toLowerCase().includes(query) ||
+          p.clientName?.toLowerCase().includes(query)
+      );
+    }
+
+    // Aplicar filtro de status
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((p) => p.status === statusFilter);
+    }
+
+    // Aplicar ordenação
+    if (sortBy === "recent") {
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      filtered.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return filtered;
+  }, [allProjects, searchQuery, statusFilter, sortBy]);
 
   // Mutations
   const createMutation = trpc.projects.create.useMutation({
@@ -82,15 +117,16 @@ export default function Projects() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       <div className="container py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50">Projetos</h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-2">
-              Gerencie seus projetos geoespaciais
-            </p>
-          </div>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50">Projetos</h1>
+              <p className="text-slate-600 dark:text-slate-400 mt-2">
+                Gerencie seus projetos geoespaciais
+              </p>
+            </div>
 
-          {canCreate && (
+            {canCreate && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="lg" className="gap-2">
@@ -178,8 +214,45 @@ export default function Projects() {
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
-          )}
+              </Dialog>
+            )}
+          </div>
+
+          {/* Barra de Busca e Filtros */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Buscar por nome, código ou cliente..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+              <SelectTrigger className="w-full sm:w-48">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="active">Ativos</SelectItem>
+                <SelectItem value="completed">Concluídos</SelectItem>
+                <SelectItem value="archived">Arquivados</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Mais Recentes</SelectItem>
+                <SelectItem value="name">Nome (A-Z)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Lista de Projetos */}
