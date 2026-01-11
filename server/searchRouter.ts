@@ -208,9 +208,12 @@ export const searchRouter = router({
         return [];
       }
 
-      // Buscar nomes de projetos
+      // Buscar projetos
       const projectSuggestions = await db
-        .select({ name: projects.name, type: sql<string>`'project'` })
+        .select({ 
+          id: projects.id,
+          name: projects.name,
+        })
         .from(projects)
         .where(
           and(
@@ -221,10 +224,16 @@ export const searchRouter = router({
         )
         .limit(limit);
 
-      // Buscar nomes de arquivos
+      // Buscar arquivos
       const fileSuggestions = await db
-        .select({ name: files.name, type: sql<string>`'file'` })
+        .select({ 
+          id: files.id,
+          name: files.name, 
+          projectId: files.projectId,
+          projectName: projects.name,
+        })
         .from(files)
+        .innerJoin(projects, eq(files.projectId, projects.id))
         .where(
           and(
             sql`${files.deletedAt} IS NULL`,
@@ -234,10 +243,48 @@ export const searchRouter = router({
         )
         .limit(limit);
 
+      // Buscar camadas
+      const layerSuggestions = await db
+        .select({ 
+          id: layers.id,
+          name: layers.name, 
+          projectId: layers.projectId,
+          projectName: projects.name,
+        })
+        .from(layers)
+        .innerJoin(projects, eq(layers.projectId, projects.id))
+        .where(
+          and(
+            eq(layers.isVisible, true),
+            sql`${layers.projectId} IN (${sql.join(authorizedProjectIds.map(id => sql`${id}`), sql`, `)})`,
+            like(layers.name, searchPattern)
+          )
+        )
+        .limit(limit);
+
       // Combinar e retornar
       const suggestions = [
-        ...projectSuggestions.map(s => ({ name: s.name, type: "project" })),
-        ...fileSuggestions.map(s => ({ name: s.name, type: "file" })),
+        ...projectSuggestions.map(s => ({ 
+          id: s.id,
+          name: s.name, 
+          type: "project" as const,
+          projectId: s.id,
+          projectName: s.name,
+        })),
+        ...fileSuggestions.map(s => ({ 
+          id: s.id,
+          name: s.name, 
+          type: "file" as const,
+          projectId: s.projectId,
+          projectName: s.projectName,
+        })),
+        ...layerSuggestions.map(s => ({ 
+          id: s.id,
+          name: s.name, 
+          type: "layer" as const,
+          projectId: s.projectId,
+          projectName: s.projectName,
+        })),
       ].slice(0, limit);
 
       return suggestions;

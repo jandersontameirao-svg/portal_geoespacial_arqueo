@@ -129,6 +129,9 @@ export default function FileUpload({
           )
         );
 
+        // Gerar descrição automática baseada no arquivo
+        const autoDescription = `Arquivo ${category === "geospatial" ? "geoespacial" : category === "document" ? "documento" : category === "image" ? "imagem" : ""} ${uploadFile.file.name} enviado em ${new Date().toLocaleDateString("pt-BR")}`;
+        
         // Upload via tRPC (sem await para simular progresso)
         const uploadPromise = uploadMutation.mutateAsync({
           projectId,
@@ -137,6 +140,8 @@ export default function FileUpload({
           size: uploadFile.file.size,
           fileData,
           category,
+          description: autoDescription,
+          tags: [category, uploadFile.file.name.split(".").pop() || "arquivo"],
         });
 
         // Simular progresso enquanto faz upload

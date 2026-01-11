@@ -55,7 +55,8 @@ export const filesRouter = router({
       size: z.number(),
       fileData: z.string(), // Base64 encoded
       category: z.enum(["geospatial", "document", "image", "other"]),
-      description: z.string().optional(),
+      description: z.string().min(10, "Descrição deve ter pelo menos 10 caracteres"),
+      tags: z.array(z.string()).min(1, "Pelo menos uma tag é obrigatória").optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // Verificar acesso ao projeto

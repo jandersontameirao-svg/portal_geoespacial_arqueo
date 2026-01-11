@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, FeatureGroup
 import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { Button } from "./ui/button";
-import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save, Hand, Upload } from "lucide-react";
+import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save, Hand, Upload, Printer } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -22,6 +22,7 @@ import { CoordinateSearch } from "./CoordinateSearch";
 import { formatUTMCoordinates } from "@/lib/utmHelper";
 import GeometryImport from "./GeometryImport";
 import SavedMapsPanel from "./SavedMapsPanel";
+import MapPrintPreview from "./MapPrintPreview";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -59,6 +60,7 @@ export default function GlobeViewer({
   const [isPanMode, setIsPanMode] = useState(false);
   const [mouseCoords, setMouseCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   
   // Buscar projetos do banco
   const { data: projects } = trpc.projects.list.useQuery();
@@ -514,6 +516,19 @@ export default function GlobeViewer({
           </Button>
         )}
         
+        {/* Imprimir Mapa Técnico */}
+        {viewMode === "2d" && projectId && (
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setPrintDialogOpen(true)}
+            className="bg-white/90 hover:bg-white shadow-lg"
+            title="Gerar Mapa Técnico ABNT"
+          >
+            <Printer className="w-5 h-5" />
+          </Button>
+        )}
+        
         {/* Busca por Coordenadas */}
         {viewMode === "2d" && (
           <CoordinateSearch
@@ -637,6 +652,23 @@ export default function GlobeViewer({
           projectId={projectId}
           open={importDialogOpen}
           onOpenChange={setImportDialogOpen}
+        />
+      )}
+      
+      {/* Modal de Impressão de Mapa Técnico */}
+      {projectId && (
+        <MapPrintPreview
+          projectId={projectId}
+          projectName={projects?.find(p => p.id === projectId)?.name || `Projeto ${projectId}`}
+          clientName={projects?.find(p => p.id === projectId)?.clientName || undefined}
+          bounds={{
+            north: currentPosition.latitude + 0.1,
+            south: currentPosition.latitude - 0.1,
+            east: currentPosition.longitude + 0.1,
+            west: currentPosition.longitude - 0.1,
+          }}
+          open={printDialogOpen}
+          onClose={() => setPrintDialogOpen(false)}
         />
       )}
     </div>

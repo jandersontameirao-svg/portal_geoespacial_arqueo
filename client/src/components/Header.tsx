@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { trpc } from "@/lib/trpc";
 import { Globe, LogOut, Menu, Settings, User } from "lucide-react";
+import GlobalSearch from "./GlobalSearch";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -81,8 +82,11 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Menu do Usuário */}
+        {/* Busca Global e Menu do Usuário */}
         <div className="flex items-center gap-4">
+          {/* Busca Global */}
+          {isAuthenticated && <GlobalSearch />}
+          
           {isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

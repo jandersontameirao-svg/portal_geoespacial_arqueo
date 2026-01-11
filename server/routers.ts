@@ -6,6 +6,8 @@ import { mfaRouter } from "./mfaRouter";
 import { searchRouter } from "./searchRouter";
 import { savedMapsRouter } from "./savedMapsRouter";
 import { printJobsRouter } from "./printJobsRouter";
+import { backupRouter } from "./backupRouter";
+import { atlasRouter } from "./atlasRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -618,6 +620,8 @@ export const appRouter = router({
   search: searchRouter,
   savedMaps: savedMapsRouter,
   printJobs: printJobsRouter,
+  backup: backupRouter,
+  atlas: atlasRouter,
 });
 
 export type AppRouter = typeof appRouter;
