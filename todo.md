@@ -281,3 +281,14 @@
 - [x] Testar visualização do globo
 - [x] Adicionar controles de zoom e navegação
 - [x] Adicionar badge informativo
+
+### 32. Globo em Tela Cheia e Melhorias
+- [x] Remover sidebar da Home para globo ocupar tela toda
+- [x] Adicionar painel lateral retrátil com informações (transparente)
+- [x] Buscar projetos do banco de dados
+- [x] Adicionar marcadores 3D de projetos no globo
+- [x] Implementar tooltip com informações ao passar mouse
+- [x] Implementar clique para redirecionar para detalhes do projeto
+- [x] Criar visualizador 2D com Leaflet
+- [x] Implementar alternância fluida entre 2D e 3D
+- [x] Manter posição e zoom ao alternar modos
