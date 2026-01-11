@@ -4,6 +4,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
+import { processGeospatialFile, validateFileSize, validateZipFile } from "./fileProcessing";
 
 // ============================================================================
 // HELPER: Verificar acesso ao projeto
@@ -99,6 +100,38 @@ export const filesRouter = router({
       // Converter base64 para buffer
       const fileBuffer = Buffer.from(input.fileData, "base64");
 
+      // Validar tamanho do arquivo
+      if (!validateFileSize(fileBuffer.length)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Arquivo muito grande após descompressão",
+        });
+      }
+
+      // Validar ZIP (proteção contra zip bomb)
+      if (input.mimeType === "application/zip" || input.mimeType === "application/x-zip-compressed") {
+        const isValidZip = await validateZipFile(fileBuffer);
+        if (!isValidZip) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Arquivo ZIP inválido ou potencialmente perigoso",
+          });
+        }
+      }
+
+      // Processar arquivo geoespacial se aplicável
+      let processingResult = null;
+      if (input.category === "geospatial") {
+        try {
+          processingResult = await processGeospatialFile(fileBuffer, input.filename);
+        } catch (error: any) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Erro ao processar arquivo geoespacial: ${error.message}`,
+          });
+        }
+      }
+
       // Upload para S3
       const { url } = await storagePut(fileKey, fileBuffer, input.mimeType);
 
@@ -112,7 +145,7 @@ export const filesRouter = router({
       else if (input.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") fileType = "xlsx";
       else if (input.mimeType.startsWith("image/")) fileType = "image";
 
-      // Salvar metadados no banco
+      // Salvar metadados no banco (incluindo dados geoespaciais se existirem)
       await db.createFile({
         projectId: input.projectId,
         name: input.filename,
@@ -122,8 +155,14 @@ export const filesRouter = router({
         fileSize: input.size,
         s3Key: fileKey,
         s3Url: url,
-        isGeospatial: input.category === "geospatial",
-        metadata: input.description ? { description: input.description } : null,
+        isGeospatial: processingResult?.isGeospatial || input.category === "geospatial",
+        crs: processingResult?.crs || null,
+        bounds: processingResult?.bounds || null,
+        metadata: {
+          ...(input.description ? { description: input.description } : {}),
+          ...(processingResult?.metadata || {}),
+          featureCount: processingResult?.featureCount,
+        },
         uploadedBy: ctx.user.id,
       });
 

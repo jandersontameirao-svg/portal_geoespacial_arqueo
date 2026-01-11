@@ -557,3 +557,28 @@
 - [ ] Monitorar status de serviços externos
 - [ ] Implementar alertas automáticos
 - [ ] Documentar procedimentos de recuperação
+
+### 51. Interface Frontend para MFA
+- [x] Criar página de configuração de MFA (/security)
+- [x] Adicionar exibição de QR code para configuração
+- [x] Implementar campo para inserir código de 6 dígitos
+- [x] Mostrar lista de códigos de backup
+- [x] Adicionar botão para desativar MFA
+- [x] Integrar com tRPC mfa router
+- [x] Adicionar link no menu de perfil do usuário
+
+### 52. Integração de Processamento de Arquivos
+- [x] Atualizar filesRouter.upload para usar fileProcessing.ts
+- [x] Extrair automaticamente bounding box de arquivos geoespaciais
+- [x] Extrair CRS de arquivos SHP/KML/GeoJSON
+- [ ] Criar camadas automaticamente após upload
+- [x] Adicionar validação de formatos suportados
+- [ ] Testar upload de SHP, KML, KMZ, GeoJSON
+
+### 53. Geração Básica de Mapas Estáticos
+- [ ] Instalar maplibre-gl-native e sharp
+- [ ] Criar utilitário de renderização de mapas
+- [ ] Adicionar elementos: título, escala, norte, legenda
+- [ ] Suportar exportação em PNG e PDF
+- [ ] Criar procedure para gerar mapa de projeto
+- [ ] Testar geração com diferentes projetos

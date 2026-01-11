@@ -10,6 +10,7 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Invitations from "./pages/Invitations";
 import Admin from "./pages/Admin";
+import Security from "./pages/Security";
 
 function Router() {
   return (
@@ -21,6 +22,7 @@ function Router() {
         <Route path="/projects/:id" component={ProjectDetail} />
         <Route path="/invitations" component={Invitations} />
         <Route path="/admin" component={Admin} />
+        <Route path="/security" component={Security} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
