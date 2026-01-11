@@ -208,3 +208,25 @@
 - [x] Implementar busca por nome/email
 - [x] Substituir valores mockados no diálogo
 - [x] Adicionar função getAllUsers no db.ts
+
+### 23. Backend de Upload de Arquivos
+- [x] Criar procedure tRPC files.upload
+- [x] Implementar upload para S3 usando storagePut
+- [x] Salvar metadados no banco de dados
+- [x] Retornar URL do arquivo
+- [x] Integrar com componente FileUpload
+
+### 24. Listagem de Arquivos Salvos
+- [x] Criar query tRPC files.list
+- [x] Buscar arquivos do projeto no banco
+- [x] Exibir cards com informações do arquivo
+- [x] Adicionar botões de download e visualizar
+- [x] Implementar exclusão de arquivos
+- [x] Criar componente FileList
+- [x] Integrar FileList na aba de arquivos
+
+### 25. Visualizador de Mapas para Arquivos Geoespaciais
+- [ ] Integrar OpenLayers ou Leaflet
+- [ ] Implementar preview de arquivos KML/KMZ
+- [ ] Adicionar controles de zoom
+- [ ] Implementar alternância de camadas

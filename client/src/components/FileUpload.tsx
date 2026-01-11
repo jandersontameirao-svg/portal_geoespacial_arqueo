@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, X, FileText, Image as ImageIcon, File } from "lucide-react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 interface FileUploadProps {
   projectId: number;
@@ -46,6 +47,8 @@ export default function FileUpload({
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const uploadMutation = trpc.files.upload.useMutation();
+
   const validateFile = (file: File): string | null => {
     // Validar tamanho
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
@@ -86,11 +89,58 @@ export default function FileUpload({
 
     setUploadingFiles((prev) => [...prev, ...newFiles]);
 
-    // Simular upload (substituir por chamada tRPC real)
+    // Upload real via tRPC
     for (const uploadFile of newFiles) {
       try {
-        // Simular progresso
-        for (let progress = 0; progress <= 100; progress += 10) {
+        // Converter arquivo para base64
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(",")[1];
+            resolve(base64);
+          };
+          reader.readAsDataURL(uploadFile.file);
+        });
+
+        const fileData = await base64Promise;
+
+        // Determinar categoria
+        let category: "geospatial" | "document" | "image" | "other" = "other";
+        if (
+          uploadFile.file.type.includes("kml") ||
+          uploadFile.file.type.includes("kmz") ||
+          uploadFile.file.type.includes("zip")
+        ) {
+          category = "geospatial";
+        } else if (
+          uploadFile.file.type.includes("pdf") ||
+          uploadFile.file.type.includes("word") ||
+          uploadFile.file.type.includes("sheet")
+        ) {
+          category = "document";
+        } else if (uploadFile.file.type.startsWith("image/")) {
+          category = "image";
+        }
+
+        // Atualizar progresso para 50% (preparando)
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.file === uploadFile.file ? { ...f, progress: 50 } : f
+          )
+        );
+
+        // Upload via tRPC (sem await para simular progresso)
+        const uploadPromise = uploadMutation.mutateAsync({
+          projectId,
+          filename: uploadFile.file.name,
+          mimeType: uploadFile.file.type,
+          size: uploadFile.file.size,
+          fileData,
+          category,
+        });
+
+        // Simular progresso enquanto faz upload
+        for (let progress = 50; progress <= 90; progress += 10) {
           await new Promise((resolve) => setTimeout(resolve, 200));
           setUploadingFiles((prev) =>
             prev.map((f) =>
@@ -98,6 +148,18 @@ export default function FileUpload({
             )
           );
         }
+
+        // Aguardar conclusão do upload
+        await uploadPromise;
+
+        // Marcar como 100% e sucesso
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.file === uploadFile.file ? { ...f, progress: 100 } : f
+          )
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
         // Marcar como sucesso
         setUploadingFiles((prev) =>
