@@ -3,6 +3,9 @@ import { filesRouter } from "./filesRouter";
 import { geometriesRouter } from "./geometriesRouter";
 import { adminRouter } from "./adminRouter";
 import { mfaRouter } from "./mfaRouter";
+import { searchRouter } from "./searchRouter";
+import { savedMapsRouter } from "./savedMapsRouter";
+import { printJobsRouter } from "./printJobsRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -612,6 +615,9 @@ export const appRouter = router({
   geometries: geometriesRouter,
   admin: adminRouter,
   mfa: mfaRouter,
+  search: searchRouter,
+  savedMaps: savedMapsRouter,
+  printJobs: printJobsRouter,
 });
 
 export type AppRouter = typeof appRouter;

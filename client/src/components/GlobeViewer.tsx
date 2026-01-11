@@ -21,6 +21,7 @@ import { MapEventsHandler } from "./MapEventsHandler";
 import { CoordinateSearch } from "./CoordinateSearch";
 import { formatUTMCoordinates } from "@/lib/utmHelper";
 import GeometryImport from "./GeometryImport";
+import SavedMapsPanel from "./SavedMapsPanel";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -527,6 +528,27 @@ export default function GlobeViewer({
 
       {/* Painel de Camadas */}
       <LayersPanel projectId={projectId} />
+      
+      {/* Painel de Estados de Mapa Salvos */}
+      {projectId && (
+        <SavedMapsPanel
+          projectId={projectId}
+          currentViewMode={viewMode}
+          currentCenter={{ lat: currentPosition.latitude, lon: currentPosition.longitude, height: currentPosition.altitude }}
+          currentZoom={viewMode === "2d" ? 12 : undefined}
+          onRestoreState={(state) => {
+            setViewMode(state.viewMode);
+            setCurrentPosition({
+              latitude: state.center.lat,
+              longitude: state.center.lon,
+              altitude: state.center.height || 2,
+            });
+            if (onViewModeChange) {
+              onViewModeChange(state.viewMode);
+            }
+          }}
+        />
+      )}
       
       {/* Info Badge */}
       <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg z-20">

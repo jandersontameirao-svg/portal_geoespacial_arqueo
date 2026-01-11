@@ -5,6 +5,7 @@ import * as db from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { processGeospatialFile, validateFileSize, validateZipFile } from "./fileProcessing";
+import { ensureFileSafe } from "./virusScanner";
 
 // ============================================================================
 // HELPER: Verificar acesso ao projeto
@@ -99,6 +100,33 @@ export const filesRouter = router({
 
       // Converter base64 para buffer
       const fileBuffer = Buffer.from(input.fileData, "base64");
+
+      // Scanner antivírus
+      const scanResult = await ensureFileSafe(fileBuffer, input.filename);
+      if (!scanResult.safe) {
+        // Log de auditoria para arquivo malicioso
+        await db.createAuditLog({
+          userId: ctx.user.id,
+          userEmail: ctx.user.email || null,
+          userName: ctx.user.name || null,
+          action: "file.malware_detected",
+          entityType: "file",
+          entityId: 0,
+          projectId: input.projectId,
+          details: {
+            filename: input.filename,
+            threats: scanResult.result.threats,
+            fileHash: scanResult.result.fileHash,
+          },
+          ipAddress: ctx.req.ip || null,
+          userAgent: ctx.req.headers?.["user-agent"] || null,
+        });
+
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Arquivo rejeitado por segurança: ${scanResult.result.threats.join(", ")}`,
+        });
+      }
 
       // Validar tamanho do arquivo
       if (!validateFileSize(fileBuffer.length)) {

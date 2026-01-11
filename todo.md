@@ -582,3 +582,53 @@
 - [ ] Suportar exportação em PNG e PDF
 - [ ] Criar procedure para gerar mapa de projeto
 - [ ] Testar geração com diferentes projetos
+
+## FASE FINAL - ITENS FALTANTES DO CHECKLIST
+
+### 54. Scanner Antivírus
+- [x] Implementar scanner local com validação de assinaturas
+- [x] Integrar com VirusTotal API (quando API key disponível)
+- [x] Escanear arquivos antes de salvar no S3
+- [x] Rejeitar arquivos com malware detectado
+- [x] Registrar resultado do scan em auditoria
+
+### 55. Headers OWASP de Segurança
+- [x] Instalar e configurar Helmet.js
+- [x] Adicionar Content-Security-Policy
+- [x] Adicionar X-Frame-Options
+- [x] Adicionar X-Content-Type-Options
+- [x] Adicionar Strict-Transport-Security
+
+### 56. Health Checks Avançados
+- [x] Criar endpoint /api/health
+- [x] Verificar conexão com banco de dados
+- [x] Verificar memória e uptime
+- [x] Retornar status de todos os serviços
+- [x] Adicionar métricas de performance
+
+### 57. Busca Global
+- [x] Criar endpoint de busca (searchRouter)
+- [x] Buscar em projetos, arquivos e camadas
+- [x] Filtrar por permissões do usuário
+- [x] Implementar sugestões de busca (autocomplete)
+- [ ] Implementar UI de busca no header
+
+### 58. Alternância 3D/2D
+- [x] Adicionar botão de toggle no viewer
+- [x] Implementar modo 2D com Leaflet
+- [x] Manter camadas sincronizadas entre modos
+- [ ] Salvar preferência do usuário
+
+### 59. Estados de Mapa Salvos
+- [x] Usar tabela savedMaps existente
+- [x] Salvar posição, zoom, camadas visíveis
+- [x] Permitir nomear e listar estados salvos
+- [x] Restaurar estado ao clicar
+- [x] Criar componente SavedMapsPanel
+
+### 60. Base para Mapas Técnicos ABNT
+- [x] Criar printJobsRouter para gerenciar jobs
+- [x] Definir schema para elementos do mapa
+- [x] Implementar generateTemplate para configuração
+- [x] Adicionar elementos: título, escala, norte, legenda, carimbo
+- [x] Cálculo automático de escala e fuso UTM
