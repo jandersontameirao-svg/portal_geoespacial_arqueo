@@ -29,6 +29,13 @@
       "when": 1768185153406,
       "tag": "0003_safe_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1768218801301,
+      "tag": "0004_illegal_mathemanic",
+      "breakpoints": true
     }
   ]
 }

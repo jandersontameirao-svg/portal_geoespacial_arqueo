@@ -140,7 +140,47 @@ export const fileVersions = mysqlTable("file_versions", {
 }));
 
 // ============================================================================
-// CAMADAS GEOESPACIAIS
+// CAMADAS BASE (DADOS OFICIAIS)
+// ============================================================================
+
+export const baseLayers = mysqlTable("base_layers", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  source: mysqlEnum("source", ["funai", "incra", "icmbio", "osm", "aneel", "custom"]).notNull(),
+  layerType: mysqlEnum("layerType", ["terras_indigenas", "terras_quilombolas", "unidades_conservacao", "rodovias", "infraestrutura_eletrica", "other"]).notNull(),
+  // Dados da camada (GeoJSON ou referência S3)
+  dataFormat: mysqlEnum("dataFormat", ["geojson", "shapefile", "kml", "wfs"]).notNull(),
+  dataUrl: text("dataUrl"), // URL do S3 ou WFS endpoint
+  s3Key: varchar("s3Key", { length: 500 }),
+  // Metadados
+  featureCount: int("featureCount"),
+  crs: varchar("crs", { length: 50 }).default("EPSG:4674").notNull(),
+  bounds: json("bounds").$type<{
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }>(),
+  // Cache e atualização
+  lastDownloadAt: timestamp("lastDownloadAt"),
+  lastUpdateAt: timestamp("lastUpdateAt"),
+  cacheExpiresAt: timestamp("cacheExpiresAt"),
+  downloadStatus: mysqlEnum("downloadStatus", ["pending", "downloading", "completed", "failed"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"),
+  // Controle
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  sourceIdx: index("source_idx").on(table.source),
+  layerTypeIdx: index("layer_type_idx").on(table.layerType),
+  statusIdx: index("status_idx").on(table.downloadStatus),
+}));
+
+// ============================================================================
+// CAMADAS GEOESPACIAIS (POR PROJETO)
 // ============================================================================
 
 export const layers = mysqlTable("layers", {

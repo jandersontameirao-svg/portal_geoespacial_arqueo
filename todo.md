@@ -826,3 +826,34 @@
 - [x] Expandir endpoint /api/health com todas as dependências
 - [x] Verificar status de PostgreSQL, Redis, S3
 - [x] Implementar métricas de performance (CPU, memória, disco)
+
+
+### 59. Sistema de Download Automático de Dados Geoespaciais
+- [x] Criar schema de banco para camadas base (base_layers, base_layer_features)
+- [x] Implementar serviço de download FUNAI (Terras Indígenas via WFS)
+- [x] Implementar serviço de download INCRA (Terras Quilombolas via ZIP)
+- [x] Criar jobs assíncronos para downloads longos
+- [x] Implementar sistema de cache (7 dias FUNAI, 30 dias INCRA)
+- [x] Adicionar reprojeção automática para EPSG:4674
+- [ ] Criar interface de gerenciamento de camadas base
+- [ ] Implementar atualização manual/automática de camadas
+
+### 60. Interface de Upload Manual de Shapefiles
+- [ ] Criar componente de upload de shapefile (ZIP com .shp, .shx, .dbf, .prj)
+- [ ] Validar formato de arquivo e completude
+- [ ] Extrair metadados (bbox, feature count, CRS)
+- [ ] Implementar reprojeção se necessário
+- [ ] Armazenar arquivos no S3
+- [ ] Registrar camadas no banco de dados
+- [ ] Criar página de gerenciamento de camadas customizadas
+
+### 61. Visualização de Camadas Base no Mapa
+- [ ] Integrar camadas FUNAI (Terras Indígenas) no visualizador
+- [ ] Integrar camadas INCRA (Terras Quilombolas) no visualizador
+- [ ] Integrar camadas ICMBio (Unidades de Conservação) via upload
+- [ ] Integrar camadas OSM (Rodovias) via upload
+- [ ] Integrar camadas ANEEL (Infraestrutura Elétrica) via upload
+- [ ] Adicionar controle de transparência por camada
+- [ ] Implementar filtros por tipo de camada
+- [ ] Adicionar legenda dinâmica para cada camada
+- [ ] Implementar tooltip com informações ao clicar em feature

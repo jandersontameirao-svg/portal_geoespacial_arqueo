@@ -10,6 +10,7 @@ import { backupRouter } from "./backupRouter";
 import { atlasRouter } from "./atlasRouter";
 import { notificationsRouter } from "./notificationsRouter";
 import { infrastructureRouter } from "./infrastructureRouter";
+import { baseLayersRouter } from "./baseLayersRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -626,6 +627,7 @@ export const appRouter = router({
   atlas: atlasRouter,
   notifications: notificationsRouter,
   infrastructure: infrastructureRouter,
+  baseLayers: baseLayersRouter,
 });
 
 export type AppRouter = typeof appRouter;
