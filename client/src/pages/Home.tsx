@@ -20,17 +20,39 @@ import {
   Database,
   BarChart3,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  PanelLeftClose,
+  PanelLeft
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import GlobeViewer from "@/components/GlobeViewer";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Carregar preferência do localStorage
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("sidebar-open");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
+  // Salvar preferências no localStorage
+  useEffect(() => {
+    localStorage.setItem("sidebar-open", JSON.stringify(sidebarOpen));
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem("sidebar-collapsed", JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   // Queries
   const { data: projects, isLoading: projectsLoading } = trpc.projects.list.useQuery(
@@ -99,24 +121,19 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* CTA Button */}
+              {/* CTA */}
               <div className="pt-8">
                 <Button 
                   size="lg" 
-                  asChild 
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 px-8 py-6 text-lg"
+                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-6 text-lg shadow-lg shadow-orange-500/25"
+                  asChild
                 >
                   <a href={getLoginUrl()}>
-                    <Users className="w-5 h-5 mr-2" />
-                    Acessar Portal
+                    Acessar Sistema
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </a>
                 </Button>
               </div>
-
-              <p className="text-sm text-slate-500">
-                Acesso restrito a usuários autorizados
-              </p>
             </div>
           </div>
 
@@ -144,227 +161,283 @@ export default function Home() {
     );
   }
 
+  // Largura do sidebar baseada no estado
+  const sidebarWidth = sidebarCollapsed ? "w-16" : "w-72";
+
   // Dashboard autenticado
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
-      {/* Main Content */}
-      <div className="flex-1 relative">
-        {/* Botão Toggle Sidebar */}
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute top-4 left-4 z-20 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-lg border border-slate-200 dark:border-slate-700"
-          title={sidebarOpen ? "Recolher painel" : "Expandir painel"}
-        >
-          {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-        </Button>
+    <TooltipProvider>
+      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+        {/* Main Content */}
+        <div className="flex-1 relative">
+          {/* Botão Toggle Sidebar (mostrar/ocultar completamente) */}
+          {!sidebarOpen && (
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="absolute top-4 left-4 z-20 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-lg border border-slate-200 dark:border-slate-700"
+              title="Mostrar painel"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </Button>
+          )}
 
-        {/* Sidebar Retrátil com Painéis */}
-        <aside 
-          data-tour="control-panel"
-          className={`absolute top-0 left-0 bottom-0 w-[420px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto scrollbar-thin z-10 transition-transform duration-300 shadow-xl ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
-        >
-          <div className="p-6 space-y-6 pt-16">
-            {/* Header do Sidebar */}
-            <div className="flex items-center gap-3 pb-2">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-slate-900 dark:text-white">Painel de Controle</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Bem-vindo, {user?.name?.split(' ')[0]}</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Ferramentas Rápidas */}
-            <div>
-              <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-                Ferramentas
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <Link href="/projects">
-                  <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:border-orange-300 dark:hover:border-orange-800 transition-all">
-                    <FolderKanban className="w-6 h-6 text-orange-500" />
-                    <span className="text-xs font-medium">Projetos</span>
-                  </Button>
-                </Link>
-                <Link href="/technical-maps">
-                  <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all">
-                    <Printer className="w-6 h-6 text-blue-500" />
-                    <span className="text-xs font-medium">Mapas ABNT</span>
-                  </Button>
-                </Link>
-                <Link href="/atlas">
-                  <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2 hover:bg-green-50 dark:hover:bg-green-950/20 hover:border-green-300 dark:hover:border-green-800 transition-all">
-                    <BookOpen className="w-6 h-6 text-green-500" />
-                    <span className="text-xs font-medium">Atlas</span>
-                  </Button>
-                </Link>
-                <Link href="/projects">
-                  <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2 hover:bg-purple-50 dark:hover:bg-purple-950/20 hover:border-purple-300 dark:hover:border-purple-800 transition-all">
-                    <FileUp className="w-6 h-6 text-purple-500" />
-                    <span className="text-xs font-medium">Arquivos</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
-            {/* Admin Tools */}
-            {user?.role === "admin" && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-                    Administração
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Link href="/admin">
-                      <Button variant="outline" className="w-full h-auto py-3 flex-col gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                        <BarChart3 className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                        <span className="text-xs">Dashboard</span>
-                      </Button>
-                    </Link>
-                    <Link href="/admin/users">
-                      <Button variant="outline" className="w-full h-auto py-3 flex-col gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                        <Users className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                        <span className="text-xs">Usuários</span>
-                      </Button>
-                    </Link>
-                    <Link href="/invitations">
-                      <Button variant="outline" className="w-full h-auto py-3 flex-col gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                        <FileText className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                        <span className="text-xs">Convites</span>
-                      </Button>
-                    </Link>
-                    <Link href="/admin">
-                      <Button variant="outline" className="w-full h-auto py-3 flex-col gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                        <Database className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                        <span className="text-xs">Backups</span>
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <Separator />
-
-            {/* Painel: Meus Projetos */}
-            <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FolderKanban className="w-5 h-5 text-orange-500" />
-                  Meus Projetos
-                </CardTitle>
-                <CardDescription>
-                  {projects?.length || 0} projeto(s) ativo(s)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {projectsLoading ? (
-                  <div className="space-y-2">
-                    {[1,2,3].map(i => (
-                      <div key={i} className="h-16 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse"></div>
-                    ))}
-                  </div>
-                ) : projects && projects.length > 0 ? (
-                  <div className="space-y-2">
-                    {projects.slice(0, 5).map((project) => (
-                      <Link key={project.id} href={`/projects/${project.id}`}>
-                        <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-orange-300 dark:hover:border-orange-700 transition-all cursor-pointer group">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-sm text-slate-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">{project.name}</p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{project.code}</p>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {project.status === 'active' ? 'Ativo' : project.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                    {projects.length > 5 && (
-                      <Button variant="ghost" size="sm" className="w-full text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300" asChild>
-                        <Link href="/projects">
-                          Ver todos os {projects.length} projetos
-                          <ArrowRight className="w-4 h-4 ml-1" />
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <FolderKanban className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                      Nenhum projeto encontrado
-                    </p>
-                    {(user?.role === "admin" || user?.role === "editor") && (
-                      <Button size="sm" className="bg-orange-500 hover:bg-orange-600" asChild>
-                        <Link href="/projects">
-                          Criar Projeto
-                        </Link>
-                      </Button>
-                    )}
+          {/* Sidebar Compacto */}
+          <aside 
+            data-tour="control-panel"
+            className={`absolute top-0 left-0 bottom-0 ${sidebarWidth} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto scrollbar-thin z-10 transition-all duration-300 shadow-lg ${
+              sidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+          >
+            <div className={`${sidebarCollapsed ? "p-2" : "p-4"} space-y-4`}>
+              {/* Header do Sidebar com botões de controle */}
+              <div className={`flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"} pb-2`}>
+                {!sidebarCollapsed && (
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600">
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="font-semibold text-sm text-slate-900 dark:text-white">Painel</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                        {user?.name?.split(' ')[0]}
+                      </p>
+                    </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Painel: Atividades Recentes */}
-            {user?.role === "admin" && (
-              <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock className="w-5 h-5 text-blue-500" />
-                    Atividades Recentes
-                  </CardTitle>
-                  <CardDescription>
-                    Últimas ações no sistema
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {logsLoading ? (
-                    <div className="space-y-2">
-                      {[1,2,3].map(i => (
-                        <div key={i} className="h-12 bg-slate-100 dark:bg-slate-800 rounded animate-pulse"></div>
-                      ))}
-                    </div>
-                  ) : recentLogs && recentLogs.length > 0 ? (
-                    <div className="space-y-3">
-                      {recentLogs.slice(0, 5).map((log) => (
-                        <div key={log.id} className="flex items-start gap-3 text-sm">
-                          <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-slate-700 dark:text-slate-300 truncate">{log.action}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {log.userName || log.userEmail} • {new Date(log.timestamp).toLocaleString('pt-BR')}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
-                      Nenhuma atividade recente
-                    </p>
+                
+                <div className="flex gap-1">
+                  {/* Botão Colapsar/Expandir */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                        className="h-7 w-7"
+                      >
+                        {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {sidebarCollapsed ? "Expandir" : "Compactar"}
+                    </TooltipContent>
+                  </Tooltip>
+                  
+                  {/* Botão Fechar */}
+                  {!sidebarCollapsed && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSidebarOpen(false)}
+                          className="h-7 w-7"
+                        >
+                          <PanelLeftClose className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        Fechar painel
+                      </TooltipContent>
+                    </Tooltip>
                   )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </aside>
+                </div>
+              </div>
 
-        {/* Visualizador Principal - Globo 3D (Tela Cheia) */}
-        <main className="absolute inset-0" data-tour="globe">
-          <GlobeViewer />
-        </main>
+              {!sidebarCollapsed && <Separator />}
+
+              {/* Ferramentas Rápidas */}
+              <div>
+                {!sidebarCollapsed && (
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    Ferramentas
+                  </h3>
+                )}
+                <div className={`${sidebarCollapsed ? "space-y-2" : "grid grid-cols-2 gap-1.5"}`}>
+                  {[
+                    { href: "/projects", icon: FolderKanban, label: "Projetos", color: "text-orange-500", hoverBg: "hover:bg-orange-50 dark:hover:bg-orange-950/20" },
+                    { href: "/technical-maps", icon: Printer, label: "Mapas", color: "text-blue-500", hoverBg: "hover:bg-blue-50 dark:hover:bg-blue-950/20" },
+                    { href: "/atlas", icon: BookOpen, label: "Atlas", color: "text-green-500", hoverBg: "hover:bg-green-50 dark:hover:bg-green-950/20" },
+                    { href: "/files", icon: FileUp, label: "Arquivos", color: "text-purple-500", hoverBg: "hover:bg-purple-50 dark:hover:bg-purple-950/20" },
+                  ].map((item) => (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <Link href={item.href}>
+                          <Button 
+                            variant="outline" 
+                            className={`${sidebarCollapsed ? "w-full h-10 p-0" : "w-full h-auto py-2.5 flex-col gap-1"} ${item.hoverBg} transition-all`}
+                          >
+                            <item.icon className={`${sidebarCollapsed ? "w-4 h-4" : "w-5 h-5"} ${item.color}`} />
+                            {!sidebarCollapsed && <span className="text-xs font-medium">{item.label}</span>}
+                          </Button>
+                        </Link>
+                      </TooltipTrigger>
+                      {sidebarCollapsed && (
+                        <TooltipContent side="right">{item.label}</TooltipContent>
+                      )}
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+
+              {/* Admin Tools */}
+              {user?.role === "admin" && (
+                <>
+                  {!sidebarCollapsed && <Separator />}
+                  <div>
+                    {!sidebarCollapsed && (
+                      <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                        Admin
+                      </h3>
+                    )}
+                    <div className={`${sidebarCollapsed ? "space-y-2" : "grid grid-cols-2 gap-1.5"}`}>
+                      {[
+                        { href: "/admin", icon: BarChart3, label: "Dashboard" },
+                        { href: "/admin/users", icon: Users, label: "Usuários" },
+                        { href: "/invitations", icon: FileText, label: "Convites" },
+                        { href: "/admin/backups", icon: Database, label: "Backups" },
+                      ].map((item) => (
+                        <Tooltip key={item.href}>
+                          <TooltipTrigger asChild>
+                            <Link href={item.href}>
+                              <Button 
+                                variant="outline" 
+                                className={`${sidebarCollapsed ? "w-full h-10 p-0" : "w-full h-auto py-2 flex-col gap-1"} hover:bg-slate-100 dark:hover:bg-slate-800 transition-all`}
+                              >
+                                <item.icon className={`${sidebarCollapsed ? "w-4 h-4" : "w-4 h-4"} text-slate-600 dark:text-slate-400`} />
+                                {!sidebarCollapsed && <span className="text-xs">{item.label}</span>}
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          {sidebarCollapsed && (
+                            <TooltipContent side="right">{item.label}</TooltipContent>
+                          )}
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Painel: Meus Projetos (apenas quando expandido) */}
+              {!sidebarCollapsed && (
+                <>
+                  <Separator />
+                  <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
+                    <CardHeader className="p-3 pb-2">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <FolderKanban className="w-4 h-4 text-orange-500" />
+                        Meus Projetos
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {projects?.length || 0} projeto(s)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0">
+                      {projectsLoading ? (
+                        <div className="space-y-1.5">
+                          {[1,2,3].map(i => (
+                            <div key={i} className="h-10 bg-slate-100 dark:bg-slate-800 rounded animate-pulse"></div>
+                          ))}
+                        </div>
+                      ) : projects && projects.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {projects.slice(0, 4).map((project) => (
+                            <Link key={project.id} href={`/projects/${project.id}`}>
+                              <div className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-orange-300 dark:hover:border-orange-700 transition-all cursor-pointer group">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-xs text-slate-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors truncate">{project.name}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{project.code}</p>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs flex-shrink-0 px-1.5 py-0">
+                                    {project.status === 'active' ? 'Ativo' : project.status}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                          {projects.length > 4 && (
+                            <Button variant="ghost" size="sm" className="w-full text-xs text-orange-600 dark:text-orange-400 h-7" asChild>
+                              <Link href="/projects">
+                                Ver todos ({projects.length})
+                                <ArrowRight className="w-3 h-3 ml-1" />
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <FolderKanban className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                            Nenhum projeto
+                          </p>
+                          {(user?.role === "admin" || user?.role === "editor") && (
+                            <Button size="sm" className="bg-orange-500 hover:bg-orange-600 h-7 text-xs" asChild>
+                              <Link href="/projects">Criar</Link>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {/* Atividades Recentes (apenas quando expandido e admin) */}
+              {!sidebarCollapsed && user?.role === "admin" && (
+                <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
+                  <CardHeader className="p-3 pb-2">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Clock className="w-4 h-4 text-blue-500" />
+                      Atividades
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    {logsLoading ? (
+                      <div className="space-y-1.5">
+                        {[1,2,3].map(i => (
+                          <div key={i} className="h-8 bg-slate-100 dark:bg-slate-800 rounded animate-pulse"></div>
+                        ))}
+                      </div>
+                    ) : recentLogs && recentLogs.length > 0 ? (
+                      <div className="space-y-2">
+                        {recentLogs.slice(0, 4).map((log) => (
+                          <div key={log.id} className="flex items-start gap-2 text-xs">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-slate-700 dark:text-slate-300 truncate">{log.action}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                {log.userName || log.userEmail?.split('@')[0]}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-2">
+                        Sem atividades recentes
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </aside>
+
+          {/* Globe Viewer */}
+          <div 
+            data-tour="globe-viewer"
+            className={`absolute inset-0 transition-all duration-300 ${
+              sidebarOpen ? (sidebarCollapsed ? "left-16" : "left-72") : "left-0"
+            }`}
+          >
+            <GlobeViewer />
+          </div>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

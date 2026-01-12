@@ -758,3 +758,30 @@
 - [ ] Salvar preferência de tour completo no localStorage
 - [ ] Adicionar botão para reiniciar tour
 - [ ] Integrar tour na página inicial
+
+
+### 77. Notificações Automáticas
+- [ ] Criar função helper para criar notificações
+- [ ] Adicionar trigger em convites (novo convite recebido)
+- [ ] Adicionar trigger em uploads (upload concluído)
+- [ ] Adicionar trigger em erros (erro em processamento)
+- [ ] Testar notificações automáticas
+
+### 78. Redesign do Menu Lateral
+- [ ] Reduzir largura do sidebar (420px → 280px)
+- [ ] Diminuir padding e espaçamentos
+- [ ] Reduzir tamanho dos ícones e textos
+- [ ] Compactar cards de ferramentas
+- [ ] Adicionar botão de recolher/expandir
+- [ ] Implementar modo mini (apenas ícones)
+- [ ] Salvar preferência do usuário no localStorage
+
+### 56. Redesign do Menu Lateral (Sidebar)
+- [x] Reduzir largura do sidebar de 420px para 288px (w-72)
+- [x] Implementar modo compacto (64px) com apenas ícones
+- [x] Adicionar botão de colapsar/expandir (setas)
+- [x] Adicionar botão de fechar painel completamente
+- [x] Persistir preferências no localStorage
+- [x] Adicionar tooltips nos ícones quando em modo compacto
+- [x] Implementar transições suaves de 300ms
+- [x] Ajustar área do globo para expandir quando sidebar recolhido

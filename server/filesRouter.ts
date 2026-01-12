@@ -6,6 +6,7 @@ import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { processGeospatialFile, validateFileSize, validateZipFile } from "./fileProcessing";
 import { ensureFileSafe } from "./virusScanner";
+import { notifyUploadComplete, notifyUploadError } from "./notificationHelper";
 
 // ============================================================================
 // HELPER: Verificar acesso ao projeto
@@ -223,6 +224,9 @@ export const filesRouter = router({
         ipAddress: ctx.req.ip || null,
         userAgent: ctx.req.headers?.["user-agent"] || null,
       });
+
+      // Notificar usuário sobre upload concluído
+      await notifyUploadComplete(ctx.user.id, input.filename, input.projectId);
 
       return {
         success: true,
