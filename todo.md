@@ -952,3 +952,12 @@
 - [ ] Destacar features encontradas no mapa
 - [ ] Adicionar botão para exportar relatório de proximidade
 - [ ] Implementar cálculo de distância mínima usando turf.js
+
+
+### 72. Visualização de Rodovias no Mapa
+- [x] Adicionar toggle "Rodovias Federais" no painel de controle
+- [x] Carregar GeoJSON de rodovias do S3
+- [x] Renderizar linhas azuis (#2563eb) com peso 3px
+- [x] Adicionar tooltips com ref, nome, tipo e superfície
+- [x] Aplicar filtros geográficos às rodovias
+- [x] Adicionar contador de rodovias visíveis

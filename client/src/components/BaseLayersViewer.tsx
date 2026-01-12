@@ -70,7 +70,7 @@ function MapRefHandler({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null
 interface LayerControl {
   id: string;
   name: string;
-  source: "funai" | "incra" | "iphan";
+  source: "funai" | "incra" | "iphan" | "osm_rodovias";
   color: string;
   visible: boolean;
   opacity: number;
@@ -123,6 +123,16 @@ export default function BaseLayersViewer() {
       data: null,
       loading: false,
     },
+    {
+      id: "osm_rodovias",
+      name: "Rodovias Federais",
+      source: "osm_rodovias",
+      color: "#2563eb", // blue-600
+      visible: false,
+      opacity: 80,
+      data: null,
+      loading: false,
+    },
   ]);
 
   const [bounds, setBounds] = useState<L.LatLngBoundsExpression | null>(null);
@@ -143,7 +153,13 @@ export default function BaseLayersViewer() {
     if (!layer) return;
 
     // Verificar se camada existe no banco
-    const dbLayer = availableLayers?.find((l) => l.source === layer.source);
+    let dbLayer;
+    if (layer.source === "osm_rodovias") {
+      dbLayer = availableLayers?.find((l) => l.source === "osm" && l.layerType === "rodovias");
+    } else {
+      dbLayer = availableLayers?.find((l) => l.source === layer.source);
+    }
+    
     if (!dbLayer || !dbLayer.dataUrl) {
       toast.error(`Camada ${layer.name} não está disponível. Baixe-a primeiro na página de Camadas Base.`);
       return;
@@ -172,6 +188,16 @@ export default function BaseLayersViewer() {
           if (feature.geometry.type === "Point") {
             const [lng, lat] = feature.geometry.coordinates as [number, number];
             coordinates.push([lat, lng]);
+          } else if (feature.geometry.type === "LineString") {
+            feature.geometry.coordinates.forEach((coord: any) => {
+              coordinates.push([coord[1], coord[0]]);
+            });
+          } else if (feature.geometry.type === "MultiLineString") {
+            feature.geometry.coordinates.forEach((line: any) => {
+              line.forEach((coord: any) => {
+                coordinates.push([coord[1], coord[0]]);
+              });
+            });
           } else if (feature.geometry.type === "Polygon") {
             feature.geometry.coordinates[0].forEach((coord: any) => {
               coordinates.push([coord[1], coord[0]]);
@@ -382,6 +408,15 @@ export default function BaseLayersViewer() {
   // Estilo para features
   const getFeatureStyle = (layer: LayerControl) => {
     return (feature?: Feature<Geometry, any>) => {
+      // Estilo para rodovias (linhas)
+      if (layer.id === "osm_rodovias") {
+        return {
+          color: layer.color,
+          weight: 3,
+          opacity: layer.opacity / 100,
+        };
+      }
+
       const baseStyle = {
         color: layer.color,
         weight: 2,
@@ -423,6 +458,13 @@ export default function BaseLayersViewer() {
           content += `<strong>Código:</strong> ${props.co_iphan || "—"}<br/>`;
           content += `<strong>Tipo:</strong> ${props.ds_classificacao || "—"}<br/>`;
           content += `<strong>Município:</strong> ${props.no_logradouro || "—"}<br/>`;
+        } else if (layer.source === "osm_rodovias") {
+          content += `<strong>Ref:</strong> ${props.ref || "—"}<br/>`;
+          content += `<strong>Nome:</strong> ${props.name || "—"}<br/>`;
+          content += `<strong>Tipo:</strong> ${props.highway || "—"}<br/>`;
+          if (props.surface) {
+            content += `<strong>Superfície:</strong> ${props.surface}<br/>`;
+          }
         }
         
         content += `</div>`;
@@ -436,7 +478,7 @@ export default function BaseLayersViewer() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Visualizador de Camadas Base</h1>
         <p className="text-muted-foreground">
-          Visualize terras indígenas, quilombolas e sítios arqueológicos no mapa
+          Visualize terras indígenas, quilombolas, sítios arqueológicos e rodovias federais no mapa
         </p>
       </div>
 
