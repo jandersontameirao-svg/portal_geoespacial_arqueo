@@ -1009,3 +1009,11 @@
 - [ ] Renderizar geometrias no mapa
 - [ ] Adicionar tooltips com metadados
 - [ ] Sincronizar com filtros geográficos
+
+
+### 75. Correção de Suporte a Arquivos KMZ
+- [x] Implementar descompactação de arquivos KMZ no backend
+- [x] Extrair arquivo KML interno do ZIP
+- [x] Atualizar validação por IA para processar KML extraído
+- [x] Testar upload de arquivo KMZ real
+- [x] Garantir que metadados são extraídos corretamente

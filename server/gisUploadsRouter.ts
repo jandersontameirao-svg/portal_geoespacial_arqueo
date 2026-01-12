@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "./_core/trpc.js";
 import * as db from "./db.js";
 import { storagePut } from "./storage.js";
 import { invokeLLM } from "./_core/llm.js";
+import AdmZip from "adm-zip";
 
 export const gisUploadsRouter = router({
   // Listar uploads do usuário
@@ -94,9 +95,37 @@ export const gisUploadsRouter = router({
 
       // Validar arquivo com IA (assíncrono)
       try {
+        // Se for KMZ, descompactar e extrair KML
+        let contentToValidate = input.fileContent;
+        let fileTypeToValidate = upload.fileType;
+
+        if (upload.fileType === "kmz") {
+          try {
+            // Decodificar base64 para buffer
+            const buffer = Buffer.from(input.fileContent, "base64");
+            const zip = new AdmZip(buffer);
+            const zipEntries = zip.getEntries();
+
+            // Procurar arquivo .kml dentro do ZIP
+            const kmlEntry = zipEntries.find(
+              (entry) => entry.entryName.toLowerCase().endsWith(".kml")
+            );
+
+            if (!kmlEntry) {
+              throw new Error("Arquivo KML não encontrado dentro do KMZ");
+            }
+
+            // Extrair conteúdo do KML
+            contentToValidate = kmlEntry.getData().toString("utf8");
+            fileTypeToValidate = "kml";
+          } catch (error: any) {
+            throw new Error(`Erro ao descompactar KMZ: ${error.message}`);
+          }
+        }
+
         const validationResult = await validateGisFile(
-          upload.fileType,
-          input.fileContent
+          fileTypeToValidate,
+          contentToValidate
         );
 
         await db.completeGisUpload(
