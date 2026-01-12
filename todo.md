@@ -739,3 +739,22 @@
 - [ ] Mostrar feedback visual de erros
 - [ ] Desabilitar botão até formulário válido
 - [ ] Adicionar preview antes de gerar
+
+
+### 75. Sistema de Notificações em Tempo Real
+- [ ] Criar tabela notifications no schema
+- [ ] Criar notificationsRouter com procedures CRUD
+- [ ] Implementar procedure para listar notificações não lidas
+- [ ] Implementar procedure para marcar como lida
+- [ ] Criar componente NotificationBell no header
+- [ ] Adicionar contador de notificações não lidas
+- [ ] Criar dropdown com lista de notificações
+- [ ] Adicionar polling para atualização em tempo real
+
+### 76. Tour Guiado para Novos Usuários
+- [ ] Instalar react-joyride
+- [ ] Criar componente GuidedTour
+- [ ] Definir steps para funcionalidades principais
+- [ ] Salvar preferência de tour completo no localStorage
+- [ ] Adicionar botão para reiniciar tour
+- [ ] Integrar tour na página inicial

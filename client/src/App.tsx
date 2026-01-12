@@ -16,6 +16,7 @@ import Atlas from "./pages/Atlas";
 import Users from "./pages/Users";
 import Files from "./pages/Files";
 import Backups from "./pages/Backups";
+import { GuidedTour } from "./components/GuidedTour";
 
 function Router() {
   return (
@@ -47,6 +48,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
+          <GuidedTour />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

@@ -416,3 +416,27 @@ export const geometries = mysqlTable("geometries", {
 
 export type Geometry = typeof geometries.$inferSelect;
 export type InsertGeometry = typeof geometries.$inferInsert;
+
+
+// ============================================================================
+// NOTIFICAÇÕES
+// ============================================================================
+
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["info", "success", "warning", "error"]).default("info").notNull(),
+  category: mysqlEnum("category", ["invite", "upload", "project", "system", "security"]).default("system").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  link: varchar("link", { length: 500 }),
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("user_id_idx").on(table.userId),
+  readIdx: index("read_idx").on(table.read),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;

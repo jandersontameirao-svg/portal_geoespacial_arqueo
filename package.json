@@ -94,6 +94,7 @@
     "react-dom": "^19.2.1",
     "react-globe.gl": "^2.37.0",
     "react-hook-form": "^7.64.0",
+    "react-joyride": "^2.9.3",
     "react-leaflet": "^5.0.0",
     "react-leaflet-draw": "^0.21.0",
     "react-resizable-panels": "^3.0.6",

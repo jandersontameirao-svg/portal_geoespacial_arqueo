@@ -162,6 +162,7 @@ export default function Home() {
 
         {/* Sidebar Retrátil com Painéis */}
         <aside 
+          data-tour="control-panel"
           className={`absolute top-0 left-0 bottom-0 w-[420px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto scrollbar-thin z-10 transition-transform duration-300 shadow-xl ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
@@ -360,7 +361,7 @@ export default function Home() {
         </aside>
 
         {/* Visualizador Principal - Globo 3D (Tela Cheia) */}
-        <main className="absolute inset-0">
+        <main className="absolute inset-0" data-tour="globe">
           <GlobeViewer />
         </main>
       </div>

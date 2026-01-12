@@ -29,6 +29,7 @@ import {
   Map as MapIcon
 } from "lucide-react";
 import GlobalSearch from "./GlobalSearch";
+import { NotificationBell } from "./NotificationBell";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -91,7 +92,7 @@ export default function Header() {
 
             {/* Projetos */}
             <Link href="/projects">
-              <a className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              <a data-tour="projects" className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 isActive("/projects")
                   ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
                   : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -101,10 +102,10 @@ export default function Header() {
               </a>
             </Link>
 
-            {/* Ferramentas Dropdown */}
+            {/* Menu Ferramentas */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
+                <button data-tour="tools-menu" className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
                   isActive("/maps") || isActive("/atlas") || isActive("/files")
                     ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
                     : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -213,12 +214,15 @@ export default function Header() {
         {/* Busca Global e Menu do Usuário */}
         <div className="flex items-center gap-3">
           {/* Busca Global */}
-          {isAuthenticated && <GlobalSearch />}
+          {isAuthenticated && <div data-tour="search"><GlobalSearch /></div>}
+          
+          {/* Notificações */}
+          {isAuthenticated && <div data-tour="notifications"><NotificationBell /></div>}
           
           {isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 border-slate-200 dark:border-slate-700">
+                <Button data-tour="user-menu" variant="outline" size="sm" className="gap-2 border-slate-200 dark:border-slate-700">
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold">
                     {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
                   </div>
