@@ -34,7 +34,9 @@ import {
   Filter,
   Ruler,
   Download,
+  Search,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { BRAZILIAN_STATES, REGIONS } from "@/lib/brazilianStates";
 import type { FeatureCollection, Feature, Geometry } from "geojson";
 import L from "leaflet";
@@ -42,15 +44,29 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "leaflet-draw/dist/leaflet.draw.css";
+import "leaflet-geometryutil";
+import MeasurementControl from "@/components/MeasurementControl";
 
 // Fix para ícones do Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
+// Componente para capturar referência do mapa
+function MapRefHandler({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null> }) {
+  const map = useMap();
+  useEffect(() => {
+    mapRef.current = map;
+  }, [map, mapRef]);
+  return null;
+}
 interface LayerControl {
   id: string;
   name: string;
@@ -113,6 +129,10 @@ export default function BaseLayersViewer() {
   const [selectedState, setSelectedState] = useState<string>("all");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [clusteringEnabled, setClusteringEnabled] = useState<boolean>(true);
+  const [measurementMode, setMeasurementMode] = useState<"distance" | "area" | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<Feature[]>([]);
+  const mapRef = useRef<L.Map | null>(null);
 
   // Query para listar camadas disponíveis
   const { data: availableLayers } = trpc.baseLayers.list.useQuery();
@@ -216,6 +236,114 @@ export default function BaseLayersViewer() {
         l.id === layerId ? { ...l, opacity } : l
       )
     );
+  };
+
+  // Função para buscar sítios
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (term.length < 3) {
+      setSearchResults([]);
+      return;
+    }
+
+    // Buscar apenas na camada IPHAN (sítios arqueológicos)
+    const iphanLayer = layers.find((l) => l.id === "iphan");
+    if (!iphanLayer || !iphanLayer.data) {
+      setSearchResults([]);
+      return;
+    }
+
+    // Filtrar features que contém o termo de busca
+    const results = iphanLayer.data.features.filter((feature) => {
+      const props = feature.properties;
+      if (!props) return false;
+
+      const searchableFields = [
+        props.nome || "",
+        props.cnsa || "",
+        props.municipio || "",
+        props.uf || "",
+      ];
+
+      return searchableFields.some((field) =>
+        field.toString().toLowerCase().includes(term.toLowerCase())
+      );
+    });
+
+    setSearchResults(results.slice(0, 10)); // Limitar a 10 resultados
+  };
+
+  // Função para zoom em um sítio
+  const handleSelectSite = (feature: Feature) => {
+    if (!mapRef.current) return;
+
+    const geometry = feature.geometry;
+    if (geometry.type === "Point") {
+      const coords = geometry.coordinates as [number, number];
+      mapRef.current.setView([coords[1], coords[0]], 15);
+      
+      // Mostrar toast com informações do sítio
+      const props = feature.properties;
+      toast.success(
+        `${props?.nome || "Sítio"} - ${props?.municipio || ""} (${props?.uf || ""})`
+      );
+    }
+
+    setSearchTerm("");
+    setSearchResults([]);
+  };
+
+  // Função para exportar dados
+  const handleExport = async (format: "geojson" | "shapefile") => {
+    try {
+      // Coletar todas as camadas visíveis com filtros aplicados
+      const visibleLayers = layers.filter((l) => l.visible && l.data);
+      if (visibleLayers.length === 0) {
+        toast.error("Nenhuma camada visível para exportar");
+        return;
+      }
+
+      // Combinar todas as features filtradas
+      const combinedFeatures: Feature[] = [];
+      visibleLayers.forEach((layer) => {
+        const filtered = filterFeatures(layer.data!);
+        filtered.features.forEach((feature) => {
+          // Adicionar propriedade de camada
+          combinedFeatures.push({
+            ...feature,
+            properties: {
+              ...feature.properties,
+              layer_source: layer.name,
+            },
+          });
+        });
+      });
+
+      const exportData: FeatureCollection = {
+        type: "FeatureCollection",
+        features: combinedFeatures,
+      };
+
+      if (format === "geojson") {
+        // Exportar como GeoJSON
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `camadas_base_${new Date().toISOString().split("T")[0]}.geojson`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("GeoJSON exportado com sucesso!");
+      } else {
+        // Exportar como Shapefile (ZIP)
+        toast.info("Exportação de Shapefile não implementada ainda");
+      }
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      toast.error("Erro ao exportar dados");
+    }
   };
 
   // Função para filtrar features por estado/região
@@ -443,6 +571,130 @@ export default function BaseLayersViewer() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Ferramentas de Medição */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Ruler className="w-5 h-5" />
+                <h3 className="font-semibold">Medição</h3>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  variant={measurementMode === "distance" ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => setMeasurementMode(measurementMode === "distance" ? null : "distance")}
+                >
+                  <Ruler className="w-4 h-4 mr-2" />
+                  Medir Distância
+                </Button>
+                <Button
+                  variant={measurementMode === "area" ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => setMeasurementMode(measurementMode === "area" ? null : "area")}
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Medir Área
+                </Button>
+              </div>
+
+              {measurementMode && (
+                <p className="text-xs text-muted-foreground">
+                  {measurementMode === "distance"
+                    ? "Clique no mapa para começar a desenhar uma linha."
+                    : "Clique no mapa para começar a desenhar um polígono."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Exportação de Dados */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Download className="w-5 h-5" />
+                <h3 className="font-semibold">Exportar Dados</h3>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => handleExport("geojson")}
+                  disabled={!layers.some((l) => l.visible && l.data)}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar GeoJSON
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => handleExport("shapefile")}
+                  disabled={!layers.some((l) => l.visible && l.data)}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar Shapefile (ZIP)
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Exporta apenas camadas visíveis com filtros aplicados.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Busca de Sítios */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="w-5 h-5" />
+                <h3 className="font-semibold">Buscar Sítios</h3>
+              </div>
+
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Nome, CNSA ou município..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pr-8"
+                />
+                <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              </div>
+
+              {searchResults.length > 0 && (
+                <div className="border rounded-md divide-y max-h-60 overflow-y-auto">
+                  {searchResults.map((feature, idx) => {
+                    const props = feature.properties;
+                    return (
+                      <button
+                        key={idx}
+                        className="w-full text-left p-2 hover:bg-accent transition-colors"
+                        onClick={() => handleSelectSite(feature)}
+                      >
+                        <div className="text-sm font-medium">
+                          {props?.nome || "Sítio sem nome"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {props?.cnsa && `CNSA: ${props.cnsa} • `}
+                          {props?.municipio} - {props?.uf}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Busca nos sítios arqueológicos do IPHAN.
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Mapa */}
@@ -504,6 +756,18 @@ export default function BaseLayersViewer() {
 
               {/* Ajustar bounds quando camada é carregada */}
               {bounds && <FitBounds bounds={bounds} />}
+
+              {/* Ferramenta de Medição */}
+              <MeasurementControl
+                enabled={measurementMode !== null}
+                mode={measurementMode}
+                onMeasurementComplete={(result) => {
+                  toast.success(`Medição: ${result.value.toFixed(2)} ${result.unit}`);
+                }}
+              />
+
+              {/* Capturar referência do mapa */}
+              <MapRefHandler mapRef={mapRef} />
             </MapContainer>
           </CardContent>
         </Card>

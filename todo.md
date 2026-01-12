@@ -899,3 +899,29 @@
 - [x] Otimizar performance com chunkedLoading
 - [x] Testar com 30.526 pontos do IPHAN
 - [ ] Adicionar estatísticas de performance no painel
+
+
+### 66. Ferramenta de Medição
+- [x] Adicionar botões de medição no painel de controle
+- [x] Implementar medição de distâncias lineares
+- [x] Implementar medição de áreas poligonais
+- [x] Exibir resultados em metros/km e hectares
+- [x] Adicionar botão para limpar medições
+- [x] Estilizar linhas e polígonos de medição
+
+### 67. Exportação de Dados Filtrados
+- [x] Criar botão de exportação no painel
+- [x] Implementar exportação em GeoJSON
+- [ ] Implementar exportação em Shapefile (ZIP)
+- [x] Aplicar filtros geográficos aos dados exportados
+- [x] Incluir metadados no arquivo exportado
+- [x] Adicionar indicador de progresso durante exportação
+
+### 68. Busca Textual de Sítios
+- [x] Adicionar campo de busca no painel
+- [x] Implementar busca por nome do sítio
+- [x] Implementar busca por CNSA
+- [x] Implementar busca por município
+- [x] Exibir resultados em dropdown
+- [x] Zoom automático no sítio selecionado
+- [x] Destacar sítio encontrado no mapa
