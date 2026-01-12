@@ -7,8 +7,9 @@
  * - IPHAN: Sítios Arqueológicos
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,13 @@ import {
 } from "lucide-react";
 
 export default function BaseLayers() {
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [downloading, setDownloading] = useState<string | null>(null);
+
+  // Log de autenticação para debug
+  useEffect(() => {
+    console.log("[BaseLayers] Auth status:", { user, isAuthenticated, authLoading });
+  }, [user, isAuthenticated, authLoading]);
 
   // Query para listar camadas
   const { data: layers, isLoading, refetch } = trpc.baseLayers.list.useQuery();
@@ -40,6 +47,7 @@ export default function BaseLayers() {
       setDownloading(null);
     },
     onError: (error) => {
+      console.error("[FUNAI] Erro na mutation:", error);
       toast.error(`Erro ao baixar FUNAI: ${error.message}`);
       setDownloading(null);
     },
@@ -52,6 +60,7 @@ export default function BaseLayers() {
       setDownloading(null);
     },
     onError: (error) => {
+      console.error("[INCRA] Erro na mutation:", error);
       toast.error(`Erro ao baixar INCRA: ${error.message}`);
       setDownloading(null);
     },
@@ -64,6 +73,7 @@ export default function BaseLayers() {
       setDownloading(null);
     },
     onError: (error) => {
+      console.error("[IPHAN] Erro na mutation:", error);
       toast.error(`Erro ao baixar IPHAN: ${error.message}`);
       setDownloading(null);
     },
@@ -76,6 +86,7 @@ export default function BaseLayers() {
       setDownloading(null);
     },
     onError: (error) => {
+      console.error("[Rodovias] Erro na mutation:", error);
       toast.error(`Erro ao baixar Rodovias: ${error.message}`);
       setDownloading(null);
     },

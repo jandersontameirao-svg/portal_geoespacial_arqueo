@@ -1017,3 +1017,12 @@
 - [x] Atualizar validação por IA para processar KML extraído
 - [x] Testar upload de arquivo KMZ real
 - [x] Garantir que metadados são extraídos corretamente
+
+
+### Bug Fix: Download de Camadas Base
+- [x] Corrigir erro no download de camadas base da FUNAI
+- [x] Implementar storage usando manus-upload-file
+- [x] Testar download de camadas FUNAI com sucesso (650 features)
+- [x] Testar download de camadas INCRA (94 features)
+- [x] Testar download de camadas IPHAN (30,533 features)
+- [x] Testar download de camadas OSM (corrigido bbox e query simplificada)

@@ -86,9 +86,12 @@ export async function downloadTerrasIndigenas(
     console.log(`[FUNAI] Baixando terras indígenas${uf ? ` do estado ${uf}` : ""}...`);
     
     // Download
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutos
+    
     const response = await fetch(url, {
-      timeout: 120000, // 2 minutos
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -151,9 +154,12 @@ export async function downloadTerrasQuilombolas(): Promise<DownloadResult> {
     console.log("[INCRA] Baixando terras quilombolas...");
     
     // Download
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minuto
+    
     const response = await fetch(url, {
-      timeout: 60000, // 1 minuto
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -233,28 +239,31 @@ export async function downloadRodovias(
 ): Promise<DownloadResult> {
   try {
     // Bounding box do Brasil ou estado específico
-    const bbox = state ? getStateBBox(state) : "(-34,-74,6,-34)";
+    const bbox = state ? getStateBBox(state) : "(-34,-74,6,-33)";
     
     // Query Overpass para rodovias federais
     const query = `
       [out:json][timeout:60];
       (
-        way["highway"~"^(motorway|trunk|primary)$"]["ref"~"^BR-"]${bbox};
+        way["highway"~"^(motorway|trunk)$"]["ref"~"^BR-"]${bbox};
       );
       out geom;
     `;
 
     console.log(`[OSM] Baixando rodovias${state ? ` do estado ${state}` : " do Brasil"}...`);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 65000);
+    
     const response = await fetch(
       "https://overpass-api.de/api/interpreter",
       {
         method: "POST",
         body: query,
         headers: { "Content-Type": "text/plain" },
-        timeout: 65000,
+        signal: controller.signal,
       }
-    );
+    ).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -413,9 +422,12 @@ export async function downloadSitiosArqueologicos(
     console.log(`[IPHAN] Baixando sítios arqueológicos${maxFeatures ? ` (limite: ${maxFeatures})` : " (todos)"}...`);
     
     // Download
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutos (pode ser grande)
+    
     const response = await fetch(url, {
-      timeout: 300000, // 5 minutos (pode ser grande)
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);

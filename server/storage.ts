@@ -1,27 +1,14 @@
 /**
- * Storage helper for S3-compatible object storage
- * Uses Manus built-in storage service
+ * Storage helper using Manus built-in storage service
+ * Uses REST API instead of S3-compatible interface
  */
 
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { ENV } from "./_core/env";
-
-// Configurar cliente S3
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || "us-east-1",
-  endpoint: process.env.S3_ENDPOINT,
-  credentials: process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY ? {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  } : undefined,
-  forcePathStyle: true,
-});
-
-const BUCKET_NAME = process.env.S3_BUCKET || "portal-geoespacial";
+import { randomBytes } from "crypto";
 
 /**
- * Upload de arquivo para S3
- * @param key - Chave do arquivo no S3 (path completo)
+ * Upload de arquivo para Manus Storage
+ * @param key - Chave do arquivo no storage (path completo)
  * @param data - Dados do arquivo (Buffer, Uint8Array ou string)
  * @param contentType - Tipo MIME do arquivo
  * @returns Objeto com key e url do arquivo
@@ -33,41 +20,70 @@ export async function storagePut(
 ): Promise<{ key: string; url: string }> {
   try {
     // Converter string para Buffer se necessário
-    const body = typeof data === "string" ? Buffer.from(data) : data;
+    const buffer = typeof data === "string" ? Buffer.from(data) : data;
 
-    // Upload para S3
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-      })
-    );
+    console.log(`[Storage] Uploading file: ${key}`);
+    console.log(`[Storage] Size: ${buffer.length} bytes`);
+    console.log(`[Storage] Content-Type: ${contentType || "application/octet-stream"}`);
 
-    // Construir URL pública
-    const url = process.env.S3_PUBLIC_URL
-      ? `${process.env.S3_PUBLIC_URL}/${key}`
-      : `https://${BUCKET_NAME}.s3.amazonaws.com/${key}`;
+    // Usar o utilitário manus-upload-file para fazer upload
+    // Este é um helper interno do Manus que já tem as credenciais configuradas
+    const { execSync } = await import("child_process");
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
 
-    return { key, url };
-  } catch (error) {
-    console.error("Erro ao fazer upload para S3:", error);
-    throw new Error("Falha ao fazer upload do arquivo");
+    // Criar arquivo temporário
+    const tmpDir = os.tmpdir();
+    const tmpFile = path.join(tmpDir, `upload-${randomBytes(8).toString("hex")}`);
+    
+    fs.writeFileSync(tmpFile, buffer);
+
+    try {
+      // Usar o comando manus-upload-file
+      const result = execSync(`manus-upload-file "${tmpFile}"`, {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      // O comando retorna a URL do arquivo
+      const url = result.trim();
+      
+      console.log(`[Storage] ✓ Upload successful: ${url}`);
+
+      // Limpar arquivo temporário
+      fs.unlinkSync(tmpFile);
+
+      return { key, url };
+    } catch (uploadError: any) {
+      // Limpar arquivo temporário em caso de erro
+      try {
+        fs.unlinkSync(tmpFile);
+      } catch {}
+      
+      throw uploadError;
+    }
+  } catch (error: any) {
+    console.error("[Storage] Erro ao fazer upload:", error);
+    console.error("[Storage] Detalhes do erro:", {
+      message: error.message,
+      stderr: error.stderr?.toString(),
+      stdout: error.stdout?.toString(),
+    });
+    throw new Error(`Falha ao fazer upload do arquivo: ${error.message}`);
   }
 }
 
 /**
- * Obter URL pré-assinada para download (se necessário)
- * Por enquanto retorna URL pública diretamente
+ * Obter URL pública para download
+ * Nota: Como usamos manus-upload-file, a URL já é retornada no upload
  */
 export async function storageGet(
   key: string,
   expiresIn?: number
 ): Promise<{ key: string; url: string }> {
-  const url = process.env.S3_PUBLIC_URL
-    ? `${process.env.S3_PUBLIC_URL}/${key}`
-    : `https://${BUCKET_NAME}.s3.amazonaws.com/${key}`;
-
-  return { key, url };
+  // Como não temos um mapeamento direto de key para URL,
+  // esta função assume que a URL já foi armazenada no banco de dados
+  // quando o arquivo foi feito upload
+  throw new Error("storageGet não é suportado com manus-upload-file. Use a URL retornada por storagePut.");
 }
