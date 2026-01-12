@@ -718,3 +718,24 @@
 - [x] Adicionar procedures listUsers, changeUserRole, resetUserMfa
 - [x] Aplicar identidade visual do Grupo Arqueo
 - [x] Melhorar responsividade e acessibilidade
+
+
+### 72. Página de Repositório de Arquivos
+- [ ] Criar página /files com listagem de arquivos
+- [ ] Adicionar filtros por tipo (SHP, KML, PDF, imagens)
+- [ ] Implementar busca por nome
+- [ ] Adicionar ações de download e exclusão
+- [ ] Mostrar metadados dos arquivos (tamanho, data, projeto)
+
+### 73. Página de Backups
+- [ ] Criar página /admin/backups
+- [ ] Mostrar histórico de backups
+- [ ] Configurar agendamento automático
+- [ ] Botão para backup manual
+- [ ] Mostrar status do último backup
+
+### 74. Validação Visual nos Formulários
+- [ ] Adicionar validação em tempo real nos campos
+- [ ] Mostrar feedback visual de erros
+- [ ] Desabilitar botão até formulário válido
+- [ ] Adicionar preview antes de gerar

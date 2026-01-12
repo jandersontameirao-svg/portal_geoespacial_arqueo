@@ -230,6 +230,31 @@ export const filesRouter = router({
       };
     }),
 
+  // Listar todos os arquivos acessíveis pelo usuário
+  listAll: protectedProcedure
+    .input(z.object({
+      category: z.enum(["geospatial", "document", "image", "other", "all"]).optional(),
+      search: z.string().optional(),
+      limit: z.number().min(1).max(100).optional(),
+      offset: z.number().min(0).optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const category = input?.category || "all";
+      const search = input?.search || "";
+      const limit = input?.limit || 50;
+      const offset = input?.offset || 0;
+
+      // Admin vê todos os arquivos, outros usuários veem apenas dos projetos que participam
+      const files = await db.getAllFilesForUser(ctx.user.id, ctx.user.role, {
+        category: category === "all" ? undefined : category,
+        search,
+        limit,
+        offset,
+      });
+
+      return files;
+    }),
+
   // Listar arquivos do projeto
   list: protectedProcedure
     .input(z.object({

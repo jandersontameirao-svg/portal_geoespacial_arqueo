@@ -342,6 +342,72 @@ export async function getFilesByProject(projectId: number) {
     .orderBy(desc(files.uploadedAt));
 }
 
+export async function getAllFilesForUser(
+  userId: number, 
+  userRole: string, 
+  options: { category?: string; search?: string; limit?: number; offset?: number }
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const { category, search, limit = 50, offset = 0 } = options;
+
+  // Base query
+  let conditions = [sql`${files.deletedAt} IS NULL`];
+
+  // Filtro por categoria
+  if (category) {
+    const categoryMap: Record<string, string[]> = {
+      geospatial: ["kml", "kmz", "shp"],
+      document: ["pdf", "docx", "xlsx"],
+      image: ["image"],
+      other: ["other"],
+    };
+    const types = categoryMap[category] || [];
+    if (types.length > 0) {
+      conditions.push(sql`${files.fileType} IN (${sql.join(types.map(t => sql`${t}`), sql`, `)})`);
+    }
+  }
+
+  // Filtro por busca
+  if (search && search.trim()) {
+    conditions.push(sql`${files.name} LIKE ${`%${search}%`}`);
+  }
+
+  // Se não for admin, filtrar apenas projetos que o usuário participa
+  if (userRole !== "admin") {
+    const userProjects = await db.select({ projectId: projectMembers.projectId })
+      .from(projectMembers)
+      .where(eq(projectMembers.userId, userId));
+    
+    const projectIds = userProjects.map(p => p.projectId);
+    if (projectIds.length === 0) return [];
+    
+    conditions.push(sql`${files.projectId} IN (${sql.join(projectIds.map(id => sql`${id}`), sql`, `)})`);
+  }
+
+  const result = await db.select({
+    id: files.id,
+    name: files.name,
+    fileType: files.fileType,
+    mimeType: files.mimeType,
+    size: files.fileSize,
+    url: files.s3Url,
+    projectId: files.projectId,
+    uploadedAt: files.uploadedAt,
+    uploadedBy: files.uploadedBy,
+    projectName: projects.name,
+  })
+    .from(files)
+    .leftJoin(projects, eq(files.projectId, projects.id))
+    .where(and(...conditions))
+    .orderBy(desc(files.uploadedAt))
+    .limit(limit)
+    .offset(offset);
+
+  return result;
+}
+
 export async function softDeleteFile(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

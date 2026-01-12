@@ -14,6 +14,8 @@ import Security from "./pages/Security";
 import TechnicalMaps from "./pages/TechnicalMaps";
 import Atlas from "./pages/Atlas";
 import Users from "./pages/Users";
+import Files from "./pages/Files";
+import Backups from "./pages/Backups";
 
 function Router() {
   return (
@@ -29,6 +31,8 @@ function Router() {
         <Route path="/security" component={Security} />
         <Route path="/technical-maps" component={TechnicalMaps} />
         <Route path="/atlas" component={Atlas} />
+        <Route path="/files" component={Files} />
+        <Route path="/admin/backups" component={Backups} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

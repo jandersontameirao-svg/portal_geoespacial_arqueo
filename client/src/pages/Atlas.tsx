@@ -42,6 +42,15 @@ export default function Atlas() {
       west: -55,
     },
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const errors = {
+    project: !selectedProject && touched.project,
+    name: !atlasConfig.name && touched.name,
+    title: !atlasConfig.title && touched.title,
+  };
+
+  const isFormValid = selectedProject && atlasConfig.name && atlasConfig.title;
 
   // Queries
   const { data: projects } = trpc.projects.list.useQuery();
@@ -143,9 +152,13 @@ export default function Atlas() {
               <CardContent className="space-y-6">
                 {/* Projeto */}
                 <div className="space-y-2">
-                  <Label>Projeto *</Label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger>
+                  <Label className={errors.project ? "text-red-500" : ""}>Projeto *</Label>
+                  <Select 
+                    value={selectedProject} 
+                    onValueChange={setSelectedProject}
+                    onOpenChange={() => setTouched(prev => ({ ...prev, project: true }))}
+                  >
+                    <SelectTrigger className={errors.project ? "border-red-500 focus:ring-red-500" : ""}>
                       <SelectValue placeholder="Selecione um projeto" />
                     </SelectTrigger>
                     <SelectContent>
@@ -161,20 +174,26 @@ export default function Atlas() {
                 {/* Nome e Título */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Nome do Atlas *</Label>
+                    <Label className={errors.name ? "text-red-500" : ""}>Nome do Atlas *</Label>
                     <Input 
                       placeholder="Ex: Atlas de Localização - Área Norte"
                       value={atlasConfig.name}
                       onChange={(e) => setAtlasConfig({ ...atlasConfig, name: e.target.value })}
+                      onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
+                      className={errors.name ? "border-red-500 focus:ring-red-500" : ""}
                     />
+                    {errors.name && <p className="text-xs text-red-500">Nome do atlas é obrigatório</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label>Título *</Label>
+                    <Label className={errors.title ? "text-red-500" : ""}>Título *</Label>
                     <Input 
                       placeholder="Ex: Atlas de Localização"
                       value={atlasConfig.title}
                       onChange={(e) => setAtlasConfig({ ...atlasConfig, title: e.target.value })}
+                      onBlur={() => setTouched(prev => ({ ...prev, title: true }))}
+                      className={errors.title ? "border-red-500 focus:ring-red-500" : ""}
                     />
+                    {errors.title && <p className="text-xs text-red-500">Título do atlas é obrigatório</p>}
                   </div>
                 </div>
 

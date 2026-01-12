@@ -43,6 +43,15 @@ export default function TechnicalMaps() {
     showGrid: true,
     showFrame: true,
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const errors = {
+    project: !selectedProject && touched.project,
+    name: !mapConfig.name && touched.name,
+    title: !mapConfig.title && touched.title,
+  };
+
+  const isFormValid = selectedProject && mapConfig.name && mapConfig.title;
 
   // Queries
   const { data: projects } = trpc.projects.list.useQuery();
@@ -148,9 +157,13 @@ export default function TechnicalMaps() {
               <CardContent className="space-y-6">
                 {/* Projeto */}
                 <div className="space-y-2">
-                  <Label>Projeto *</Label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger>
+                  <Label className={errors.project ? "text-red-500" : ""}>Projeto *</Label>
+                  <Select 
+                    value={selectedProject} 
+                    onValueChange={setSelectedProject}
+                    onOpenChange={() => setTouched(prev => ({ ...prev, project: true }))}
+                  >
+                    <SelectTrigger className={errors.project ? "border-red-500 focus:ring-red-500" : ""}>
                       <SelectValue placeholder="Selecione um projeto" />
                     </SelectTrigger>
                     <SelectContent>
@@ -165,23 +178,29 @@ export default function TechnicalMaps() {
 
                 {/* Nome do Job */}
                 <div className="space-y-2">
-                  <Label>Nome do Job *</Label>
+                  <Label className={errors.name ? "text-red-500" : ""}>Nome do Job *</Label>
                   <Input 
                     placeholder="Ex: Mapa de Localização - Versão 1"
                     value={mapConfig.name}
                     onChange={(e) => setMapConfig({ ...mapConfig, name: e.target.value })}
+                    onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
+                    className={errors.name ? "border-red-500 focus:ring-red-500" : ""}
                   />
+                  {errors.name && <p className="text-xs text-red-500">Nome do job é obrigatório</p>}
                 </div>
 
                 {/* Título e Subtítulo */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Título do Mapa *</Label>
+                    <Label className={errors.title ? "text-red-500" : ""}>Título do Mapa *</Label>
                     <Input 
                       placeholder="Ex: Mapa de Localização"
                       value={mapConfig.title}
                       onChange={(e) => setMapConfig({ ...mapConfig, title: e.target.value })}
+                      onBlur={() => setTouched(prev => ({ ...prev, title: true }))}
+                      className={errors.title ? "border-red-500 focus:ring-red-500" : ""}
                     />
+                    {errors.title && <p className="text-xs text-red-500">Título do mapa é obrigatório</p>}
                   </div>
                   <div className="space-y-2">
                     <Label>Subtítulo (opcional)</Label>
