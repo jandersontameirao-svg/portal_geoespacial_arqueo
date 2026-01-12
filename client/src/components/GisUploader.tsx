@@ -93,7 +93,7 @@ export default function GisUploader() {
       updateFileStatus(index, { uploadId, progress: 30 });
 
       // Ler conteúdo do arquivo
-      const fileContent = await readFileAsText(file);
+      const fileContent = await readFileContent(file, fileType);
 
       updateFileStatus(index, { progress: 50 });
 
@@ -131,12 +131,23 @@ export default function GisUploader() {
     );
   };
 
-  const readFileAsText = (file: File): Promise<string> => {
+  const readFileContent = (file: File, fileType: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
-      reader.readAsText(file);
+      
+      // Arquivos binários (KMZ, ZIP) devem ser lidos como base64
+      if (fileType === 'kmz' || fileType === 'shp') {
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Arquivos de texto (KML, GeoJSON, etc)
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsText(file);
+      }
     });
   };
 

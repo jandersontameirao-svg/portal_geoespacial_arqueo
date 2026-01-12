@@ -1026,3 +1026,10 @@
 - [x] Testar download de camadas INCRA (94 features)
 - [x] Testar download de camadas IPHAN (30,533 features)
 - [x] Testar download de camadas OSM (corrigido bbox e query simplificada)
+
+
+### Bug Fix: Erro ao Descompactar Arquivos KMZ
+- [x] Investigar erro "ADM-ZIP: invalid or unsupported zip format. No END header found"
+- [x] Corrigir código de processamento de arquivos KMZ (leitura como base64)
+- [x] Validar formato do arquivo antes de tentar descompactar
+- [x] Testar com arquivo KMZ válido (test.kmz - 411 bytes - sucesso!)
