@@ -1,0 +1,2 @@
+ALTER TABLE `base_layers` MODIFY COLUMN `source` enum('funai','incra','icmbio','osm','aneel','iphan','custom') NOT NULL;--> statement-breakpoint
+ALTER TABLE `base_layers` MODIFY COLUMN `layerType` enum('terras_indigenas','terras_quilombolas','unidades_conservacao','rodovias','infraestrutura_eletrica','sitios_arqueologicos','other') NOT NULL;

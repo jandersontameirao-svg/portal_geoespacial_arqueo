@@ -147,8 +147,8 @@ export const baseLayers = mysqlTable("base_layers", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  source: mysqlEnum("source", ["funai", "incra", "icmbio", "osm", "aneel", "custom"]).notNull(),
-  layerType: mysqlEnum("layerType", ["terras_indigenas", "terras_quilombolas", "unidades_conservacao", "rodovias", "infraestrutura_eletrica", "other"]).notNull(),
+  source: mysqlEnum("source", ["funai", "incra", "icmbio", "osm", "aneel", "iphan", "custom"]).notNull(),
+  layerType: mysqlEnum("layerType", ["terras_indigenas", "terras_quilombolas", "unidades_conservacao", "rodovias", "infraestrutura_eletrica", "sitios_arqueologicos", "other"]).notNull(),
   // Dados da camada (GeoJSON ou referência S3)
   dataFormat: mysqlEnum("dataFormat", ["geojson", "shapefile", "kml", "wfs"]).notNull(),
   dataUrl: text("dataUrl"), // URL do S3 ou WFS endpoint

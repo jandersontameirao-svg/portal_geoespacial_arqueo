@@ -219,6 +219,106 @@ export async function downloadTerrasQuilombolas(): Promise<DownloadResult> {
 }
 
 // ============================================================================
+// IPHAN - SÍTIOS ARQUEOLÓGICOS
+// ============================================================================
+
+/**
+ * Baixa sítios arqueológicos do IPHAN via WFS
+ * 
+ * @param maxFeatures Limite de features (opcional, padrão: todos)
+ * @returns Resultado do download com URL do S3
+ */
+export async function downloadSitiosArqueologicos(
+  maxFeatures?: number
+): Promise<DownloadResult> {
+  try {
+    const baseUrl = "http://portal.iphan.gov.br/geoserver/SICG/ows";
+    
+    const params = new URLSearchParams({
+      service: "WFS",
+      version: "1.0.0",
+      request: "GetFeature",
+      typeName: "SICG:sitios",
+      outputFormat: "application/json",
+    });
+
+    // Limite de features (se não especificado, baixa todos)
+    if (maxFeatures) {
+      params.append("maxFeatures", maxFeatures.toString());
+    }
+
+    const url = `${baseUrl}?${params.toString()}`;
+    
+    console.log(`[IPHAN] Baixando sítios arqueológicos${maxFeatures ? ` (limite: ${maxFeatures})` : " (todos)"}...`);
+    
+    // Download
+    const response = await fetch(url, {
+      timeout: 300000, // 5 minutos (pode ser grande)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const geojson = (await response.json()) as GeoJSONFeatureCollection;
+    
+    // Extrair metadados
+    const featureCount = geojson.features.length;
+    const totalFeatures = (geojson as any).totalFeatures || featureCount;
+    
+    // Calcular bounds manualmente
+    let bounds: DownloadResult["bounds"];
+    if (geojson.features.length > 0) {
+      let minLon = Infinity, minLat = Infinity;
+      let maxLon = -Infinity, maxLat = -Infinity;
+      
+      for (const feature of geojson.features) {
+        if (feature.geometry.type === "Point") {
+          const [lon, lat] = feature.geometry.coordinates as [number, number];
+          minLon = Math.min(minLon, lon);
+          minLat = Math.min(minLat, lat);
+          maxLon = Math.max(maxLon, lon);
+          maxLat = Math.max(maxLat, lat);
+        }
+      }
+      
+      bounds = {
+        west: minLon,
+        south: minLat,
+        east: maxLon,
+        north: maxLat,
+      };
+    }
+
+    // Salvar no S3
+    const suffix = randomBytes(4).toString("hex");
+    const s3Key = `base-layers/iphan/sitios_arqueologicos_${suffix}.geojson`;
+    
+    const { url: s3Url } = await storagePut(
+      s3Key,
+      JSON.stringify(geojson),
+      "application/json"
+    );
+
+    console.log(`[IPHAN] ✓ ${featureCount} sítios arqueológicos baixados (total no servidor: ${totalFeatures})`);
+
+    return {
+      success: true,
+      featureCount: totalFeatures, // Usar total do servidor
+      bounds,
+      s3Key,
+      s3Url,
+    };
+  } catch (error: any) {
+    console.error("[IPHAN] Erro ao baixar sítios arqueológicos:", error);
+    return {
+      success: false,
+      errorMessage: error.message || "Erro desconhecido",
+    };
+  }
+}
+
+// ============================================================================
 // CACHE E ATUALIZAÇÃO
 // ============================================================================
 
@@ -247,6 +347,10 @@ export function calculateCacheExpiration(source: string): Date {
     case "incra":
       // Cache de 30 dias
       return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    case "iphan":
+      // Cache de 14 dias (dados atualizados com frequência média)
+      return new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
     
     default:
       // Cache de 7 dias por padrão

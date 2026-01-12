@@ -835,8 +835,8 @@
 - [x] Criar jobs assíncronos para downloads longos
 - [x] Implementar sistema de cache (7 dias FUNAI, 30 dias INCRA)
 - [x] Adicionar reprojeção automática para EPSG:4674
-- [ ] Criar interface de gerenciamento de camadas base
-- [ ] Implementar atualização manual/automática de camadas
+- [x] Criar interface de gerenciamento de camadas base
+- [x] Implementar atualização manual/automática de camadas
 
 ### 60. Interface de Upload Manual de Shapefiles
 - [ ] Criar componente de upload de shapefile (ZIP com .shp, .shx, .dbf, .prj)
@@ -857,3 +857,12 @@
 - [ ] Implementar filtros por tipo de camada
 - [ ] Adicionar legenda dinâmica para cada camada
 - [ ] Implementar tooltip com informações ao clicar em feature
+
+
+### 62. Integração com IPHAN GeoServer
+- [x] Testar conectividade com http://portal.iphan.gov.br/geoserver/web/
+- [x] Identificar camadas disponíveis (sítios arqueológicos, bens tombados)
+- [x] Implementar serviço de download via WFS
+- [x] Adicionar ao geodataService.ts
+- [x] Criar procedure no baseLayersRouter
+- [x] Integrar na interface de gerenciamento

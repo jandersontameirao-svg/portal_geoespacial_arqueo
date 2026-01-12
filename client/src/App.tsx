@@ -16,6 +16,7 @@ import Atlas from "./pages/Atlas";
 import Users from "./pages/Users";
 import Files from "./pages/Files";
 import Backups from "./pages/Backups";
+import BaseLayers from "./pages/BaseLayers";
 import { GuidedTour } from "./components/GuidedTour";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/atlas" component={Atlas} />
         <Route path="/files" component={Files} />
         <Route path="/admin/backups" component={Backups} />
+        <Route path="/base-layers" component={BaseLayers} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

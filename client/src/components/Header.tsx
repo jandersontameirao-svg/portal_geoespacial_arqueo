@@ -146,6 +146,15 @@ export default function Header() {
                       </div>
                     </DropdownMenuItem>
                   </Link>
+                  <Link href="/base-layers">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Database className="mr-2 h-4 w-4 text-amber-500" />
+                      <div>
+                        <span>Camadas Base</span>
+                        <p className="text-xs text-slate-500">Dados oficiais (FUNAI, INCRA, IPHAN)</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
