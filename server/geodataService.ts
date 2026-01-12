@@ -219,6 +219,167 @@ export async function downloadTerrasQuilombolas(): Promise<DownloadResult> {
 }
 
 // ============================================================================
+// OSM - RODOVIAS (via Overpass API)
+// ============================================================================
+
+/**
+ * Baixa rodovias federais do OpenStreetMap via Overpass API
+ * 
+ * @param state Sigla do estado (opcional) - ex: 'BA', 'MG'. Se não informado, baixa do Brasil inteiro.
+ * @returns Resultado do download com URL do S3
+ */
+export async function downloadRodovias(
+  state?: string
+): Promise<DownloadResult> {
+  try {
+    // Bounding box do Brasil ou estado específico
+    const bbox = state ? getStateBBox(state) : "(-34,-74,6,-34)";
+    
+    // Query Overpass para rodovias federais
+    const query = `
+      [out:json][timeout:60];
+      (
+        way["highway"~"^(motorway|trunk|primary)$"]["ref"~"^BR-"]${bbox};
+      );
+      out geom;
+    `;
+
+    console.log(`[OSM] Baixando rodovias${state ? ` do estado ${state}` : " do Brasil"}...`);
+
+    const response = await fetch(
+      "https://overpass-api.de/api/interpreter",
+      {
+        method: "POST",
+        body: query,
+        headers: { "Content-Type": "text/plain" },
+        timeout: 65000,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const osmData = await response.json() as any;
+
+    // Converter OSM para GeoJSON
+    const features = osmData.elements.map((element: any) => {
+      const coordinates = element.geometry.map((point: any) => [
+        point.lon,
+        point.lat,
+      ]);
+
+      return {
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates,
+        },
+        properties: {
+          nome: element.tags.name || element.tags.ref || "Rodovia",
+          ref: element.tags.ref,
+          tipo: element.tags.highway,
+          superficie: element.tags.surface,
+          faixas: element.tags.lanes,
+          velocidade_max: element.tags.maxspeed,
+          osm_id: element.id,
+        },
+      };
+    });
+
+    const geojson: GeoJSONFeatureCollection = {
+      type: "FeatureCollection",
+      features,
+    };
+
+    const featureCount = features.length;
+
+    // Calcular bounds
+    let bounds: DownloadResult["bounds"];
+    if (features.length > 0) {
+      let minLon = Infinity, minLat = Infinity;
+      let maxLon = -Infinity, maxLat = -Infinity;
+      
+      for (const feature of features) {
+        for (const [lon, lat] of feature.geometry.coordinates) {
+          minLon = Math.min(minLon, lon);
+          minLat = Math.min(minLat, lat);
+          maxLon = Math.max(maxLon, lon);
+          maxLat = Math.max(maxLat, lat);
+        }
+      }
+      
+      bounds = {
+        west: minLon,
+        south: minLat,
+        east: maxLon,
+        north: maxLat,
+      };
+    }
+
+    // Salvar no S3
+    const suffix = randomBytes(4).toString("hex");
+    const s3Key = `base-layers/osm/rodovias${state ? `_${state}` : ""}_${suffix}.geojson`;
+    
+    const { url: s3Url } = await storagePut(
+      s3Key,
+      JSON.stringify(geojson),
+      "application/json"
+    );
+
+    console.log(`[OSM] ✓ ${featureCount} rodovias baixadas`);
+
+    return {
+      success: true,
+      featureCount,
+      bounds,
+      s3Key,
+      s3Url,
+    };
+  } catch (error: any) {
+    console.error("[OSM] Erro ao baixar rodovias:", error);
+    return {
+      success: false,
+      errorMessage: error.message || "Erro desconhecido",
+    };
+  }
+}
+
+// Helper para bbox de estados
+function getStateBBox(state: string): string {
+  const bboxes: Record<string, string> = {
+    AC: "(-11,-74,-7,-66)",
+    AL: "(-10.5,-38,-8.8,-35)",
+    AM: "(-10,-74,2,-56)",
+    AP: "(2,-55,5,-49)",
+    BA: "(-18.5,-47,-8.5,-37)",
+    CE: "(-8,-41.5,-2.5,-37)",
+    DF: "(-16.1,-48.3,-15.5,-47.3)",
+    ES: "(-21.5,-41.5,-17.5,-39.5)",
+    GO: "(-19.5,-53.5,-12,-45.5)",
+    MA: "(-10.5,-48,-1.5,-41.5)",
+    MG: "(-23,-51,-14,-39)",
+    MS: "(-24.5,-58.5,-17,-50.5)",
+    MT: "(-18.5,-61.5,-7,-50.5)",
+    PA: "(-10,-59,3,-46)",
+    PB: "(-8.5,-39,-6,-34.5)",
+    PE: "(-9.5,-41.5,-7,-34.5)",
+    PI: "(-11,-46,-2.5,-40)",
+    PR: "(-26.5,-55,-22.5,-48)",
+    RJ: "(-23.5,-45,-20.5,-40.5)",
+    RN: "(-7,-38.5,-4.5,-34.5)",
+    RO: "(-14,-66.5,-7.5,-59.5)",
+    RR: "(-1,-65,6,-58)",
+    RS: "(-34,-58,-27,-49)",
+    SC: "(-29.5,-54,-25.5,-48)",
+    SE: "(-11.5,-38.5,-10,-36.5)",
+    SP: "(-25.5,-53.5,-19.5,-44)",
+    TO: "(-13.5,-51.5,-5,-45.5)",
+  };
+  return bboxes[state] || "(-34,-74,6,-34)";
+}
+
+// ============================================================================
 // IPHAN - SÍTIOS ARQUEOLÓGICOS
 // ============================================================================
 
@@ -351,6 +512,11 @@ export function calculateCacheExpiration(source: string): Date {
     case "iphan":
       // Cache de 14 dias (dados atualizados com frequência média)
       return new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    
+    case "osm":
+    case "osm_rodovias":
+      // Cache de 30 dias (dados de rodovias mudam com menos frequência)
+      return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     
     default:
       // Cache de 7 dias por padrão

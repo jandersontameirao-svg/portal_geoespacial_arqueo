@@ -69,6 +69,18 @@ export default function BaseLayers() {
     },
   });
 
+  const downloadRodovias = trpc.baseLayers.downloadRodovias.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      refetch();
+      setDownloading(null);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao baixar Rodovias: ${error.message}`);
+      setDownloading(null);
+    },
+  });
+
   // Handlers
   const handleDownloadFunai = () => {
     setDownloading("funai");
@@ -85,6 +97,11 @@ export default function BaseLayers() {
     downloadIphan.mutate({ forceUpdate: false });
   };
 
+  const handleDownloadRodovias = () => {
+    setDownloading("osm");
+    downloadRodovias.mutate({ forceUpdate: false });
+  };
+
   const handleForceUpdate = (source: string) => {
     setDownloading(source);
     if (source === "funai") {
@@ -93,6 +110,8 @@ export default function BaseLayers() {
       downloadIncra.mutate({ forceUpdate: true });
     } else if (source === "iphan") {
       downloadIphan.mutate({ forceUpdate: true });
+    } else if (source === "osm") {
+      downloadRodovias.mutate({ forceUpdate: true });
     }
   };
 
@@ -100,6 +119,7 @@ export default function BaseLayers() {
   const funaiLayer = layers?.find((l) => l.source === "funai");
   const incraLayer = layers?.find((l) => l.source === "incra");
   const iphanLayer = layers?.find((l) => l.source === "iphan");
+  const osmLayer = layers?.find((l) => l.source === "osm" && l.layerType === "rodovias");
 
   // Helper para formatar data
   const formatDate = (date: Date | string | null) => {
@@ -435,6 +455,91 @@ export default function BaseLayers() {
             )}
           </CardContent>
         </Card>
+
+        {/* OSM - Rodovias Federais */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  Rodovias Federais
+                </CardTitle>
+                <CardDescription>OpenStreetMap</CardDescription>
+              </div>
+              {osmLayer && <StatusBadge status={osmLayer.downloadStatus} />}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {osmLayer ? (
+              <>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Features:</span>
+                    <span className="font-medium flex items-center gap-1">
+                      <Database className="w-3 h-3" />
+                      {osmLayer.featureCount?.toLocaleString() || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Último download:</span>
+                    <span className="font-medium flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(osmLayer.lastDownloadAt)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Cache expira:</span>
+                    <span
+                      className={`font-medium ${
+                        isCacheExpired(osmLayer.cacheExpiresAt)
+                          ? "text-orange-500"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {formatDate(osmLayer.cacheExpiresAt)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => handleForceUpdate("osm")}
+                    disabled={downloading === "osm"}
+                  >
+                    {downloading === "osm" ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Atualizar
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Rodovias federais (BR-xxx) do Brasil via OpenStreetMap. Dados atualizados pela comunidade OSM.
+                </p>
+                <Button
+                  className="w-full"
+                  onClick={handleDownloadRodovias}
+                  disabled={downloading === "osm"}
+                >
+                  {downloading === "osm" ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Baixar Camada
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Informações adicionais */}
@@ -456,6 +561,9 @@ export default function BaseLayers() {
             </li>
             <li>
               <strong>IPHAN:</strong> Cache de 14 dias - Sítios arqueológicos via WFS em SIRGAS 2000
+            </li>
+            <li>
+              <strong>OSM:</strong> Cache de 30 dias - Rodovias federais via Overpass API
             </li>
           </ul>
           <p>

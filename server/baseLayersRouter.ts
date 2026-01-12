@@ -13,6 +13,7 @@ import {
   downloadTerrasIndigenas,
   downloadTerrasQuilombolas,
   downloadSitiosArqueologicos,
+  downloadRodovias,
   calculateCacheExpiration,
   isCacheExpired,
 } from "./geodataService";
@@ -384,6 +385,126 @@ export const baseLayersRouter = router({
             description: "Sítios arqueológicos cadastrados no SICG/IPHAN",
             source: "iphan",
             layerType: "sitios_arqueologicos",
+            dataFormat: "geojson",
+            dataUrl: result.s3Url,
+            s3Key: result.s3Key,
+            featureCount: result.featureCount,
+            crs: "EPSG:4674",
+            bounds: result.bounds,
+            lastDownloadAt: new Date(),
+            lastUpdateAt: new Date(),
+            cacheExpiresAt,
+            downloadStatus: "completed",
+            isActive: true,
+            createdBy: ctx.user.id,
+          })
+          .$returningId();
+
+        return {
+          success: true,
+          message: `Camada criada com sucesso (${result.featureCount} features)`,
+          layerId: newLayer.id,
+        };
+      }
+    }),
+
+  /**
+   * Baixa rodovias federais do OpenStreetMap
+   */
+  downloadRodovias: protectedProcedure
+    .input(
+      z.object({
+        state: z.string().length(2).optional(),
+        forceUpdate: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database connection failed");
+      const { state, forceUpdate } = input;
+
+      // Verificar se já existe e se o cache é válido
+      const [existing] = await db
+        .select()
+        .from(baseLayers)
+        .where(
+          and(
+            eq(baseLayers.source, "osm"),
+            eq(baseLayers.layerType, "rodovias")
+          )
+        );
+
+      if (existing && !forceUpdate && !isCacheExpired(existing.cacheExpiresAt)) {
+        return {
+          success: true,
+          message: "Camada já está atualizada (cache válido)",
+          layer: existing,
+        };
+      }
+
+      // Atualizar status para "downloading"
+      if (existing) {
+        await db
+          .update(baseLayers)
+          .set({
+            downloadStatus: "downloading",
+            updatedAt: new Date(),
+          })
+          .where(eq(baseLayers.id, existing.id));
+      }
+
+      // Fazer download
+      const result = await downloadRodovias(state);
+
+      if (!result.success) {
+        // Atualizar status para "failed"
+        if (existing) {
+          await db
+            .update(baseLayers)
+            .set({
+              downloadStatus: "failed",
+              errorMessage: result.errorMessage,
+              updatedAt: new Date(),
+            })
+            .where(eq(baseLayers.id, existing.id));
+        }
+
+        throw new Error(result.errorMessage || "Erro ao baixar dados do OpenStreetMap");
+      }
+
+      // Salvar ou atualizar no banco
+      const cacheExpiresAt = calculateCacheExpiration("osm");
+
+      if (existing) {
+        await db
+          .update(baseLayers)
+          .set({
+            dataUrl: result.s3Url,
+            s3Key: result.s3Key,
+            featureCount: result.featureCount,
+            bounds: result.bounds,
+            lastDownloadAt: new Date(),
+            lastUpdateAt: new Date(),
+            cacheExpiresAt,
+            downloadStatus: "completed",
+            errorMessage: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(baseLayers.id, existing.id));
+
+        return {
+          success: true,
+          message: `Camada atualizada com sucesso (${result.featureCount} features)`,
+          layer: { ...existing, ...result },
+        };
+      } else {
+        const [newLayer] = await db
+          .insert(baseLayers)
+          .values({
+            name: `Rodovias Federais${state ? ` - ${state}` : ""}`,
+            description: "Rodovias federais do Brasil (OpenStreetMap)",
+            source: "osm",
+            layerType: "rodovias",
             dataFormat: "geojson",
             dataUrl: result.s3Url,
             s3Key: result.s3Key,

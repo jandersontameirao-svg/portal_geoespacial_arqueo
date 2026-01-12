@@ -925,3 +925,30 @@
 - [x] Exibir resultados em dropdown
 - [x] Zoom automático no sítio selecionado
 - [x] Destacar sítio encontrado no mapa
+
+
+### 69. Integração de Rodovias (DNIT/OSM)
+- [x] Adicionar tipo "rodovias" ao schema de base_layers
+- [x] Implementar download de rodovias do OpenStreetMap (Overpass API)
+- [x] Criar procedure downloadRodovias no baseLayersRouter
+- [x] Adicionar card de rodovias na página BaseLayers
+- [ ] Integrar visualização de rodovias no mapa (linhas)
+- [ ] Adicionar filtro por tipo de rodovia (federal, estadual, municipal)
+
+### 70. Integração de Infraestrutura Elétrica (ANEEL)
+- [ ] Adicionar tipo "infraestrutura_eletrica" ao schema
+- [ ] Testar fontes alternativas (EPE, ONS) se ANEEL offline
+- [ ] Implementar download de linhas de transmissão
+- [ ] Criar procedure downloadInfraestruturaEletrica
+- [ ] Adicionar card de infraestrutura elétrica na página BaseLayers
+- [ ] Integrar visualização no mapa (linhas de transmissão, subestações)
+
+### 71. Ferramenta de Análise de Proximidade
+- [ ] Criar componente ProximityAnalysis.tsx
+- [ ] Implementar desenho de ponto/linha/polígono de referência
+- [ ] Adicionar input de distância de buffer (km)
+- [ ] Calcular features dentro do buffer para cada camada
+- [ ] Exibir resultados em tabela (camada, quantidade, distância mínima)
+- [ ] Destacar features encontradas no mapa
+- [ ] Adicionar botão para exportar relatório de proximidade
+- [ ] Implementar cálculo de distância mínima usando turf.js
