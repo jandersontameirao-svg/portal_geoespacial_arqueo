@@ -274,6 +274,9 @@ importers:
       react-dom:
         specifier: ^19.2.1
         version: 19.2.1(react@19.2.1)
+      react-dropzone:
+        specifier: ^14.3.8
+        version: 14.3.8(react@19.2.1)
       react-globe.gl:
         specifier: ^2.37.0
         version: 2.37.0(react@19.2.1)
@@ -2795,6 +2798,10 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
+  attr-accept@2.2.5:
+    resolution: {integrity: sha512-0bDNnY/u6pPwHDMoF0FieU354oBi0a8rD9FcsLwzcGWbc8KS8KPIi7y+s13OlVY+gMWc/9xEMUgNE6Qm8ZllYQ==}
+    engines: {node: '>=4'}
+
   autolinker@4.1.5:
     resolution: {integrity: sha512-vEfYZPmvVOIuE567XBVCsx8SBgOYtjB2+S1iAaJ+HgH+DNjAcrHem2hmAeC9yaNGWayicv4yR+9UaJlkF3pvtw==}
     engines: {pnpm: '>=10.10.0'}
@@ -3610,6 +3617,10 @@ packages:
 
   fflate@0.8.2:
     resolution: {integrity: sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==}
+
+  file-selector@2.1.2:
+    resolution: {integrity: sha512-QgXo+mXTe8ljeqUFaX3QVHc5osSItJ/Km+xpocx0aSqWGMSCf6qYs/VnzZgS864Pjn5iceMRFigeAV7AfTlaig==}
+    engines: {node: '>= 12'}
 
   file-source@0.6.1:
     resolution: {integrity: sha512-1R1KneL7eTXmXfKxC10V/9NeGOdbsAXJ+lQ//fvvcHUgtaZcZDWNJNblxAoVOyV1cj45pOtUrR3vZTBwqcW8XA==}
@@ -4675,6 +4686,12 @@ packages:
     resolution: {integrity: sha512-ibrK8llX2a4eOskq1mXKu/TGZj9qzomO+sNfO98M6d9zIPOEhlBkMkBUBLd1vgS0gQsLDBzA+8jJBVXDnfHmJg==}
     peerDependencies:
       react: ^19.2.1
+
+  react-dropzone@14.3.8:
+    resolution: {integrity: sha512-sBgODnq+lcA4P296DY4wacOZz3JFpD99fp+hb//iBO2HHnyeZU3FwWyXJ6salNpqQdsZrgMrotuko/BdJMV8Ug==}
+    engines: {node: '>= 10.13'}
+    peerDependencies:
+      react: '>= 16.8 || 18.0.0'
 
   react-floater@0.7.9:
     resolution: {integrity: sha512-NXqyp9o8FAXOATOEo0ZpyaQ2KPb4cmPMXGWkx377QtJkIXHlHRAGer7ai0r0C1kG5gf+KJ6Gy+gdNIiosvSicg==}
@@ -8315,6 +8332,8 @@ snapshots:
 
   asynckit@0.4.0: {}
 
+  attr-accept@2.2.5: {}
+
   autolinker@4.1.5:
     dependencies:
       tslib: 2.8.1
@@ -9124,6 +9143,10 @@ snapshots:
       picomatch: 4.0.3
 
   fflate@0.8.2: {}
+
+  file-selector@2.1.2:
+    dependencies:
+      tslib: 2.8.1
 
   file-source@0.6.1:
     dependencies:
@@ -10466,6 +10489,13 @@ snapshots:
     dependencies:
       react: 19.2.1
       scheduler: 0.27.0
+
+  react-dropzone@14.3.8(react@19.2.1):
+    dependencies:
+      attr-accept: 2.2.5
+      file-selector: 2.1.2
+      prop-types: 15.8.1
+      react: 19.2.1
 
   react-floater@0.7.9(react-dom@19.2.1(react@19.2.1))(react@19.2.1):
     dependencies:

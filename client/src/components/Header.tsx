@@ -155,6 +155,15 @@ export default function Header() {
                       </div>
                     </DropdownMenuItem>
                   </Link>
+                  <Link href="/gis-uploads">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <FileUp className="mr-2 h-4 w-4 text-indigo-500" />
+                      <div>
+                        <span>Upload de Arquivos GIS</span>
+                        <p className="text-xs text-slate-500">Enviar e validar shapefiles, KML, GeoJSON</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>

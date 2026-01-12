@@ -970,9 +970,42 @@
 - [x] Implementar extração de metadados (CRS, bounds, feature count, geometry types)
 - [x] Criar procedure tRPC para upload e listagem
 - [x] Integrar validação com IA (LLM) para verificar qualidade dos dados
-- [ ] Criar componente de drag-and-drop com react-dropzone
-- [ ] Adicionar preview de arquivos antes do upload
-- [ ] Implementar barra de progresso de upload
-- [ ] Criar página de gerenciamento de uploads
-- [ ] Adicionar visualização de arquivos uploadados no mapa
-- [ ] Implementar download de arquivos uploadados
+- [x] Criar componente de drag-and-drop com react-dropzone
+- [x] Adicionar preview de arquivos antes do upload
+- [x] Implementar barra de progresso de upload
+- [x] Criar página de gerenciamento de uploads
+- [x] Adicionar visualização de arquivos uploadados no mapa
+- [x] Implementar download de arquivos uploadados
+
+
+### 74. Integração de Arquivos GIS Uploadados no Visualizador
+- [ ] Adicionar query tRPC para listar arquivos GIS validados (status=completed)
+- [ ] Criar seção "Arquivos Uploadados" no painel de controle do BaseLayersViewer
+- [ ] Adicionar checkbox para cada arquivo com nome e tipo
+- [ ] Implementar carregamento dinâmico de GeoJSON do S3
+- [ ] Renderizar geometrias no mapa com estilo padrão
+- [ ] Adicionar tooltips com metadados do arquivo
+- [ ] Sincronizar com filtros geográficos existentes
+- [ ] Adicionar contador de features por arquivo
+
+
+### 74. Interface de Upload com Drag-and-Drop
+- [ ] Instalar react-dropzone
+- [ ] Criar componente GisUploader.tsx com área de drag-and-drop
+- [ ] Validar formatos aceitos (SHP, KML, KMZ, GeoJSON, GPX, GML, DXF)
+- [ ] Validar tamanho máximo (100MB)
+- [ ] Implementar preview de arquivos selecionados
+- [ ] Adicionar barra de progresso de upload
+- [ ] Exibir resultados da validação por IA (isValid, errors, warnings, metadata)
+- [ ] Mostrar metadados extraídos (CRS, bounds, feature count, geometry types)
+- [ ] Criar página /gis-uploads para gerenciamento
+- [ ] Adicionar rota no App.tsx e link no menu
+
+### 75. Integração de Arquivos GIS no Visualizador
+- [ ] Adicionar query para listar arquivos validados (status=completed)
+- [ ] Criar seção "Arquivos Uploadados" no painel de controle
+- [ ] Adicionar checkbox para cada arquivo
+- [ ] Carregar GeoJSON dinamicamente do S3
+- [ ] Renderizar geometrias no mapa
+- [ ] Adicionar tooltips com metadados
+- [ ] Sincronizar com filtros geográficos

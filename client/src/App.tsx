@@ -18,6 +18,7 @@ import Files from "./pages/Files";
 import Backups from "./pages/Backups";
 import BaseLayers from "./pages/BaseLayers";
 import BaseLayersViewer from "./pages/BaseLayersViewer";
+import GisUploads from "./pages/GisUploads";
 import { GuidedTour } from "./components/GuidedTour";
 
 function Router() {
@@ -38,6 +39,7 @@ function Router() {
         <Route path="/admin/backups" component={Backups} />
         <Route path="/base-layers" component={BaseLayers} />
         <Route path="/base-layers/viewer" component={BaseLayersViewer} />
+        <Route path="/gis-uploads" component={GisUploads} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

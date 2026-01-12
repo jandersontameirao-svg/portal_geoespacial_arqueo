@@ -70,12 +70,13 @@ function MapRefHandler({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null
 interface LayerControl {
   id: string;
   name: string;
-  source: "funai" | "incra" | "iphan" | "osm_rodovias";
+  source: "funai" | "incra" | "iphan" | "osm_rodovias" | "gis_upload";
   color: string;
   visible: boolean;
   opacity: number;
   data: FeatureCollection | null;
   loading: boolean;
+  uploadId?: number; // Para camadas de arquivos GIS uploadados
 }
 
 // Componente para ajustar bounds do mapa
@@ -146,6 +147,7 @@ export default function BaseLayersViewer() {
 
   // Query para listar camadas disponíveis
   const { data: availableLayers } = trpc.baseLayers.list.useQuery();
+  const { data: gisUploads } = trpc.gisUploads.list.useQuery({});
 
   // Função para carregar dados de uma camada
   const loadLayerData = async (layerId: string) => {
@@ -262,6 +264,58 @@ export default function BaseLayersViewer() {
         l.id === layerId ? { ...l, opacity } : l
       )
     );
+  };
+
+  // Handler para toggle de visibilidade de arquivos GIS uploadados
+  const handleToggleUploadVisibility = async (uploadId: number) => {
+    const uploadLayerId = `upload-${uploadId}`;
+    const existingLayer = layers.find(l => l.id === uploadLayerId);
+
+    if (!existingLayer) {
+      // Criar nova camada para o arquivo uploadado
+      const upload = gisUploads?.find(u => u.id === uploadId);
+      if (!upload || upload.status !== 'completed') return;
+
+      const newLayer: LayerControl = {
+        id: uploadLayerId,
+        name: upload.originalName,
+        source: 'gis_upload',
+        color: '#6366f1',
+        visible: true,
+        opacity: 70,
+        data: null,
+        loading: true,
+        uploadId: uploadId,
+      };
+
+      setLayers(prev => [...prev, newLayer]);
+
+      // Carregar dados do arquivo
+      try {
+        const response = await fetch(upload.s3Url);
+        const geojson = await response.json();
+        
+        setLayers(prev =>
+          prev.map(l =>
+            l.id === uploadLayerId
+              ? { ...l, data: geojson, loading: false }
+              : l
+          )
+        );
+
+        toast.success(`Arquivo ${upload.originalName} carregado`);
+      } catch (error) {
+        toast.error(`Erro ao carregar arquivo`);
+        setLayers(prev => prev.filter(l => l.id !== uploadLayerId));
+      }
+    } else {
+      // Toggle visibilidade
+      setLayers(prev =>
+        prev.map(l =>
+          l.id === uploadLayerId ? { ...l, visible: !l.visible } : l
+        )
+      );
+    }
   };
 
   // Função para buscar sítios
@@ -599,6 +653,64 @@ export default function BaseLayersViewer() {
                   )}
                 </div>
               ))}
+
+              {/* Arquivos GIS Uploadados */}
+              {gisUploads && gisUploads.filter(u => u.status === 'completed').length > 0 && (
+                <>
+                  <div className="pt-4 mt-4 border-t">
+                    <div className="flex items-center gap-2 mb-4">
+                      <MapPin className="w-5 h-5" />
+                      <h3 className="font-semibold">Arquivos Uploadados</h3>
+                    </div>
+                    {gisUploads.filter(u => u.status === 'completed').map((upload) => {
+                      const uploadLayer = layers.find(l => l.uploadId === upload.id);
+                      return (
+                        <div key={`upload-${upload.id}`} className="space-y-3 pb-4 border-b last:border-0">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={uploadLayer?.visible || false}
+                                onCheckedChange={() => handleToggleUploadVisibility(upload.id)}
+                                disabled={uploadLayer?.loading}
+                              />
+                              <div
+                                className="w-4 h-4 rounded"
+                                style={{ backgroundColor: "#6366f1" }}
+                              />
+                              <span className="text-sm font-medium truncate" title={upload.originalName}>
+                                {upload.originalName}
+                              </span>
+                            </div>
+                            {uploadLayer?.loading && (
+                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            )}
+                          </div>
+
+                          {uploadLayer?.visible && uploadLayer.data && (
+                            <div className="space-y-2 ml-6">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Opacidade</span>
+                                <span>{uploadLayer.opacity}%</span>
+                              </div>
+                              <Slider
+                                value={[uploadLayer.opacity]}
+                                onValueChange={([value]) => handleOpacityChange(`upload-${upload.id}`, value)}
+                                min={0}
+                                max={100}
+                                step={10}
+                                className="w-full"
+                              />
+                              <div className="text-xs text-muted-foreground">
+                                {uploadLayer.data.features.length.toLocaleString()} features
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
