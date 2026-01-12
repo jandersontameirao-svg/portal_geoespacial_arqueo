@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
+import MarkerClusterGroup from "@/components/MarkerClusterGroup";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -38,6 +39,9 @@ import { BRAZILIAN_STATES, REGIONS } from "@/lib/brazilianStates";
 import type { FeatureCollection, Feature, Geometry } from "geojson";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 // Fix para ícones do Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -108,6 +112,7 @@ export default function BaseLayersViewer() {
   const [bounds, setBounds] = useState<L.LatLngBoundsExpression | null>(null);
   const [selectedState, setSelectedState] = useState<string>("all");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
+  const [clusteringEnabled, setClusteringEnabled] = useState<boolean>(true);
 
   // Query para listar camadas disponíveis
   const { data: availableLayers } = trpc.baseLayers.list.useQuery();
@@ -352,6 +357,20 @@ export default function BaseLayersViewer() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Toggle de Clustering */}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">Clustering</label>
+                  <p className="text-xs text-muted-foreground">
+                    Agrupar marcadores próximos
+                  </p>
+                </div>
+                <Checkbox
+                  checked={clusteringEnabled}
+                  onCheckedChange={(checked) => setClusteringEnabled(checked === true)}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -445,23 +464,41 @@ export default function BaseLayersViewer() {
                 .filter((l) => l.visible && l.data)
                 .map((layer) => {
                   const filteredData = filterFeatures(layer.data!);
-                  return (
-                  <GeoJSON
-                    key={`${layer.id}-${selectedState}-${selectedRegion}`}
-                    data={filteredData}
-                    style={getFeatureStyle(layer)}
-                    onEachFeature={onEachFeature(layer)}
-                    pointToLayer={(feature, latlng) => {
-                      return L.circleMarker(latlng, {
-                        radius: 6,
-                        fillColor: layer.color,
-                        color: layer.color,
-                        weight: 2,
-                        opacity: layer.opacity / 100,
-                        fillOpacity: (layer.opacity / 100) * 0.6,
-                      });
-                    }}
-                  />
+                  const isPointLayer = layer.id === "iphan";
+                  const useCluster = isPointLayer && clusteringEnabled;
+
+                  const geoJsonElement = (
+                    <GeoJSON
+                      key={`${layer.id}-${selectedState}-${selectedRegion}-${clusteringEnabled}`}
+                      data={filteredData}
+                      style={getFeatureStyle(layer)}
+                      onEachFeature={onEachFeature(layer)}
+                      pointToLayer={(feature, latlng) => {
+                        return L.circleMarker(latlng, {
+                          radius: 6,
+                          fillColor: layer.color,
+                          color: layer.color,
+                          weight: 2,
+                          opacity: layer.opacity / 100,
+                          fillOpacity: (layer.opacity / 100) * 0.6,
+                        });
+                      }}
+                    />
+                  );
+
+                  return useCluster ? (
+                    <MarkerClusterGroup
+                      key={`cluster-${layer.id}-${selectedState}-${selectedRegion}`}
+                      chunkedLoading
+                      maxClusterRadius={50}
+                      spiderfyOnMaxZoom
+                      showCoverageOnHover={false}
+                      zoomToBoundsOnClick
+                    >
+                      {geoJsonElement}
+                    </MarkerClusterGroup>
+                  ) : (
+                    geoJsonElement
                   );
                 })}
 

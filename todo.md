@@ -888,3 +888,14 @@
 - [ ] Criar exportação de features dentro de área selecionada (GeoJSON)
 - [ ] Adicionar exportação em formato Shapefile (ZIP)
 - [ ] Otimizar carregamento com paginação/clustering para grandes volumes
+
+
+### 65. Clustering para Otimização de Visualização
+- [x] Instalar leaflet.markercluster e tipos
+- [x] Configurar MarkerClusterGroup para camada IPHAN
+- [x] Customizar ícones de clusters (cor, tamanho baseado em quantidade)
+- [x] Adicionar toggle para habilitar/desabilitar clustering
+- [x] Implementar spiderfier para clusters pequenos
+- [x] Otimizar performance com chunkedLoading
+- [x] Testar com 30.526 pontos do IPHAN
+- [ ] Adicionar estatísticas de performance no painel
