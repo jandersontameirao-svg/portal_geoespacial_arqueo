@@ -124,6 +124,9 @@ importers:
       '@types/cesium':
         specifier: ^1.70.4
         version: 1.70.4
+      '@types/geojson':
+        specifier: ^7946.0.16
+        version: 7946.0.16
       '@types/html2canvas':
         specifier: ^1.0.0
         version: 1.0.0

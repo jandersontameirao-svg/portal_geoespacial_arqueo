@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { Link } from "wouter";
 import {
   Download,
   RefreshCw,
@@ -164,11 +165,19 @@ export default function BaseLayers() {
 
   return (
     <div className="container py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Camadas Base</h1>
-        <p className="text-muted-foreground">
-          Gerencie camadas de dados geoespaciais de fontes oficiais brasileiras
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Camadas Base</h1>
+          <p className="text-muted-foreground">
+            Gerencie camadas de dados geoespaciais de fontes oficiais brasileiras
+          </p>
+        </div>
+        <Link href="/base-layers/viewer">
+          <Button>
+            <MapPin className="w-4 h-4 mr-2" />
+            Visualizar no Mapa
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

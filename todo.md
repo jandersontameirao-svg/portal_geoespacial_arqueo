@@ -866,3 +866,14 @@
 - [x] Adicionar ao geodataService.ts
 - [x] Criar procedure no baseLayersRouter
 - [x] Integrar na interface de gerenciamento
+
+
+### 63. Visualização de Camadas Base no Globo 3D
+- [x] Adicionar suporte a GeoJSON no componente Map.tsx
+- [x] Criar controles de toggle para camadas (FUNAI, INCRA, IPHAN)
+- [x] Implementar controle de transparência (slider 0-100%)
+- [x] Adicionar tooltips informativos ao clicar em features
+- [ ] Implementar filtros geográficos por estado/região
+- [x] Criar legenda dinâmica para cada camada
+- [x] Otimizar renderização para grandes volumes de dados
+- [x] Adicionar indicador de carregamento durante fetch
