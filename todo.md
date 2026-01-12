@@ -1033,3 +1033,14 @@
 - [x] Corrigir código de processamento de arquivos KMZ (leitura como base64)
 - [x] Validar formato do arquivo antes de tentar descompactar
 - [x] Testar com arquivo KMZ válido (test.kmz - 411 bytes - sucesso!)
+
+
+### Feature: Validação com IA para Arquivos KMZ
+- [x] Analisar código atual de validação de arquivos
+- [x] Implementar extração automática de KML do arquivo KMZ
+- [x] Melhorar prompt da IA para validação geoespacial detalhada (brasileiro)
+- [x] Validar estrutura XML do KML extraído
+- [x] Identificar sistema de coordenadas (CRS)
+- [x] Detectar geometrias inválidas ou problemáticas (coordenadas fora do Brasil)
+- [x] Gerar relatório com metadados (feature count, geometry types, bounds, attributes)
+- [x] Testar com arquivo KMZ real (teste_validacao.kmz - detectou erro de coordenada em Paris!)

@@ -183,17 +183,30 @@ async function validateGisFile(
         ? fileContent.substring(0, maxLength) + "\n... (truncated)"
         : fileContent;
 
-    const prompt = `Você é um especialista em dados geoespaciais. Analise o seguinte arquivo ${fileType.toUpperCase()} e forneça:
+    const prompt = `Você é um especialista em dados geoespaciais brasileiros. Analise o seguinte arquivo ${fileType.toUpperCase()} e forneça:
 
-1. Se o arquivo é válido (formato correto, estrutura adequada)
-2. Lista de erros encontrados (se houver)
-3. Lista de avisos/sugestões (se houver)
-4. Metadados extraídos:
-   - Sistema de coordenadas (CRS/EPSG)
-   - Bounding box (se disponível)
-   - Número de features/geometrias
-   - Tipos de geometria (Point, LineString, Polygon, etc.)
-   - Nomes dos atributos/campos
+1. VALIDAÇÃO DE ESTRUTURA:
+   - Formato XML válido (para KML)
+   - Estrutura hierárquica correta (Document, Folder, Placemark)
+   - Namespaces corretos
+
+2. VALIDAÇÃO DE GEOMETRIAS:
+   - Tipos de geometria presentes (Point, LineString, Polygon, MultiGeometry)
+   - Coordenadas no formato correto (longitude, latitude, altitude)
+   - Geometrias auto-intersectantes ou inválidas
+   - Coordenadas dentro do Brasil (-74° a -28° longitude, -34° a 6° latitude)
+
+3. VALIDAÇÃO DE DADOS:
+   - Sistema de coordenadas (CRS) - padrão é EPSG:4326 (WGS84)
+   - Presença de atributos/campos nos Placemarks
+   - Dados de elevação (3D) se houver
+   - Timestamps ou animações temporais
+
+4. AVISOS E SUGESTÕES:
+   - Coordenadas suspeitas (muito longe do Brasil)
+   - Geometrias muito complexas (muitos pontos)
+   - Falta de atributos descritivos
+   - Estilos ou ícones personalizados
 
 Conteúdo do arquivo:
 \`\`\`

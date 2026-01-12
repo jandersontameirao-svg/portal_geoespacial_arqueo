@@ -5,6 +5,8 @@ import * as db from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { processGeospatialFile, validateFileSize, validateZipFile } from "./fileProcessing";
+import { invokeLLM } from "./_core/llm";
+import AdmZip from "adm-zip";
 import { ensureFileSafe } from "./virusScanner";
 import { notifyUploadComplete, notifyUploadError } from "./notificationHelper";
 
@@ -149,11 +151,49 @@ export const filesRouter = router({
         }
       }
 
+      // Determinar fileType baseado no mimeType
+      let fileType: "kml" | "kmz" | "shp" | "pdf" | "docx" | "xlsx" | "image" | "other" = "other";
+      if (input.mimeType === "application/vnd.google-earth.kml+xml") fileType = "kml";
+      else if (input.mimeType === "application/vnd.google-earth.kmz") fileType = "kmz";
+      else if (input.mimeType === "application/zip" || input.mimeType === "application/x-zip-compressed") fileType = "shp";
+      else if (input.mimeType === "application/pdf") fileType = "pdf";
+      else if (input.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") fileType = "docx";
+      else if (input.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") fileType = "xlsx";
+      else if (input.mimeType.startsWith("image/")) fileType = "image";
+
       // Processar arquivo geoespacial se aplicável
       let processingResult = null;
+      let validationResult = null;
       if (input.category === "geospatial") {
         try {
           processingResult = await processGeospatialFile(fileBuffer, input.filename);
+          
+          // Validar com IA para arquivos KML/KMZ
+          if (fileType === "kml" || fileType === "kmz") {
+            let contentToValidate = fileBuffer.toString("utf8");
+            let fileTypeToValidate = fileType;
+            
+            // Se for KMZ, extrair KML interno
+            if (fileType === "kmz") {
+              try {
+                const zip = new AdmZip(fileBuffer);
+                const zipEntries = zip.getEntries();
+                const kmlEntry = zipEntries.find(
+                  (entry) => entry.entryName.toLowerCase().endsWith(".kml")
+                );
+                
+                if (kmlEntry) {
+                  contentToValidate = kmlEntry.getData().toString("utf8");
+                  fileTypeToValidate = "kml";
+                }
+              } catch (error: any) {
+                console.error("Erro ao extrair KML do KMZ:", error);
+              }
+            }
+            
+            // Validar com IA
+            validationResult = await validateGisFileWithAI(fileTypeToValidate, contentToValidate);
+          }
         } catch (error: any) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -164,16 +204,6 @@ export const filesRouter = router({
 
       // Upload para S3
       const { url } = await storagePut(fileKey, fileBuffer, input.mimeType);
-
-      // Determinar fileType baseado no mimeType
-      let fileType: "kml" | "kmz" | "shp" | "pdf" | "docx" | "xlsx" | "image" | "other" = "other";
-      if (input.mimeType === "application/vnd.google-earth.kml+xml") fileType = "kml";
-      else if (input.mimeType === "application/vnd.google-earth.kmz") fileType = "kmz";
-      else if (input.mimeType === "application/zip" || input.mimeType === "application/x-zip-compressed") fileType = "shp";
-      else if (input.mimeType === "application/pdf") fileType = "pdf";
-      else if (input.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") fileType = "docx";
-      else if (input.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") fileType = "xlsx";
-      else if (input.mimeType.startsWith("image/")) fileType = "image";
 
       // Salvar metadados no banco (incluindo dados geoespaciais se existirem)
       await db.createFile({
@@ -192,6 +222,7 @@ export const filesRouter = router({
           ...(input.description ? { description: input.description } : {}),
           ...(processingResult?.metadata || {}),
           featureCount: processingResult?.featureCount,
+          ...(validationResult ? { validation: validationResult } : {}),
         },
         uploadedBy: ctx.user.id,
       });
@@ -441,3 +472,141 @@ export const filesRouter = router({
       return { success: true };
     }),
 });
+
+// ============================================================================
+// FUNÇÃO AUXILIAR: Validar arquivo GIS com IA
+// ============================================================================
+
+async function validateGisFileWithAI(
+  fileType: string,
+  fileContent: string
+): Promise<{
+  isValid: boolean;
+  errors?: string[];
+  warnings?: string[];
+  metadata?: {
+    crs?: string;
+    bounds?: number[];
+    featureCount?: number;
+    geometryTypes?: string[];
+    attributes?: string[];
+  };
+}> {
+  try {
+    // Truncar conteúdo se muito grande (máximo 50KB para análise)
+    const maxLength = 50000;
+    const truncatedContent =
+      fileContent.length > maxLength
+        ? fileContent.substring(0, maxLength) + "\n... (truncated)"
+        : fileContent;
+
+    const prompt = `Você é um especialista em dados geoespaciais brasileiros. Analise o seguinte arquivo ${fileType.toUpperCase()} e forneça:
+
+1. VALIDAÇÃO DE ESTRUTURA:
+   - Formato XML válido (para KML)
+   - Estrutura hierárquica correta (Document, Folder, Placemark)
+   - Namespaces corretos
+
+2. VALIDAÇÃO DE GEOMETRIAS:
+   - Tipos de geometria presentes (Point, LineString, Polygon, MultiGeometry)
+   - Coordenadas no formato correto (longitude, latitude, altitude)
+   - Geometrias auto-intersectantes ou inválidas
+   - Coordenadas dentro do Brasil (-74° a -28° longitude, -34° a 6° latitude)
+
+3. VALIDAÇÃO DE DADOS:
+   - Sistema de coordenadas (CRS) - padrão é EPSG:4326 (WGS84)
+   - Presença de atributos/campos nos Placemarks
+   - Dados de elevação (3D) se houver
+   - Timestamps ou animações temporais
+
+4. AVISOS E SUGESTÕES:
+   - Coordenadas suspeitas (muito longe do Brasil)
+   - Geometrias muito complexas (muitos pontos)
+   - Falta de atributos descritivos
+   - Estilos ou ícones personalizados
+
+Conteúdo do arquivo:
+\`\`\`
+${truncatedContent}
+\`\`\`
+
+Responda APENAS com um objeto JSON no seguinte formato:
+{
+  "isValid": boolean,
+  "errors": ["erro1", "erro2"],
+  "warnings": ["aviso1", "aviso2"],
+  "metadata": {
+    "crs": "EPSG:4326",
+    "bounds": [minLon, minLat, maxLon, maxLat],
+    "featureCount": number,
+    "geometryTypes": ["Point", "LineString"],
+    "attributes": ["campo1", "campo2"]
+  }
+}`;
+
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content:
+            "Você é um especialista em análise de dados geoespaciais. Responda APENAS com JSON válido, sem texto adicional.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "gis_validation",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              isValid: { type: "boolean" },
+              errors: {
+                type: "array",
+                items: { type: "string" },
+              },
+              warnings: {
+                type: "array",
+                items: { type: "string" },
+              },
+              metadata: {
+                type: "object",
+                properties: {
+                  crs: { type: "string" },
+                  bounds: {
+                    type: "array",
+                    items: { type: "number" },
+                  },
+                  featureCount: { type: "number" },
+                  geometryTypes: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                  attributes: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                },
+                required: [],
+                additionalProperties: false,
+              },
+            },
+            required: ["isValid"],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    const content = response.choices[0].message.content;
+    const result = JSON.parse(typeof content === "string" ? content : "{}");
+    return result;
+  } catch (error: any) {
+    console.error("Error validating GIS file with AI:", error);
+    return {
+      isValid: false,
+      errors: [`Erro ao validar arquivo: ${error.message}`],
+    };
+  }
+}
