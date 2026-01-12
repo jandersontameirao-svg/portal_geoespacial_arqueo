@@ -877,3 +877,14 @@
 - [x] Criar legenda dinâmica para cada camada
 - [x] Otimizar renderização para grandes volumes de dados
 - [x] Adicionar indicador de carregamento durante fetch
+
+
+### 64. Melhorias do Visualizador de Camadas Base
+- [x] Adicionar dropdown de filtro por estado (UF)
+- [x] Implementar filtro por região (Norte, Nordeste, Centro-Oeste, Sudeste, Sul)
+- [ ] Adicionar ferramenta de medição de distâncias (régua)
+- [ ] Adicionar ferramenta de medição de áreas (polígono)
+- [ ] Implementar desenho de polígono para seleção de área
+- [ ] Criar exportação de features dentro de área selecionada (GeoJSON)
+- [ ] Adicionar exportação em formato Shapefile (ZIP)
+- [ ] Otimizar carregamento com paginação/clustering para grandes volumes

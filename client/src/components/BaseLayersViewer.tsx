@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -23,7 +30,11 @@ import {
   Eye,
   EyeOff,
   Info,
+  Filter,
+  Ruler,
+  Download,
 } from "lucide-react";
+import { BRAZILIAN_STATES, REGIONS } from "@/lib/brazilianStates";
 import type { FeatureCollection, Feature, Geometry } from "geojson";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -95,6 +106,8 @@ export default function BaseLayersViewer() {
   ]);
 
   const [bounds, setBounds] = useState<L.LatLngBoundsExpression | null>(null);
+  const [selectedState, setSelectedState] = useState<string>("all");
+  const [selectedRegion, setSelectedRegion] = useState<string>("all");
 
   // Query para listar camadas disponíveis
   const { data: availableLayers } = trpc.baseLayers.list.useQuery();
@@ -200,6 +213,39 @@ export default function BaseLayersViewer() {
     );
   };
 
+  // Função para filtrar features por estado/região
+  const filterFeatures = (data: FeatureCollection): FeatureCollection => {
+    if (selectedState === "all" && selectedRegion === "all") {
+      return data;
+    }
+
+    const filtered: FeatureCollection = {
+      ...data,
+      features: data.features.filter((feature) => {
+        const props = feature.properties;
+        if (!props) return false;
+
+        // Tentar extrair UF de diferentes propriedades
+        const uf = props.uf || props.UF || props.sigla_uf || props.cd_geocuf;
+
+        // Filtro por estado específico
+        if (selectedState !== "all") {
+          return uf === selectedState;
+        }
+
+        // Filtro por região
+        if (selectedRegion !== "all") {
+          const state = BRAZILIAN_STATES.find((s) => s.uf === uf);
+          return state?.region === selectedRegion;
+        }
+
+        return true;
+      }),
+    };
+
+    return filtered;
+  };
+
   // Estilo para features
   const getFeatureStyle = (layer: LayerControl) => {
     return (feature?: Feature<Geometry, any>) => {
@@ -267,6 +313,51 @@ export default function BaseLayersViewer() {
           <Card>
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-center gap-2 mb-4">
+                <Filter className="w-5 h-5" />
+                <h3 className="font-semibold">Filtros Geográficos</h3>
+              </div>
+
+              {/* Filtro por Região */}
+              <div className="space-y-2 mb-4">
+                <label className="text-sm font-medium">Região</label>
+                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as regiões" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as regiões</SelectItem>
+                    {REGIONS.map((region) => (
+                      <SelectItem key={region} value={region}>
+                        {region}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro por Estado */}
+              <div className="space-y-2 mb-4">
+                <label className="text-sm font-medium">Estado (UF)</label>
+                <Select value={selectedState} onValueChange={setSelectedState}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os estados" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os estados</SelectItem>
+                    {BRAZILIAN_STATES.map((state) => (
+                      <SelectItem key={state.uf} value={state.uf}>
+                        {state.uf} - {state.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center gap-2 mb-4">
                 <Layers className="w-5 h-5" />
                 <h3 className="font-semibold">Camadas</h3>
               </div>
@@ -306,7 +397,14 @@ export default function BaseLayersViewer() {
                         className="w-full"
                       />
                       <div className="text-xs text-muted-foreground">
-                        {layer.data.features.length.toLocaleString()} features
+                        {(() => {
+                          const filtered = filterFeatures(layer.data!);
+                          const total = layer.data.features.length;
+                          const shown = filtered.features.length;
+                          return shown < total
+                            ? `${shown.toLocaleString()} de ${total.toLocaleString()} features`
+                            : `${total.toLocaleString()} features`;
+                        })()}
                       </div>
                     </div>
                   )}
@@ -345,10 +443,12 @@ export default function BaseLayersViewer() {
               {/* Renderizar camadas visíveis */}
               {layers
                 .filter((l) => l.visible && l.data)
-                .map((layer) => (
+                .map((layer) => {
+                  const filteredData = filterFeatures(layer.data!);
+                  return (
                   <GeoJSON
-                    key={layer.id}
-                    data={layer.data!}
+                    key={`${layer.id}-${selectedState}-${selectedRegion}`}
+                    data={filteredData}
                     style={getFeatureStyle(layer)}
                     onEachFeature={onEachFeature(layer)}
                     pointToLayer={(feature, latlng) => {
@@ -362,7 +462,8 @@ export default function BaseLayersViewer() {
                       });
                     }}
                   />
-                ))}
+                  );
+                })}
 
               {/* Ajustar bounds quando camada é carregada */}
               {bounds && <FitBounds bounds={bounds} />}
