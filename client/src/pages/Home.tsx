@@ -192,7 +192,7 @@ export default function Home() {
                     <span className="text-xs font-medium">Projetos</span>
                   </Button>
                 </Link>
-                <Link href="/maps/technical">
+                <Link href="/technical-maps">
                   <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all">
                     <Printer className="w-6 h-6 text-blue-500" />
                     <span className="text-xs font-medium">Mapas ABNT</span>
@@ -204,7 +204,7 @@ export default function Home() {
                     <span className="text-xs font-medium">Atlas</span>
                   </Button>
                 </Link>
-                <Link href="/files">
+                <Link href="/projects">
                   <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2 hover:bg-purple-50 dark:hover:bg-purple-950/20 hover:border-purple-300 dark:hover:border-purple-800 transition-all">
                     <FileUp className="w-6 h-6 text-purple-500" />
                     <span className="text-xs font-medium">Arquivos</span>
@@ -240,7 +240,7 @@ export default function Home() {
                         <span className="text-xs">Convites</span>
                       </Button>
                     </Link>
-                    <Link href="/admin/backups">
+                    <Link href="/admin">
                       <Button variant="outline" className="w-full h-auto py-3 flex-col gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
                         <Database className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                         <span className="text-xs">Backups</span>

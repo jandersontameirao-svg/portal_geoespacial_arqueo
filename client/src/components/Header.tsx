@@ -118,7 +118,7 @@ export default function Header() {
                 <DropdownMenuLabel>Ferramentas Geoespaciais</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <Link href="/maps/technical">
+                  <Link href="/technical-maps">
                     <DropdownMenuItem className="cursor-pointer">
                       <Printer className="mr-2 h-4 w-4 text-blue-500" />
                       <div>
@@ -136,7 +136,7 @@ export default function Header() {
                       </div>
                     </DropdownMenuItem>
                   </Link>
-                  <Link href="/files">
+                  <Link href="/projects">
                     <DropdownMenuItem className="cursor-pointer">
                       <FileUp className="mr-2 h-4 w-4 text-purple-500" />
                       <div>
@@ -194,7 +194,7 @@ export default function Header() {
                         </div>
                       </DropdownMenuItem>
                     </Link>
-                    <Link href="/admin/backups">
+                    <Link href="/admin">
                       <DropdownMenuItem className="cursor-pointer">
                         <Database className="mr-2 h-4 w-4 text-purple-500" />
                         <div>
@@ -298,7 +298,7 @@ export default function Header() {
                 </Link>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Ferramentas</DropdownMenuLabel>
-                <Link href="/maps/technical">
+                <Link href="/technical-maps">
                   <DropdownMenuItem className="cursor-pointer">
                     <Printer className="mr-2 h-4 w-4" />
                     Mapas ABNT
@@ -310,7 +310,7 @@ export default function Header() {
                     Atlas
                   </DropdownMenuItem>
                 </Link>
-                <Link href="/files">
+                <Link href="/projects">
                   <DropdownMenuItem className="cursor-pointer">
                     <FileUp className="mr-2 h-4 w-4" />
                     Arquivos
@@ -338,7 +338,7 @@ export default function Header() {
                         Convites
                       </DropdownMenuItem>
                     </Link>
-                    <Link href="/admin/backups">
+                    <Link href="/admin">
                       <DropdownMenuItem className="cursor-pointer">
                         <Database className="mr-2 h-4 w-4" />
                         Backups
