@@ -806,3 +806,63 @@ export async function countFilteredAuditLogs(filters?: {
     return 0;
   }
 }
+
+
+// ============================================================================
+// ESTATÍSTICAS E MÉTRICAS
+// ============================================================================
+
+/**
+ * Conta total de projetos
+ */
+export async function countProjects(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(projects);
+  return result[0]?.count || 0;
+}
+
+/**
+ * Conta total de usuários
+ */
+export async function countUsers(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(users);
+  return result[0]?.count || 0;
+}
+
+/**
+ * Conta total de arquivos
+ */
+export async function countFiles(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(files);
+  return result[0]?.count || 0;
+}
+
+/**
+ * Conta total de camadas
+ */
+export async function countLayers(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(layers);
+  return result[0]?.count || 0;
+}
+
+/**
+ * Conta total de mapas salvos
+ */
+export async function countSavedMaps(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(savedMaps);
+  return result[0]?.count || 0;
+}

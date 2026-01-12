@@ -9,6 +9,7 @@ import { printJobsRouter } from "./printJobsRouter";
 import { backupRouter } from "./backupRouter";
 import { atlasRouter } from "./atlasRouter";
 import { notificationsRouter } from "./notificationsRouter";
+import { infrastructureRouter } from "./infrastructureRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -624,6 +625,7 @@ export const appRouter = router({
   backup: backupRouter,
   atlas: atlasRouter,
   notifications: notificationsRouter,
+  infrastructure: infrastructureRouter,
 });
 
 export type AppRouter = typeof appRouter;
