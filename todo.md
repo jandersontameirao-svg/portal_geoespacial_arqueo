@@ -674,3 +674,47 @@
 - [x] Adicionar validação de descrição obrigatória (min 10 caracteres)
 - [x] Adicionar campo de tags obrigatório
 - [x] Exibir erros de validação no upload (via Zod)
+
+
+## MELHORIA DE LAYOUT E UX
+
+### 67. Redesign da Página Inicial
+- [ ] Criar hero section profissional com call-to-action
+- [ ] Adicionar cards de acesso rápido às funcionalidades
+- [ ] Melhorar visualização de projetos recentes
+- [ ] Adicionar seção de estatísticas do sistema
+- [ ] Implementar animações suaves
+
+### 68. Melhorar Navegação e Menu
+- [ ] Expandir menu com todas as funcionalidades
+- [ ] Adicionar ícones descritivos
+- [ ] Criar submenu para ferramentas geoespaciais
+- [ ] Melhorar dropdown do usuário
+- [ ] Adicionar breadcrumbs em todas as páginas
+
+### 69. Páginas de Funcionalidades
+- [ ] Criar página de Mapas Técnicos ABNT
+- [ ] Criar página de Atlas Automático
+- [ ] Criar página de Backups (admin)
+- [ ] Criar página de Gerenciamento de Usuários
+- [ ] Melhorar página de Administração
+
+### 70. Polimento Visual
+- [ ] Aplicar sombras e bordas consistentes
+- [ ] Melhorar espaçamentos e tipografia
+- [ ] Adicionar micro-interações
+- [ ] Garantir responsividade em todas as páginas
+- [ ] Revisar paleta de cores
+
+
+### 71. Redesign Completo do Layout (Concluído)
+- [x] Redesenhar página inicial com hero section profissional
+- [x] Adicionar cards de funcionalidades principais
+- [x] Mostrar estatísticas do sistema na home
+- [x] Criar menu de navegação expandido com dropdown de Ferramentas
+- [x] Criar página de Mapas Técnicos ABNT (/technical-maps)
+- [x] Criar página de Atlas Automático (/atlas)
+- [x] Criar página de Gerenciamento de Usuários (/admin/users)
+- [x] Adicionar procedures listUsers, changeUserRole, resetUserMfa
+- [x] Aplicar identidade visual do Grupo Arqueo
+- [x] Melhorar responsividade e acessibilidade
