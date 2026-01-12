@@ -459,6 +459,37 @@ export type InsertGeometry = typeof geometries.$inferInsert;
 
 
 // ============================================================================
+// UPLOADS DE ARQUIVOS GIS
+// ============================================================================
+
+export const gisUploads = mysqlTable("gis_uploads", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  projectId: int("projectId"),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  originalName: varchar("originalName", { length: 255 }).notNull(),
+  fileType: mysqlEnum("fileType", ["shp", "kml", "kmz", "geojson", "gpx", "gml", "dxf"]).notNull(),
+  fileSize: int("fileSize").notNull(),
+  mimeType: varchar("mimeType", { length: 100 }).notNull(),
+  s3Key: varchar("s3Key", { length: 500 }).notNull(),
+  s3Url: varchar("s3Url", { length: 1000 }).notNull(),
+  status: mysqlEnum("status", ["pending", "processing", "completed", "failed"]).default("pending").notNull(),
+  validationResult: json("validationResult"),
+  metadata: json("metadata"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("user_id_idx").on(table.userId),
+  projectIdIdx: index("project_id_idx").on(table.projectId),
+  statusIdx: index("status_idx").on(table.status),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export type GisUpload = typeof gisUploads.$inferSelect;
+export type InsertGisUpload = typeof gisUploads.$inferInsert;
+
+// ============================================================================
 // NOTIFICAÇÕES
 // ============================================================================
 

@@ -11,6 +11,7 @@ import { atlasRouter } from "./atlasRouter";
 import { notificationsRouter } from "./notificationsRouter";
 import { infrastructureRouter } from "./infrastructureRouter";
 import { baseLayersRouter } from "./baseLayersRouter";
+import { gisUploadsRouter } from "./gisUploadsRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -628,6 +629,7 @@ export const appRouter = router({
   notifications: notificationsRouter,
   infrastructure: infrastructureRouter,
   baseLayers: baseLayersRouter,
+  gisUploads: gisUploadsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -24,7 +24,9 @@ import {
   auditLogs,
   InsertAuditLog,
   geometries,
-  InsertGeometry
+  InsertGeometry,
+  gisUploads,
+  InsertGisUpload
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -865,4 +867,121 @@ export async function countSavedMaps(): Promise<number> {
   
   const result = await db.select({ count: sql<number>`COUNT(*)` }).from(savedMaps);
   return result[0]?.count || 0;
+}
+
+
+// ============================================================================
+// GIS UPLOADS
+// ============================================================================
+
+export async function listGisUploads(
+  userId: number,
+  options: {
+    projectId?: number;
+    status?: "pending" | "processing" | "completed" | "failed";
+    limit?: number;
+    offset?: number;
+  }
+) {
+  const dbConn = await getDb();
+  if (!dbConn) return [];
+
+  const query = await dbConn
+    .select()
+    .from(gisUploads)
+    .where(eq(gisUploads.userId, userId))
+    .orderBy(desc(gisUploads.createdAt))
+    .limit(options.limit || 50)
+    .offset(options.offset || 0);
+
+  return query;
+}
+
+export async function getGisUpload(id: number, userId: number) {
+  const dbConn = await getDb();
+  if (!dbConn) return null;
+
+  const [upload] = await dbConn
+    .select()
+    .from(gisUploads)
+    .where(eq(gisUploads.id, id))
+    .limit(1);
+
+  if (!upload || upload.userId !== userId) {
+    return null;
+  }
+
+  return upload;
+}
+
+export async function createGisUpload(data: {
+  userId: number;
+  projectId?: number;
+  filename: string;
+  originalName: string;
+  fileType: "shp" | "kml" | "kmz" | "geojson" | "gpx" | "gml" | "dxf";
+  fileSize: number;
+  mimeType: string;
+  s3Key: string;
+  s3Url: string;
+  status: "pending" | "processing" | "completed" | "failed";
+}) {
+  const dbConn = await getDb();
+  if (!dbConn) throw new Error("Database connection not available");
+
+  const [result] = await dbConn.insert(gisUploads).values(data).$returningId();
+  return result.id;
+}
+
+export async function updateGisUploadStatus(
+  id: number,
+  status: "pending" | "processing" | "completed" | "failed",
+  s3Url?: string,
+  errorMessage?: string
+) {
+  const dbConn = await getDb();
+  if (!dbConn) throw new Error("Database connection not available");
+
+  const updateData: any = {
+    status,
+    updatedAt: new Date(),
+  };
+
+  if (s3Url) {
+    updateData.s3Url = s3Url;
+  }
+
+  if (errorMessage) {
+    updateData.errorMessage = errorMessage;
+  }
+
+  await dbConn.update(gisUploads).set(updateData).where(eq(gisUploads.id, id));
+}
+
+export async function completeGisUpload(
+  id: number,
+  status: "completed" | "failed",
+  validationResult: any,
+  errorMessage?: string
+) {
+  const dbConn = await getDb();
+  if (!dbConn) throw new Error("Database connection not available");
+
+  await dbConn
+    .update(gisUploads)
+    .set({
+      status,
+      validationResult,
+      metadata: validationResult.metadata,
+      errorMessage,
+      updatedAt: new Date(),
+    })
+    .where(eq(gisUploads.id, id));
+}
+
+export async function deleteGisUpload(id: number) {
+  const dbConn = await getDb();
+  if (!dbConn) throw new Error("Database connection not available");
+
+  await dbConn.delete(gisUploads).where(eq(gisUploads.id, id));
 }

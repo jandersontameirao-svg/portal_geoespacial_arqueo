@@ -961,3 +961,18 @@
 - [x] Adicionar tooltips com ref, nome, tipo e superfície
 - [x] Aplicar filtros geográficos às rodovias
 - [x] Adicionar contador de rodovias visíveis
+
+
+### 73. Interface de Upload de Arquivos GIS
+- [x] Criar schema de banco para gis_uploads (id, userId, filename, originalName, fileType, fileSize, mimeType, s3Key, s3Url, status, validationResult, metadata, createdAt)
+- [x] Implementar backend de upload com multipart/form-data
+- [x] Adicionar validação de tipos de arquivo (SHP, KML, KMZ, GeoJSON, GPX)
+- [x] Implementar extração de metadados (CRS, bounds, feature count, geometry types)
+- [x] Criar procedure tRPC para upload e listagem
+- [x] Integrar validação com IA (LLM) para verificar qualidade dos dados
+- [ ] Criar componente de drag-and-drop com react-dropzone
+- [ ] Adicionar preview de arquivos antes do upload
+- [ ] Implementar barra de progresso de upload
+- [ ] Criar página de gerenciamento de uploads
+- [ ] Adicionar visualização de arquivos uploadados no mapa
+- [ ] Implementar download de arquivos uploadados
