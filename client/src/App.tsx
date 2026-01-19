@@ -19,6 +19,8 @@ import Backups from "./pages/Backups";
 import BaseLayers from "./pages/BaseLayers";
 import BaseLayersViewer from "./pages/BaseLayersViewer";
 import GisUploads from "./pages/GisUploads";
+import WMSDemo from "./pages/WMSDemo";
+import GISDiagnostics from "./pages/GISDiagnostics";
 import { GuidedTour } from "./components/GuidedTour";
 
 function Router() {
@@ -40,6 +42,8 @@ function Router() {
         <Route path="/base-layers" component={BaseLayers} />
         <Route path="/base-layers/viewer" component={BaseLayersViewer} />
         <Route path="/gis-uploads" component={GisUploads} />
+        <Route path="/wms-demo" component={WMSDemo} />
+        <Route path="/gis-diagnostics" component={GISDiagnostics} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

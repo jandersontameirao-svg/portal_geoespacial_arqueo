@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # PostGIS Database
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: arqueo_postgis
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-arqueo_gis}
+      POSTGRES_USER: ${POSTGRES_USER:-gis_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gis_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gis_user} -d ${POSTGRES_DB:-arqueo_gis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gis_network
+
+  # QGIS Server
+  qgis-server:
+    image: qgis/qgis-server:3.34
+    container_name: arqueo_qgis_server
+    environment:
+      QGIS_PROJECT_FILE: /etc/qgis/projects/demo_project.qgz
+      QGIS_SERVER_LOG_LEVEL: 0
+      QGIS_SERVER_LOG_STDERR: 1
+      POSTGRES_HOST: postgis
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-arqueo_gis}
+      POSTGRES_USER: ${POSTGRES_USER:-gis_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gis_password}
+    ports:
+      - "8080:80"
+    volumes:
+      - ./infra/qgis/projects:/etc/qgis/projects:ro
+      - ./infra/qgis/styles:/etc/qgis/styles:ro
+    depends_on:
+      postgis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/ows?SERVICE=WMS&REQUEST=GetCapabilities"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - gis_network
+
+  # Redis for job queue
+  redis:
+    image: redis:7-alpine
+    container_name: arqueo_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gis_network
+
+  # Worker (stub for now - just healthcheck)
+  worker:
+    image: node:20-alpine
+    container_name: arqueo_worker
+    working_dir: /app
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: postgis
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-arqueo_gis}
+      POSTGRES_USER: ${POSTGRES_USER:-gis_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gis_password}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      WORKER_LOG_LEVEL: ${WORKER_LOG_LEVEL:-info}
+    volumes:
+      - ./infra/worker:/app
+    command: sh -c "npm install && node index.js"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - gis_network
+
+volumes:
+  postgis_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  gis_network:
+    driver: bridge

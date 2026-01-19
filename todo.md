@@ -1044,3 +1044,87 @@
 - [x] Detectar geometrias inválidas ou problemáticas (coordenadas fora do Brasil)
 - [x] Gerar relatório com metadados (feature count, geometry types, bounds, attributes)
 - [x] Testar com arquivo KMZ real (teste_validacao.kmz - detectou erro de coordenada em Paris!)
+
+
+## SPRINT A - Motor GIS no Ar (Desktop) ✅ CONCLUÍDO (12/01/2026)
+
+### Infraestrutura Docker
+- [x] Criar docker-compose.gis.yml com PostGIS, QGIS Server, Redis, Worker
+- [x] Configurar volumes persistentes para PostGIS
+- [x] Configurar volume para projetos QGIS (./infra/qgis/projects -> /projects)
+- [x] Expor portas: PostGIS (5432), QGIS Server (8080), Redis (6379), Worker (3001)
+- [x] Criar arquivo .env.gis.example com variáveis de ambiente
+- [x] Criar scripts de bootstrap (Linux/Mac/Windows)
+
+### Banco PostGIS Demo
+- [x] Criar banco arqueo_gis
+- [x] Criar schema demo
+- [x] Criar tabela demo.municipios (id, name, codigo_ibge, uf, area_km2, populacao, geom MultiPolygon EPSG:4674)
+- [x] Inserir 3 polígonos demo (Brasília, Goiânia, Belo Horizonte)
+- [x] Criar índice espacial GIST
+
+### Projeto QGIS Demo
+- [x] Criar projeto demo_project.qgz
+- [x] Configurar conexão PostGIS para demo.municipios
+- [x] Aplicar estilo laranja/bordô (cores Grupo Arqueo)
+- [x] Definir CRS do projeto como EPSG:4674 (SIRGAS 2000)
+- [x] Nomear camada como "demo_municipios"
+- [x] Adicionar labels com nome dos municípios
+
+### QGIS Server - Publicação WMS
+- [x] Configurar endpoint /ows com WMS habilitado
+- [x] Validar GetCapabilities WMS
+- [x] Validar GetMap com bbox dos polígonos
+- [x] Configurar metadados WMS (title, abstract, organization)
+
+### Portal - Overlay WMS
+- [x] Implementar componente WMSTileOverlay para Google Maps
+- [x] Criar página de demonstração /wms-demo
+- [x] Implementar conversão tile->bbox para GetMap
+- [x] Adicionar controles de visibilidade e opacidade
+- [x] Criar router tRPC gisDiagnosticsRouter
+- [x] Criar página de diagnósticos /gis-diagnostics
+- [x] Implementar auto-refresh de status
+
+### Documentação
+- [x] Criar SPRINT_A_README.md completo
+- [x] Documentar arquitetura e componentes
+- [x] Documentar como usar e testar
+- [x] Documentar troubleshooting
+- [x] Validar 7/7 critérios de aceite
+- [ ] Permitir ligar/desligar camada visualmente
+
+### Healthchecks e Diagnósticos
+- [ ] Criar página /admin/diagnostics
+- [ ] Mostrar status PostGIS (ping)
+- [ ] Mostrar status QGIS Server (GetCapabilities)
+- [ ] Mostrar status Redis (ping)
+- [ ] Link clicável para GetCapabilities
+
+### Scripts de Bootstrap
+- [ ] Criar /infra/scripts/bootstrap_gis_demo.sh (Linux/Mac)
+- [ ] Criar /infra/scripts/bootstrap_gis_demo.ps1 (Windows)
+- [ ] Script deve criar tabelas, inserir dados demo, publicar projeto QGIS
+
+### Documentação
+- [ ] Criar docs/SprintA.md com instruções completas
+- [ ] Documentar comando para subir ambiente (docker compose up)
+- [ ] Documentar comando para executar bootstrap
+- [ ] Documentar URLs do portal e QGIS Server
+- [ ] Incluir exemplos curl GetCapabilities e GetMap
+
+### Critérios de Aceite
+- [ ] docker compose up sobe tudo sem erro
+- [ ] Bootstrap cria tabela e insere polígono demo
+- [ ] GetCapabilities responde listando "demo_municipios"
+- [ ] Overlay WMS visível no portal ao ativar "Camada Demo"
+- [ ] Entregar evidências: prints + respostas curl
+
+### Checklist de Homologação
+- [ ] Subida limpa do compose
+- [ ] Banco com tabela demo e SRID correto
+- [ ] GetCapabilities OK
+- [ ] GetMap OK
+- [ ] Overlay visível no portal
+- [ ] Logs do QGIS Server sem erros críticos
+- [ ] Documentação de como rodar e reproduzir

@@ -1,0 +1,481 @@
+{
+  "project": {
+    "name": "Portal Geoespacial Corporativo - Grupo Arqueo",
+    "version": "d7782f75",
+    "description": "Sistema unificado de gerenciamento de dados geoespaciais para arqueologia, integrando visualização de mapas, repositório de arquivos, camadas base oficiais brasileiras e ferramentas de análise espacial.",
+    "purpose": "Centralizar funcionalidades comuns (gestão de usuários, clientes, projetos) e reduzir passos redundantes entre aplicações do Grupo Arqueo, com foco em avaliação de desempenho contratual de trabalhadores PJ e gestão de dados geoespaciais arqueológicos.",
+    "tech_stack": {
+      "frontend": {
+        "framework": "React 19",
+        "styling": "Tailwind CSS 4",
+        "ui_library": "shadcn/ui",
+        "routing": "Wouter",
+        "state_management": "tRPC + React Query",
+        "maps": "Google Maps JavaScript API (via proxy Manus)"
+      },
+      "backend": {
+        "framework": "Express 4",
+        "api": "tRPC 11",
+        "database": "MySQL/TiDB (via Drizzle ORM)",
+        "authentication": "Manus OAuth + JWT",
+        "file_storage": "S3-compatible (via manus-upload-file utility)",
+        "ai": "Manus LLM API (para validação de arquivos geoespaciais)"
+      },
+      "geospatial": {
+        "coordinate_system": "EPSG:4326 (WGS84) padrão, EPSG:4674 (SIRGAS 2000) para dados brasileiros",
+        "data_formats": "KML, KMZ, SHP (zipado), GeoJSON",
+        "visualization": "Google Maps (2D), CesiumJS (3D - planejado)"
+      }
+    }
+  },
+  "architecture": {
+    "pattern": "Cliente-Servidor com tRPC",
+    "authentication_flow": "OAuth 2.0 via Manus → JWT session cookie → ctx.user em procedures protegidas",
+    "data_isolation": "Por projeto - usuários veem apenas projetos aos quais foram vinculados",
+    "file_processing": "Upload → Validação (antivírus, tamanho, formato) → Processamento geoespacial → Validação IA → Storage S3 → Metadados no banco",
+    "authorization": "RBAC com roles: admin (acesso total), user (acesso a projetos vinculados)",
+    "audit": "Logs imutáveis de todas as ações (audit_logs table)"
+  },
+  "database_schema": {
+    "users": {
+      "description": "Usuários do sistema",
+      "key_fields": ["id", "openId", "email", "name", "role (admin|user)", "createdAt", "updatedAt"]
+    },
+    "projects": {
+      "description": "Projetos arqueológicos com AOI (Área de Interesse)",
+      "key_fields": ["id", "name", "description", "code", "aoi (geometria)", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "project_members": {
+      "description": "Vinculação de usuários a projetos",
+      "key_fields": ["id", "projectId", "userId", "role", "joinedAt"]
+    },
+    "files": {
+      "description": "Repositório de arquivos (geoespaciais e documentos)",
+      "key_fields": ["id", "projectId", "name", "s3Key", "s3Url", "fileType", "size", "mimeType", "isGeospatial", "crs", "bounds", "metadata (JSON)", "uploadedBy", "createdAt", "updatedAt"]
+    },
+    "file_versions": {
+      "description": "Versionamento de arquivos",
+      "key_fields": ["id", "fileId", "versionNumber", "s3Key", "s3Url", "size", "uploadedBy", "createdAt"]
+    },
+    "base_layers": {
+      "description": "Camadas base oficiais brasileiras (FUNAI, INCRA, IPHAN, OSM)",
+      "key_fields": ["id", "name", "description", "source", "dataType", "url", "status", "featureCount", "lastDownload", "cacheExpiry", "metadata (JSON)", "createdAt", "updatedAt"]
+    },
+    "saved_maps": {
+      "description": "Configurações salvas de mapas (layers, zoom, center)",
+      "key_fields": ["id", "projectId", "name", "description", "config (JSON)", "thumbnail", "createdBy", "createdAt", "updatedAt"]
+    },
+    "notifications": {
+      "description": "Notificações do sistema",
+      "key_fields": ["id", "userId", "type", "title", "message", "isRead", "relatedEntityType", "relatedEntityId", "createdAt"]
+    },
+    "audit_logs": {
+      "description": "Logs de auditoria imutáveis",
+      "key_fields": ["id", "userId", "userEmail", "userName", "action", "entityType", "entityId", "projectId", "details (JSON)", "ipAddress", "userAgent", "createdAt"]
+    },
+    "invitations": {
+      "description": "Convites para novos usuários (sem auto-cadastro)",
+      "key_fields": ["id", "email", "role", "projectIds (JSON)", "invitedBy", "token", "expiresAt", "acceptedAt", "createdAt"]
+    }
+  },
+  "features_implemented": {
+    "authentication": {
+      "status": "✅ Implementado",
+      "details": [
+        "OAuth 2.0 via Manus",
+        "Sistema de convites (sem auto-cadastro)",
+        "Roles: admin, user",
+        "Proteção de rotas via protectedProcedure",
+        "Session cookie JWT"
+      ]
+    },
+    "projects": {
+      "status": "✅ Implementado",
+      "details": [
+        "CRUD completo de projetos",
+        "Definição de AOI (Área de Interesse) via desenho no mapa",
+        "Vinculação de membros",
+        "Isolamento de dados por projeto",
+        "Histórico de ações via audit_logs"
+      ]
+    },
+    "file_repository": {
+      "status": "✅ Implementado",
+      "details": [
+        "Upload de arquivos geoespaciais (KML, KMZ, SHP zipado)",
+        "Upload de documentos (PDF, DOCX, XLSX, imagens)",
+        "Validação de tamanho (máximo 100MB)",
+        "Proteção contra zip bomb",
+        "Validação com IA para KML/KMZ (estrutura, geometrias, coordenadas, CRS)",
+        "Extração automática de metadados (bounds, featureCount, geometryTypes, attributes)",
+        "Storage S3 via manus-upload-file",
+        "Versionamento de arquivos",
+        "Auditoria de uploads/downloads"
+      ]
+    },
+    "base_layers": {
+      "status": "✅ Implementado",
+      "details": [
+        "Download automático de camadas oficiais brasileiras:",
+        "- FUNAI: Terras Indígenas (WFS)",
+        "- INCRA: Terras Quilombolas (WFS)",
+        "- IPHAN: Sítios Arqueológicos (WFS)",
+        "- OSM: Rodovias Federais (Overpass API)",
+        "Sistema de cache com expiração automática",
+        "Atualização manual via botão",
+        "Metadados: featureCount, lastDownload, cacheExpiry",
+        "Status: pending, downloading, complete, error"
+      ]
+    },
+    "map_viewer": {
+      "status": "✅ Implementado",
+      "details": [
+        "Visualização 2D com Google Maps",
+        "Ferramentas de desenho (polígono, linha, ponto, círculo, retângulo)",
+        "Ferramentas de medição (distância, área)",
+        "Busca de coordenadas",
+        "Exibição de coordenadas do cursor",
+        "Layers panel para controle de camadas",
+        "Salvamento de configurações de mapa",
+        "Importação de geometrias de arquivos",
+        "Clustering de marcadores",
+        "Print preview"
+      ]
+    },
+    "notifications": {
+      "status": "✅ Implementado",
+      "details": [
+        "Sistema de notificações em tempo real",
+        "Badge com contador de não lidas",
+        "Notificações de upload concluído/erro",
+        "Notificações de convites aceitos",
+        "Marcar como lida",
+        "Limpar todas"
+      ]
+    },
+    "search": {
+      "status": "✅ Implementado",
+      "details": [
+        "Busca global (Ctrl+K)",
+        "Busca em projetos, arquivos, mapas salvos",
+        "Navegação rápida via teclado"
+      ]
+    },
+    "audit": {
+      "status": "✅ Implementado",
+      "details": [
+        "Logs imutáveis de todas as ações",
+        "Registro de: userId, action, entityType, entityId, projectId, details, ipAddress, userAgent",
+        "Histórico completo por projeto",
+        "Filtros por tipo de ação e usuário"
+      ]
+    },
+    "guided_tour": {
+      "status": "✅ Implementado",
+      "details": [
+        "Tour guiado de 9 passos para novos usuários",
+        "Apresentação das principais funcionalidades",
+        "Pode ser pulado ou reiniciado"
+      ]
+    }
+  },
+  "features_planned": {
+    "infrastructure": [
+      "PostgreSQL + PostGIS para geometrias (EPSG:4674)",
+      "QGIS Server para geração de mapas",
+      "Sistema de filas para jobs assíncronos",
+      "Health checks e monitoramento"
+    ],
+    "authentication": [
+      "MFA obrigatório para usuários internos",
+      "MFA opcional para clientes",
+      "Rate limiting",
+      "Proteções OWASP Top 10"
+    ],
+    "geospatial": [
+      "Globo 3D com CesiumJS",
+      "Alternância 2D <-> 3D",
+      "Identificação de feições",
+      "Basemaps variados"
+    ],
+    "maps_generation": [
+      "Templates QGIS padrão ABNT",
+      "Geração via QGIS Server + Print Layout",
+      "Elementos obrigatórios: título, projeto, cliente, autor, data, escala, norte, legenda",
+      "CRS: UTM / SIRGAS 2000 com fuso automático",
+      "Grade UTM, moldura cartográfica, carimbo técnico"
+    ],
+    "atlas": [
+      "Sistema de atlas automático",
+      "Definição de escala e tamanho de folha",
+      "Cálculo automático de grid",
+      "Geração de PDF multipágina"
+    ],
+    "collaboration": [
+      "Comentários em arquivos",
+      "Anotações em mapas",
+      "Compartilhamento externo de mapas"
+    ]
+  },
+  "api_endpoints": {
+    "auth": {
+      "me": "Retorna usuário autenticado",
+      "logout": "Encerra sessão"
+    },
+    "projects": {
+      "list": "Lista projetos do usuário",
+      "get": "Detalhes de um projeto",
+      "create": "Cria novo projeto",
+      "update": "Atualiza projeto",
+      "delete": "Deleta projeto",
+      "addMember": "Adiciona membro ao projeto",
+      "removeMember": "Remove membro do projeto",
+      "updateMemberRole": "Atualiza role de membro"
+    },
+    "files": {
+      "list": "Lista arquivos do projeto",
+      "listAll": "Lista todos os arquivos acessíveis",
+      "get": "Detalhes de um arquivo",
+      "upload": "Faz upload de arquivo (com validação IA para KML/KMZ)",
+      "delete": "Deleta arquivo",
+      "update": "Atualiza metadados do arquivo"
+    },
+    "baseLayers": {
+      "list": "Lista camadas base disponíveis",
+      "download": "Baixa/atualiza camada base específica (FUNAI, INCRA, IPHAN, OSM)"
+    },
+    "savedMaps": {
+      "list": "Lista mapas salvos do projeto",
+      "get": "Detalhes de um mapa salvo",
+      "create": "Salva configuração de mapa",
+      "update": "Atualiza mapa salvo",
+      "delete": "Deleta mapa salvo"
+    },
+    "notifications": {
+      "list": "Lista notificações do usuário",
+      "markAsRead": "Marca notificação como lida",
+      "markAllAsRead": "Marca todas como lidas",
+      "clearAll": "Limpa todas as notificações"
+    },
+    "invitations": {
+      "create": "Cria convite para novo usuário",
+      "list": "Lista convites pendentes",
+      "accept": "Aceita convite (via token)",
+      "revoke": "Revoga convite"
+    },
+    "auditLogs": {
+      "listByProject": "Lista logs de auditoria do projeto",
+      "listByUser": "Lista logs de auditoria do usuário"
+    }
+  },
+  "file_validation_ai": {
+    "description": "Sistema de validação automática com IA para arquivos geoespaciais",
+    "supported_formats": ["KML", "KMZ"],
+    "validations": {
+      "structure": [
+        "Formato XML válido",
+        "Estrutura hierárquica correta (Document, Folder, Placemark)",
+        "Namespaces corretos"
+      ],
+      "geometries": [
+        "Tipos de geometria presentes (Point, LineString, Polygon, MultiGeometry)",
+        "Coordenadas no formato correto (longitude, latitude, altitude)",
+        "Geometrias auto-intersectantes ou inválidas",
+        "Coordenadas dentro do Brasil (-74° a -28° longitude, -34° a 6° latitude)"
+      ],
+      "data": [
+        "Sistema de coordenadas (CRS) - padrão EPSG:4326 (WGS84)",
+        "Presença de atributos/campos nos Placemarks",
+        "Dados de elevação (3D) se houver",
+        "Timestamps ou animações temporais"
+      ],
+      "warnings": [
+        "Coordenadas suspeitas (muito longe do Brasil)",
+        "Geometrias muito complexas (muitos pontos)",
+        "Falta de atributos descritivos",
+        "Estilos ou ícones personalizados"
+      ]
+    },
+    "output": {
+      "isValid": "boolean",
+      "errors": "array de strings",
+      "warnings": "array de strings",
+      "metadata": {
+        "crs": "string (ex: EPSG:4326)",
+        "bounds": "array [minLon, minLat, maxLon, maxLat]",
+        "featureCount": "number",
+        "geometryTypes": "array de strings",
+        "attributes": "array de strings"
+      }
+    },
+    "example_result": {
+      "isValid": false,
+      "errors": [
+        "Coordenada do ponto 'Ponto em Paris (ERRO - Fora do Brasil)' está fora dos limites do Brasil (2.3522, 48.8566)."
+      ],
+      "warnings": [
+        "O arquivo contém coordenadas fora da área geográfica do Brasil, verifique a intenção do dado.",
+        "A LineString 'Linha com Geometria Complexa' possui 10 pontos, o que pode ser considerado complexo para algumas aplicações."
+      ],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "bounds": [-47.9292, -15.7801, 2.3522, 48.8566],
+        "featureCount": 3,
+        "geometryTypes": ["Point", "LineString"],
+        "attributes": ["name", "description"]
+      }
+    }
+  },
+  "ui_components": {
+    "layout": {
+      "DashboardLayout": "Layout principal com sidebar, header, notificações e perfil de usuário",
+      "Header": "Cabeçalho com logo, navegação e busca global",
+      "NotificationBell": "Sino de notificações com badge de contador"
+    },
+    "maps": {
+      "MapViewer": "Visualizador principal de mapas com Google Maps",
+      "LayersPanel": "Painel de controle de camadas",
+      "MeasurementTools": "Ferramentas de medição (distância, área)",
+      "CoordinateSearch": "Busca de coordenadas",
+      "CoordinatesDisplay": "Exibição de coordenadas do cursor",
+      "GeometryImport": "Importação de geometrias de arquivos",
+      "MapPrintPreview": "Preview de impressão de mapas"
+    },
+    "files": {
+      "FileUpload": "Componente de upload com drag-and-drop",
+      "FileList": "Lista de arquivos com filtros e ações",
+      "GisUploader": "Upload especializado para arquivos geoespaciais"
+    },
+    "base_layers": {
+      "BaseLayersViewer": "Visualizador de camadas base oficiais brasileiras com status e ações"
+    },
+    "ui_library": {
+      "shadcn_ui": "Biblioteca de componentes: Button, Card, Dialog, Dropdown, Input, Select, Table, Toast, etc."
+    }
+  },
+  "design_system": {
+    "colors": {
+      "primary": "Laranja (#F97316)",
+      "secondary": "Bordô/Maroon (#7C2D12)",
+      "accent": "Azul (#3B82F6)",
+      "warning": "Amarelo (#EAB308)",
+      "description": "Cores oficiais do Grupo Arqueo"
+    },
+    "typography": {
+      "font_family": "Inter (via Google Fonts)",
+      "sizes": "text-xs, text-sm, text-base, text-lg, text-xl, text-2xl, text-3xl, text-4xl"
+    },
+    "spacing": "Tailwind padrão (4px base)",
+    "radius": "rounded-sm, rounded-md, rounded-lg, rounded-xl",
+    "shadows": "shadow-sm, shadow-md, shadow-lg"
+  },
+  "environment_variables": {
+    "system": [
+      "DATABASE_URL: MySQL/TiDB connection string",
+      "JWT_SECRET: Session cookie signing secret",
+      "VITE_APP_ID: Manus OAuth application ID",
+      "OAUTH_SERVER_URL: Manus OAuth backend base URL",
+      "VITE_OAUTH_PORTAL_URL: Manus login portal URL (frontend)",
+      "OWNER_OPEN_ID: Owner's OpenID",
+      "OWNER_NAME: Owner's name",
+      "BUILT_IN_FORGE_API_URL: Manus built-in APIs URL (server-side)",
+      "BUILT_IN_FORGE_API_KEY: Bearer token for Manus built-in APIs (server-side)",
+      "VITE_FRONTEND_FORGE_API_KEY: Bearer token for frontend access",
+      "VITE_FRONTEND_FORGE_API_URL: Manus built-in APIs URL (frontend)",
+      "VITE_APP_LOGO: Logo URL",
+      "VITE_APP_TITLE: Application title"
+    ],
+    "note": "Todas as variáveis são injetadas automaticamente pelo sistema Manus"
+  },
+  "external_apis": {
+    "funai": {
+      "name": "FUNAI - Fundação Nacional dos Povos Indígenas",
+      "url": "https://geoserver.funai.gov.br/geoserver/Funai/ows",
+      "type": "WFS (Web Feature Service)",
+      "layer": "Funai:wgs_84_sirgas_2000_terras_indigenas",
+      "description": "Terras Indígenas demarcadas no Brasil",
+      "cache_duration": "7 dias"
+    },
+    "incra": {
+      "name": "INCRA - Instituto Nacional de Colonização e Reforma Agrária",
+      "url": "https://geoserver.incra.gov.br/geoserver/wfs",
+      "type": "WFS",
+      "layer": "incra:quilombolas",
+      "description": "Terras Quilombolas certificadas",
+      "cache_duration": "30 dias"
+    },
+    "iphan": {
+      "name": "IPHAN - Instituto do Patrimônio Histórico e Artístico Nacional",
+      "url": "http://portal.iphan.gov.br/geoserver/CNSA/ows",
+      "type": "WFS",
+      "layer": "CNSA:sitios_arqueologicos",
+      "description": "Sítios Arqueológicos cadastrados no CNSA",
+      "cache_duration": "14 dias"
+    },
+    "osm": {
+      "name": "OpenStreetMap - Overpass API",
+      "url": "https://overpass-api.de/api/interpreter",
+      "type": "Overpass QL",
+      "query": "way[\"highway\"~\"motorway|trunk\"][\"ref\"~\"BR-\"]({bbox});",
+      "description": "Rodovias Federais Brasileiras",
+      "cache_duration": "30 dias"
+    }
+  },
+  "deployment": {
+    "platform": "Manus",
+    "hosting": "Built-in Manus hosting with custom domain support",
+    "database": "Managed MySQL/TiDB",
+    "storage": "S3-compatible via manus-upload-file",
+    "ssl": "Automatic HTTPS",
+    "domain": "Custom domain support (xxx.manus.space or custom)"
+  },
+  "security": {
+    "authentication": "OAuth 2.0 + JWT",
+    "authorization": "RBAC (Role-Based Access Control)",
+    "data_isolation": "Por projeto - usuários veem apenas dados autorizados",
+    "file_validation": "Antivírus, tamanho, formato, zip bomb protection",
+    "audit": "Logs imutáveis de todas as ações",
+    "planned": [
+      "MFA obrigatório para usuários internos",
+      "Rate limiting",
+      "OWASP Top 10 protections",
+      "TLS obrigatório",
+      "Hashing forte de senha"
+    ]
+  },
+  "testing": {
+    "framework": "Vitest",
+    "example_test": "server/auth.logout.test.ts",
+    "coverage": "Testes de procedures críticas (auth, files, projects)"
+  },
+  "documentation": {
+    "readme": "README.md no diretório raiz",
+    "todo": "todo.md com lista completa de funcionalidades e tarefas",
+    "this_file": "project_documentation.json - documentação estruturada para GPT"
+  },
+  "next_steps_suggested": [
+    "Exibir resultados da validação IA na interface (cards com erros/avisos)",
+    "Estender validação IA para Shapefiles e GeoJSON",
+    "Implementar correção automática de problemas detectados pela IA",
+    "Implementar globo 3D com CesiumJS",
+    "Implementar geração de mapas técnicos ABNT via QGIS Server",
+    "Implementar sistema de atlas automático",
+    "Adicionar PostgreSQL + PostGIS para geometrias complexas",
+    "Implementar MFA obrigatório para usuários internos",
+    "Implementar sistema de comentários e anotações em mapas",
+    "Implementar compartilhamento externo de mapas"
+  ],
+  "known_issues": [
+    "Query OSM para rodovias federais retorna 0 features (bbox ou query pode estar incorreta)",
+    "Validação IA só funciona para KML/KMZ (não para SHP ou GeoJSON ainda)",
+    "Não há exibição visual dos resultados da validação IA na interface",
+    "Globo 3D (CesiumJS) ainda não implementado",
+    "QGIS Server para geração de mapas ainda não configurado"
+  ],
+  "contact": {
+    "organization": "Grupo Arqueo",
+    "project_owner": "Janderson Rubens",
+    "platform": "Manus",
+    "support": "https://help.manus.im"
+  }
+}
