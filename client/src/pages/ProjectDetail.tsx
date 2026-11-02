@@ -9,17 +9,16 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye, Map } from "lucide-react";
+import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye, Map, Sparkles } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import FileList from "@/components/FileList";
 import ProjectGeoWorkspace from "@/components/ProjectGeoWorkspace";
-import { Link, useLocation, useParams } from "wouter";
+import { Link, useLocation, useParams, useSearch } from "wouter";
 
 const projectTabs = new Set(["overview", "members", "files", "map", "history"]);
 
 function tabFromLocation(location: string): string {
-  const query = location.split("?")[1] || "";
-  const tab = new URLSearchParams(query).get("tab");
+  const tab = new URLSearchParams(location.replace(/^\?/, "")).get("tab");
   return tab && projectTabs.has(tab) ? tab : "overview";
 }
 
@@ -28,14 +27,15 @@ export default function ProjectDetail() {
   const projectId = parseInt(id || "0");
   const { user, isAuthenticated } = useAuth();
   const [location, setLocation] = useLocation();
-  const [activeTab, setActiveTab] = useState(() => tabFromLocation(location));
+  const search = useSearch();
+  const [activeTab, setActiveTab] = useState(() => tabFromLocation(search));
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<"viewer" | "editor" | "owner">("viewer");
 
   useEffect(() => {
-    setActiveTab(tabFromLocation(location));
-  }, [location]);
+    setActiveTab(tabFromLocation(search));
+  }, [search]);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isMapWorkspace = activeTab === "map";
@@ -169,12 +169,17 @@ export default function ProjectDetail() {
               </div>
             </div>
 
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button variant="outline" asChild className="gap-2">
+                <Link href={`/atena?projectId=${projectId}`}><Sparkles className="w-4 h-4" />Atena</Link>
+              </Button>
             {canEdit && (
               <Button variant="outline" className="gap-2">
                 <Settings className="w-4 h-4" />
                 Configurações
               </Button>
             )}
+            </div>
           </div>
         </div>
 

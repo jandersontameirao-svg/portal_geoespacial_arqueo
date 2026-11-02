@@ -4,6 +4,11 @@ import { protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { createAuditLog } from "./db";
 import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
+import { and, eq } from "drizzle-orm";
+import { geometries } from "../drizzle/schema";
+import { loadLayerNodesForUser, requireLeafLayer } from "./layersRouter";
+import { effectiveVisibility } from "./layerTree";
+import { accessibleProjectIds, getSafeProjectSelection } from "./projectSelectionRouter";
 import {
   storedPolygonToGeoJSON,
   validateStoredGeometryCoordinates,
@@ -11,6 +16,7 @@ import {
 
 const geometryInput = z.object({
   projectId: z.number(),
+  layerId: z.number().int().positive().nullable().optional(),
   type: z.enum(["marker", "polyline", "polygon"]),
   name: z.string().trim().min(1).max(255),
   description: z.string().trim().max(4000).optional(),
@@ -98,11 +104,38 @@ async function getWritableGeometry(id: number, user: { id: number; role: "admin"
   return geometry;
 }
 
+async function listVisibleGeometries(projectId: number, userId: number) {
+  const rows = await db.getGeometriesByProject(projectId);
+  const visibility = effectiveVisibility(await loadLayerNodesForUser(projectId, userId));
+  return rows.map(geometry => ({
+    ...geometry,
+    // visible remains the stored flag. Legacy detached geometries remain renderable.
+    effectiveVisible: geometry.visible === 1 && (geometry.layerId == null || visibility.get(geometry.layerId) === true),
+  }));
+}
+
+const moveToLayer = protectedProcedure
+  .input(z.object({ id: z.number().int().positive(), layerId: z.number().int().positive().nullable() }))
+  .mutation(async ({ input, ctx }) => {
+    const geometry = await getWritableGeometry(input.id, ctx.user);
+    await requireLeafLayer(geometry.projectId, input.layerId);
+    const database = await db.getDb();
+    if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    await database.update(geometries).set({ layerId: input.layerId })
+      .where(and(eq(geometries.id, geometry.id), eq(geometries.projectId, geometry.projectId)));
+    await createAuditLog({ userId: ctx.user.id, action: "geometry.layer.update", entityType: "geometry", entityId: geometry.id, projectId: geometry.projectId, details: { layerId: input.layerId } });
+    return { success: true };
+  });
+
 export const geometriesRouter = router({
+  moveToLayer,
+  setLayer: moveToLayer, // PR8 compatibility; same authorization and validation.
+
   create: protectedProcedure
     .input(geometryInput)
     .mutation(async ({ input, ctx }) => {
       await requireProjectEditor(input.projectId, ctx.user);
+      await requireLeafLayer(input.projectId, input.layerId);
       const coordinates = parseAndValidateCoordinates(input.type, input.coordinates);
       await db.createGeometry({
         ...input,
@@ -127,7 +160,19 @@ export const geometriesRouter = router({
     .input(z.object({ projectId: z.number() }))
     .query(async ({ input, ctx }) => {
       await requireProjectAccess(input.projectId, ctx.user);
-      return db.getGeometriesByProject(input.projectId);
+      return listVisibleGeometries(input.projectId, ctx.user.id);
+    }),
+
+  // No input means the caller's saved selection. Explicit [] means no projects.
+  listForProjects: protectedProcedure
+    .input(z.object({ projectIds: z.array(z.number().int().positive()).max(500).optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      const allowed = input?.projectIds === undefined
+        ? await getSafeProjectSelection(ctx.user)
+        : await accessibleProjectIds(ctx.user, input.projectIds);
+      const out: Awaited<ReturnType<typeof listVisibleGeometries>> = [];
+      for (const projectId of allowed) out.push(...await listVisibleGeometries(projectId, ctx.user.id));
+      return out;
     }),
 
   update: protectedProcedure
@@ -228,16 +273,21 @@ export const geometriesRouter = router({
     }),
 
   importBatch: protectedProcedure
-    .input(z.object({ projectId: z.number(), geometries: z.array(geometryInput.omit({ projectId: true })).min(1).max(500) }))
+    .input(z.object({ projectId: z.number(), layerId: geometryInput.shape.layerId, geometries: z.array(geometryInput.omit({ projectId: true })).min(1).max(500) }))
     .mutation(async ({ input, ctx }) => {
       await requireProjectEditor(input.projectId, ctx.user);
       const validated = input.geometries.map((geometry) => ({
         ...geometry,
+        layerId: geometry.layerId === undefined ? input.layerId ?? null : geometry.layerId,
         coordinates: JSON.stringify(parseAndValidateCoordinates(geometry.type, geometry.coordinates)),
       }));
-      for (const geometry of validated) {
-        await db.createGeometry({ ...geometry, projectId: input.projectId, userId: ctx.user.id, visible: 1, opacity: 100, description: geometry.description || "" });
+      for (const layerId of Array.from(new Set(validated.map(geometry => geometry.layerId)))) {
+        await requireLeafLayer(input.projectId, layerId);
       }
+      const database = await db.getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      // One INSERT after all topology/layer checks: no partially imported batch.
+      await database.insert(geometries).values(validated.map(geometry => ({ ...geometry, projectId: input.projectId, userId: ctx.user.id, visible: 1, opacity: 100, description: geometry.description || "" })));
       await createAuditLog({ userId: ctx.user.id, action: "geometry.import", entityType: "geometry", entityId: input.projectId, projectId: input.projectId, details: { count: input.geometries.length, topologyValidated: true } });
       return { success: true, count: input.geometries.length };
     }),

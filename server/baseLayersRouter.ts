@@ -7,7 +7,8 @@
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { baseLayers } from "../drizzle/schema";
+import { TRPCError } from "@trpc/server";
+import { baseLayers, userBaseLayerVisibility } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import {
   downloadTerrasIndigenas,
@@ -24,6 +25,29 @@ function withCacheState<T extends { downloadStatus: "pending" | "downloading" | 
 }
 
 export const baseLayersRouter = router({
+  // Only persisted active bases, no remote loading and no provider/catalog replacement.
+  catalog: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const rows = await db.select().from(baseLayers).where(eq(baseLayers.isActive, true));
+    const overrides = await db.select().from(userBaseLayerVisibility).where(eq(userBaseLayerVisibility.userId, ctx.user.id));
+    const byId = new Map(overrides.map(row => [row.baseLayerId, row.visible]));
+    return rows.map(row => ({ ...withCacheState(row), userVisible: byId.get(row.id) ?? false }));
+  }),
+
+  setVisibility: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), visible: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [row] = await db.select({ id: baseLayers.id }).from(baseLayers)
+        .where(and(eq(baseLayers.id, input.id), eq(baseLayers.isActive, true))).limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Camada base não encontrada" });
+      await db.insert(userBaseLayerVisibility).values({ userId: ctx.user.id, baseLayerId: row.id, visible: input.visible })
+        .onDuplicateKeyUpdate({ set: { visible: input.visible } });
+      return { success: true };
+    }),
+
   /**
    * Lista todas as camadas base
    */

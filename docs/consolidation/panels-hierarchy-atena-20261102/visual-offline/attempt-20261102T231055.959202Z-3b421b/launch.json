@@ -1,0 +1,30 @@
+{
+  "command": [
+    "sudo",
+    "-n",
+    "unshare",
+    "--net",
+    "/bin/sh",
+    "-ec",
+    "ip link set lo up; exec /usr/bin/env -i \"$@\"",
+    "panels-atena-offline",
+    "HOME=/tmp",
+    "PATH=/home/ubuntu/.nvm/versions/node/v22.23.4/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "LANG=C.UTF-8",
+    "NO_PROXY=*",
+    "no_proxy=*",
+    "/usr/bin/python3",
+    "/home/ubuntu/atena_geoportal_paineis_atena_isolado/infra/scripts/run_panels_atena_visual_harness.py",
+    "--inside-offline-namespace",
+    "/home/ubuntu/atena_integracao_paineis_atena_20261102_1954/visual-offline/attempt-20261102T231055.959202Z-3b421b"
+  ],
+  "cleanEnvironmentKeys": [
+    "HOME",
+    "PATH",
+    "LANG",
+    "NO_PROXY",
+    "no_proxy"
+  ],
+  "finiteTimeoutSeconds": 300,
+  "parentNetworkNamespace": "net:[4026531833]"
+}

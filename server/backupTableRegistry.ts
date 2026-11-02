@@ -1,4 +1,5 @@
-export const backupTableRegistry = [
+/** Exact historical registry for verification of pre-Atena v2.0 artifacts. */
+export const legacyBackupTableRegistry = [
   { name: "users", primaryKey: "id" },
   { name: "invitations", primaryKey: "id" },
   { name: "projects", primaryKey: "id" },
@@ -22,12 +23,17 @@ export const backupTableRegistry = [
   { name: "audit_logs", primaryKey: "id" },
 ] as const;
 
+export const backupTableRegistry = [
+  ...legacyBackupTableRegistry,
+  { name: "user_project_selection", primaryKey: "id" },
+  { name: "user_layer_visibility", primaryKey: "id" },
+  { name: "user_base_layer_visibility", primaryKey: "id" },
+  { name: "atena_runs", primaryKey: "id" },
+] as const;
+
 export type BackupTableName = (typeof backupTableRegistry)[number]["name"];
 
-/**
- * Retorna apenas nomes físicos versionados neste módulo. Nunca aceite nome de tabela
- * do cliente ou concatene entrada externa em SQL de backup.
- */
+/** Only versioned physical names; never interpolate a client-provided table name. */
 export function isBackupTableName(value: string): value is BackupTableName {
   return backupTableRegistry.some((entry) => entry.name === value);
 }

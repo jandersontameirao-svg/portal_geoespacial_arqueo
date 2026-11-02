@@ -1,0 +1,354 @@
+{
+  "id": "atena-unauthorized",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "passed": true,
+  "assertions": [
+    {
+      "assertion": "unauthorized: no horizontal overflow",
+      "passed": true
+    },
+    {
+      "assertion": "URL candidate never becomes a project-scoped query",
+      "passed": true
+    },
+    {
+      "assertion": "unknown context reveals no project identity",
+      "passed": true
+    },
+    {
+      "assertion": "final: no horizontal overflow",
+      "passed": true
+    },
+    {
+      "assertion": "no cookies or browser storage",
+      "passed": true
+    },
+    {
+      "assertion": "all loaded resources loopback",
+      "passed": true
+    },
+    {
+      "assertion": "memory APIs never fall through to unknown calls",
+      "passed": true
+    }
+  ],
+  "checkpoints": {
+    "unauthorized": {
+      "inspection": {
+        "caseId": "atena-unauthorized",
+        "calls": [
+          {
+            "index": 1,
+            "path": "auth.me",
+            "type": "query",
+            "input": null,
+            "response": {
+              "id": 9000,
+              "name": "SESSÃO SINTÉTICA, não autenticada",
+              "role": "editor",
+              "email": null
+            }
+          },
+          {
+            "index": 2,
+            "path": "projects.list",
+            "type": "query",
+            "input": null,
+            "response": [
+              {
+                "id": 4242,
+                "name": "Projeto Sintético Alfa",
+                "code": "QA-ALFA",
+                "createdAt": {},
+                "updatedAt": {},
+                "status": "active",
+                "ownerId": 9000
+              },
+              {
+                "id": 4243,
+                "name": "Projeto Sintético Beta",
+                "code": "QA-BETA",
+                "createdAt": {},
+                "updatedAt": {},
+                "status": "active",
+                "ownerId": 9000
+              }
+            ]
+          }
+        ],
+        "suppressedStorageWrites": [],
+        "storageBoundary": "Storage.setItem is a harness-only no-op, attempts recorded in memory; production useAuth is untouched",
+        "navigationHistory": [
+          "/synthetic"
+        ],
+        "synthetic": true,
+        "mockedApis": [
+          "auth.me",
+          "projects.list",
+          "layers.list",
+          "geometries.list",
+          "layers.setVisibility",
+          "baseLayers.catalog",
+          "atena.status",
+          "atena.templates",
+          "atena.layers",
+          "prospect.sources",
+          "atena.list",
+          "atena.interpret",
+          "atena.plan",
+          "atena.run",
+          "atena.get"
+        ],
+        "limits": "No App, OAuth, cookies, persistent storage, HTTP tRPC, model, GIS execution, remote source, backend validation or real authentication. auth.me is a synthetic return value, NOT a bypass."
+      },
+      "body": "HARNESS OFFLINE · APIs 100% SIMULADAS\n\nComponentes reais · tRPC em memória · sem App/OAuth/cookies/storage. Não prova autenticação nem backend. Nenhum mapa-base/tile é montado.\n\nProjeto autorizado\nSelecione um projeto…\nProjeto Sintético Alfa · QA-ALFA\nProjeto Sintético Beta · QA-BETA\n\nO contexto solicitado não está disponível nesta sessão. Selecione um projeto da lista. Nenhum dado desse contexto foi consultado.",
+      "layout": {
+        "innerWidth": 390,
+        "innerHeight": 844,
+        "scrollWidth": 390,
+        "bodyScrollWidth": 390
+      },
+      "cookies": "",
+      "localStorageKeys": [],
+      "sessionStorageKeys": [],
+      "resources": [
+        "http://127.0.0.1:4183/@vite/client",
+        "http://127.0.0.1:4183/src/panelsAtenaVisualHarness.tsx",
+        "http://127.0.0.1:4183/@react-refresh",
+        "http://127.0.0.1:4183/@fs/home/ubuntu/portal_geoespacial_arqueo/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react_jsx-dev-runtime.js?v=ca798f40",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react.js?v=ca798f40",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react-dom_client.js?v=b22b733d",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/wouter.js?v=0c2f5839",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/wouter_memory-location.js?v=49984b42",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@tanstack_react-query.js?v=a1d8c17d",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@trpc_client.js?v=92a21931",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@trpc_server_observable.js?v=0118ea3f",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/sonner.js?v=92dfc1d1",
+        "http://127.0.0.1:4183/src/lib/trpc.ts",
+        "http://127.0.0.1:4183/src/components/GlobalMapPanels.tsx",
+        "http://127.0.0.1:4183/src/lib/basemaps.ts",
+        "http://127.0.0.1:4183/src/components/AtenaPanel.tsx",
+        "http://127.0.0.1:4183/src/index.css",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-J6KJZGIC.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-PR4QN5HX.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-KIWVTICO.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-3QQKMZI7.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-ZNFMMVZO.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-56AF53FS.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-HHJWUANA.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-F2HAFAE2.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@trpc_react-query.js?v=2acbc51b",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/lucide-react.js?v=1bf065b9",
+        "http://127.0.0.1:4183/src/components/ui/button.tsx",
+        "http://127.0.0.1:4183/src/components/MyProjectsPanel.tsx",
+        "http://127.0.0.1:4183/src/components/BaseLayersPanel.tsx",
+        "http://127.0.0.1:4183/src/components/ui/input.tsx",
+        "http://127.0.0.1:4183/src/components/ui/textarea.tsx",
+        "http://127.0.0.1:4183/src/components/ui/checkbox.tsx",
+        "http://127.0.0.1:4183/src/lib/atenaChatCommands.ts",
+        "http://127.0.0.1:4183/src/components/ProspectionGenerator.tsx",
+        "http://127.0.0.1:4183/src/components/InfluenceAreasPanel.tsx",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@radix-ui_react-slot.js?v=737f5ae3",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/class-variance-authority.js?v=e0dcd5b2",
+        "http://127.0.0.1:4183/src/lib/utils.ts",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-3FJRZKLA.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-V3DB2WJH.js?v=a82a0a68",
+        "http://127.0.0.1:4183/src/_core/hooks/useAuth.ts",
+        "http://127.0.0.1:4183/src/components/LayersTree.tsx",
+        "http://127.0.0.1:4183/src/components/ui/dialog.tsx",
+        "http://127.0.0.1:4183/src/hooks/useComposition.ts",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react-leaflet.js?v=76acdb2e",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/leaflet.js?v=3d3710a8",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-AXGRQG5Q.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-PYY5W3VD.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@radix-ui_react-checkbox.js?v=7353ac85",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/clsx.js?v=f3d01f6e",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/tailwind-merge.js?v=9224cca7",
+        "http://127.0.0.1:4183/@fs/home/ubuntu/portal_geoespacial_arqueo/node_modules/.pnpm/leaflet@1.9.4/node_modules/leaflet/dist/leaflet.css",
+        "http://127.0.0.1:4183/src/const.ts",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-M5UFOPDZ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-Y25SA4KN.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-JRLF6HNN.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-X5VH7W2D.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-JBGP4G2H.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-LPPTCXVQ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-OMLQNTNF.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@radix-ui_react-dialog.js?v=faa5e705",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-6622G7HZ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-ORHYMSFJ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-NTMFKXBG.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-L3JH3LNO.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-7CCOGB65.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-XEJMURHB.js?v=a82a0a68",
+        "http://127.0.0.1:4183/src/hooks/usePersistFn.ts",
+        "http://127.0.0.1:4183/@fs/home/ubuntu/atena_geoportal_paineis_atena_isolado/shared/const.ts"
+      ],
+      "checkboxes": [],
+      "links": []
+    },
+    "final": {
+      "inspection": {
+        "caseId": "atena-unauthorized",
+        "calls": [
+          {
+            "index": 1,
+            "path": "auth.me",
+            "type": "query",
+            "input": null,
+            "response": {
+              "id": 9000,
+              "name": "SESSÃO SINTÉTICA, não autenticada",
+              "role": "editor",
+              "email": null
+            }
+          },
+          {
+            "index": 2,
+            "path": "projects.list",
+            "type": "query",
+            "input": null,
+            "response": [
+              {
+                "id": 4242,
+                "name": "Projeto Sintético Alfa",
+                "code": "QA-ALFA",
+                "createdAt": {},
+                "updatedAt": {},
+                "status": "active",
+                "ownerId": 9000
+              },
+              {
+                "id": 4243,
+                "name": "Projeto Sintético Beta",
+                "code": "QA-BETA",
+                "createdAt": {},
+                "updatedAt": {},
+                "status": "active",
+                "ownerId": 9000
+              }
+            ]
+          }
+        ],
+        "suppressedStorageWrites": [],
+        "storageBoundary": "Storage.setItem is a harness-only no-op, attempts recorded in memory; production useAuth is untouched",
+        "navigationHistory": [
+          "/synthetic"
+        ],
+        "synthetic": true,
+        "mockedApis": [
+          "auth.me",
+          "projects.list",
+          "layers.list",
+          "geometries.list",
+          "layers.setVisibility",
+          "baseLayers.catalog",
+          "atena.status",
+          "atena.templates",
+          "atena.layers",
+          "prospect.sources",
+          "atena.list",
+          "atena.interpret",
+          "atena.plan",
+          "atena.run",
+          "atena.get"
+        ],
+        "limits": "No App, OAuth, cookies, persistent storage, HTTP tRPC, model, GIS execution, remote source, backend validation or real authentication. auth.me is a synthetic return value, NOT a bypass."
+      },
+      "body": "HARNESS OFFLINE · APIs 100% SIMULADAS\n\nComponentes reais · tRPC em memória · sem App/OAuth/cookies/storage. Não prova autenticação nem backend. Nenhum mapa-base/tile é montado.\n\nProjeto autorizado\nSelecione um projeto…\nProjeto Sintético Alfa · QA-ALFA\nProjeto Sintético Beta · QA-BETA\n\nO contexto solicitado não está disponível nesta sessão. Selecione um projeto da lista. Nenhum dado desse contexto foi consultado.",
+      "layout": {
+        "innerWidth": 390,
+        "innerHeight": 844,
+        "scrollWidth": 390,
+        "bodyScrollWidth": 390
+      },
+      "cookies": "",
+      "localStorageKeys": [],
+      "sessionStorageKeys": [],
+      "resources": [
+        "http://127.0.0.1:4183/@vite/client",
+        "http://127.0.0.1:4183/src/panelsAtenaVisualHarness.tsx",
+        "http://127.0.0.1:4183/@react-refresh",
+        "http://127.0.0.1:4183/@fs/home/ubuntu/portal_geoespacial_arqueo/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react_jsx-dev-runtime.js?v=ca798f40",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react.js?v=ca798f40",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react-dom_client.js?v=b22b733d",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/wouter.js?v=0c2f5839",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/wouter_memory-location.js?v=49984b42",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@tanstack_react-query.js?v=a1d8c17d",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@trpc_client.js?v=92a21931",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@trpc_server_observable.js?v=0118ea3f",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/sonner.js?v=92dfc1d1",
+        "http://127.0.0.1:4183/src/lib/trpc.ts",
+        "http://127.0.0.1:4183/src/components/GlobalMapPanels.tsx",
+        "http://127.0.0.1:4183/src/lib/basemaps.ts",
+        "http://127.0.0.1:4183/src/components/AtenaPanel.tsx",
+        "http://127.0.0.1:4183/src/index.css",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-J6KJZGIC.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-PR4QN5HX.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-KIWVTICO.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-3QQKMZI7.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-ZNFMMVZO.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-56AF53FS.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-HHJWUANA.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-F2HAFAE2.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@trpc_react-query.js?v=2acbc51b",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/lucide-react.js?v=1bf065b9",
+        "http://127.0.0.1:4183/src/components/ui/button.tsx",
+        "http://127.0.0.1:4183/src/components/MyProjectsPanel.tsx",
+        "http://127.0.0.1:4183/src/components/BaseLayersPanel.tsx",
+        "http://127.0.0.1:4183/src/components/ui/input.tsx",
+        "http://127.0.0.1:4183/src/components/ui/textarea.tsx",
+        "http://127.0.0.1:4183/src/components/ui/checkbox.tsx",
+        "http://127.0.0.1:4183/src/lib/atenaChatCommands.ts",
+        "http://127.0.0.1:4183/src/components/ProspectionGenerator.tsx",
+        "http://127.0.0.1:4183/src/components/InfluenceAreasPanel.tsx",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@radix-ui_react-slot.js?v=737f5ae3",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/class-variance-authority.js?v=e0dcd5b2",
+        "http://127.0.0.1:4183/src/lib/utils.ts",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-3FJRZKLA.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-V3DB2WJH.js?v=a82a0a68",
+        "http://127.0.0.1:4183/src/_core/hooks/useAuth.ts",
+        "http://127.0.0.1:4183/src/components/LayersTree.tsx",
+        "http://127.0.0.1:4183/src/components/ui/dialog.tsx",
+        "http://127.0.0.1:4183/src/hooks/useComposition.ts",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/react-leaflet.js?v=76acdb2e",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/leaflet.js?v=3d3710a8",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-AXGRQG5Q.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-PYY5W3VD.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@radix-ui_react-checkbox.js?v=7353ac85",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/clsx.js?v=f3d01f6e",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/tailwind-merge.js?v=9224cca7",
+        "http://127.0.0.1:4183/@fs/home/ubuntu/portal_geoespacial_arqueo/node_modules/.pnpm/leaflet@1.9.4/node_modules/leaflet/dist/leaflet.css",
+        "http://127.0.0.1:4183/src/const.ts",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-M5UFOPDZ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-Y25SA4KN.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-JRLF6HNN.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-X5VH7W2D.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-JBGP4G2H.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-LPPTCXVQ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-OMLQNTNF.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/@radix-ui_react-dialog.js?v=faa5e705",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-6622G7HZ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-ORHYMSFJ.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-NTMFKXBG.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-L3JH3LNO.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-7CCOGB65.js?v=a82a0a68",
+        "http://127.0.0.1:4183/@fs/tmp/atena-panels-ui-0i95l6ul/vite-cache/deps/chunk-XEJMURHB.js?v=a82a0a68",
+        "http://127.0.0.1:4183/src/hooks/usePersistFn.ts",
+        "http://127.0.0.1:4183/@fs/home/ubuntu/atena_geoportal_paineis_atena_isolado/shared/const.ts"
+      ],
+      "checkboxes": [],
+      "links": []
+    }
+  },
+  "screenshots": [
+    {
+      "file": "atena-unauthorized.png",
+      "sha256": "3d94ebc2f80fde4f072cd19622b76c54aa8dedc630eae584b8b8104c292a1df3"
+    }
+  ]
+}

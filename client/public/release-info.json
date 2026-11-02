@@ -1,15 +1,23 @@
 {
-  "releaseId": "geoportal-gis-f5-20261102-1916",
+  "releaseId": "geoportal-paineis-hierarquia-atena-20261102",
   "application": "Portal Geoespacial Corporativo - Grupo Arqueo",
   "targetDomain": "https://geoportal.manus.space",
-  "functionalSourceCommit": "97ff97bc0ba421cc851c1a9bac05b29e5ae12250",
-  "candidateEvidenceCommit": "deaaf16e23e077d6de2cce0dcb9f927a79381c52",
-  "expectedGisMigration": "0013_glamorous_betty_brant",
-  "preparedAt": "2026-11-02T19:16:00-03:00",
+  "functionalSourceCommit": "09539ac8158df86d07eb1fc8f20046eb1d4919c5",
+  "candidatePackageCommit": "e55240856905a8e26883e8838032e53ef5a9e1e3",
+  "baselineCheckpoint": "13bd34ef34e91bba0b813249dda2469d78fd8761",
+  "expectedMigration": "0014_hierarchy_atena",
+  "migrationSha256": "aefe1d867073dd95e6ef66b91e0f771ef7037594aedbcbc028812e4291136de5",
+  "migrationState": "applied and verified in target database on 2026-11-02",
+  "preparationState": "release source integrated; deployment must be confirmed by platform and served version",
   "acceptedLimitations": [
     "Recovery of 11 legacy file/base-layer objects is deferred; their records are preserved.",
     "End-to-end authenticated functional validation is deferred.",
     "Raster/tiles/Atlas runtime and durable asset availability in deployment remain unverified and may be unavailable."
   ],
-  "note": "This file identifies source content only. Its presence in source or sandbox is not proof of production publication."
+  "newValidationLimits": [
+    "The 0014 schema was applied and verified on the managed target; transaction coordination was tested with local MySQL, not functionally exercised on TiDB Serverless.",
+    "Visual component harness uses synthetic in-memory tRPC, not real OAuth or backend persistence.",
+    "LLM, official remote sources, generated remote PDFs and storage were not functionally exercised in this integration."
+  ],
+  "note": "This marker identifies source content. A sandbox file or checkpoint is not proof of production deployment."
 }

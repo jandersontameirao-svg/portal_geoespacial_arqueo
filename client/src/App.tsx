@@ -23,6 +23,8 @@ import WMSDemo from "./pages/WMSDemo";
 import GISDiagnostics from "./pages/GISDiagnostics";
 import OgcCatalog from "./pages/OgcCatalog";
 import { GuidedTour } from "./components/GuidedTour";
+import Atena from "./pages/Atena";
+import AtenaChatWidget from "./components/AtenaChatWidget";
 
 function Router() {
   return (
@@ -38,6 +40,7 @@ function Router() {
         <Route path="/security" component={Security} />
         <Route path="/technical-maps" component={TechnicalMaps} />
         <Route path="/atlas" component={Atlas} />
+        <Route path="/atena" component={Atena} />
         <Route path="/files" component={Files} />
         <Route path="/admin/backups" component={Backups} />
         <Route path="/admin/ogc-catalog" component={OgcCatalog} />
@@ -62,6 +65,7 @@ function App() {
           <Toaster />
           <GuidedTour />
           <Router />
+          <AtenaChatWidget />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

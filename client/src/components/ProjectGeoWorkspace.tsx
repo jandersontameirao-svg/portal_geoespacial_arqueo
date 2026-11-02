@@ -6,6 +6,7 @@ import "leaflet-draw/dist/leaflet.draw.css";
 import LeafletDrawControl from "@/components/LeafletDrawControl";
 import RasterIngestionPanel from "@/components/RasterIngestionPanel";
 import RasterRealPixelExport from "@/components/RasterRealPixelExport";
+import LayersTree from "@/components/LayersTree";
 import ThematicLayerTree, { moveThematicItem, type ThematicLayerItem } from "@/components/ThematicLayerTree";
 import { trpc } from "@/lib/trpc";
 import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { storedPolygonToGeoJSON } from "../../../shared/geometry-coordinates";
 import { closeLeafletPolygonRings } from "@/lib/leaflet-geometry-coordinates";
+import { isWorkspaceFeatureCollection, standaloneWorkspaceGeometry, workspaceLayerVisible } from "../../../shared/workspaceHierarchy";
 
 type CoordinateGeometry = Exclude<Geometry, { type: "GeometryCollection" }>;
 
@@ -35,6 +37,7 @@ type StoredGeometry = {
   color: string;
   visible: number;
   opacity: number;
+  layerId?: number | null;
 };
 
 type ProjectVectorLayer = {
@@ -149,10 +152,25 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
   const utils = trpc.useUtils();
   const { data: rawGeometries, isLoading: geometriesLoading } = trpc.geometries.list.useQuery({ projectId });
   const { data: rawAnalysisLayers, isLoading: layersLoading } = trpc.gisAnalysis.list.useQuery({ projectId });
-  const { data: rasterLayers = [], isLoading: rastersLoading } = trpc.raster.listForMap.useQuery({ projectId });
+  const { data: rawRasterLayers, isLoading: rastersLoading } = trpc.raster.listForMap.useQuery({ projectId });
   const { data: historicalImagery = [] } = trpc.raster.historicalCatalog.useQuery({ projectId });
   const { data: rawOgcLayers = [] } = trpc.ogcCatalog.listPublished.useQuery();
-  const geometries = (rawGeometries || []) as StoredGeometry[];
+  const hierarchy = trpc.layers.list.useQuery({ projectId });
+  const hierarchyLayers = hierarchy.data || [];
+  const presentedLayers = useMemo(() => (rawAnalysisLayers || []).map((layer) => ({
+    ...layer, isVisible: workspaceLayerVisible(layer.id, Boolean(layer.isVisible), hierarchyLayers),
+  })), [rawAnalysisLayers, hierarchy.data]);
+  const rasterLayers = useMemo(() => (rawRasterLayers || []).map((layer) => ({
+    ...layer, isVisible: workspaceLayerVisible(layer.id, Boolean(layer.isVisible), hierarchyLayers),
+  })), [rawRasterLayers, hierarchy.data]);
+  const geometries = useMemo(() => ((rawGeometries || []) as StoredGeometry[])
+    .filter((geometry) => standaloneWorkspaceGeometry(geometry, presentedLayers))
+    .map((geometry) => ({ ...geometry, visible: geometry.visible === 1 && (geometry.layerId == null || workspaceLayerVisible(geometry.layerId, true, hierarchyLayers)) ? 1 : 0 })),
+  [rawGeometries, presentedLayers, hierarchy.data]);
+  const setPersonalLayerVisibility = trpc.layers.setVisibility.useMutation({
+    onSuccess: () => utils.layers.list.invalidate({ projectId }),
+    onError: (error) => toast.error(error.message || "Não foi possível atualizar a visibilidade pessoal"),
+  });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [operation, setOperation] = useState<Operation>("buffer");
   const [bufferMeters, setBufferMeters] = useState("1000");
@@ -175,8 +193,8 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
     () => geometries.filter((geometry) => selectedIds.includes(geometry.id)),
     [geometries, selectedIds],
   );
-  const projectVectorLayers = useMemo<ProjectVectorLayer[]>(() => (rawAnalysisLayers || []).flatMap((layer: any) => {
-    if (layer.layerType !== "vector" || !["file-vector-import", "wfs-import"].includes(layer.metadata?.kind) || layer.layerData?.type !== "FeatureCollection") return [];
+  const projectVectorLayers = useMemo<ProjectVectorLayer[]>(() => presentedLayers.flatMap((layer: any) => {
+    if (layer.isGroup || layer.layerType !== "vector" || layer.metadata?.kind === "gis-analysis-result" || !isWorkspaceFeatureCollection(layer.layerData)) return [];
     return [{
       id: layer.id as number,
       name: layer.name as string,
@@ -185,7 +203,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
       isVisible: Boolean(layer.isVisible),
       metadata: (layer.metadata || null) as ProjectVectorLayer["metadata"],
     }];
-  }), [rawAnalysisLayers]);
+  }), [presentedLayers]);
   const selectedVectorFeatures = useMemo(() => projectVectorLayers
     .filter((layer) => selectedVectorLayerIds.includes(layer.id))
     .flatMap((layer) => layer.layerData.features
@@ -201,7 +219,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
     [basemapId],
   );
   const center = useMemo(() => calculateCenter(geometries), [geometries]);
-  const analysisLayers = (rawAnalysisLayers || []).filter((layer: any) => layer.metadata?.kind === "gis-analysis-result" && layer.layerData);
+  const analysisLayers = presentedLayers.filter((layer: any) => !layer.isGroup && layer.metadata?.kind === "gis-analysis-result" && layer.layerData);
   const publishedOgcLayers = rawOgcLayers as PublishedOgcLayer[];
   const publishedWfsLayers = useMemo(() => publishedOgcLayers.filter((layer) => layer.selected?.serviceType === "wfs"), [publishedOgcLayers]);
   const thematicItems = useMemo<ThematicLayerItem[]>(() => {
@@ -267,11 +285,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
   const visibleOgcLayers = useMemo(() => publishedOgcLayers.filter((layer) => layer.selected?.serviceType === "wms" && visibleOgcLayerIds.includes(layer.logicalLayer)), [publishedOgcLayers, visibleOgcLayerIds]);
   useEffect(() => {
     setVisibleRasterIds((current) => {
-      const existing = new Set(rasterLayers.map((layer: any) => layer.id));
-      const next = current.filter((id) => existing.has(id));
-      rasterLayers.filter((layer: any) => layer.isVisible).forEach((layer: any) => {
-        if (!next.includes(layer.id)) next.push(layer.id);
-      });
+      const next = rasterLayers.filter((layer) => layer.isVisible).map((layer) => layer.id);
       return next.length === current.length && next.every((id, index) => id === current[index]) ? current : next;
     });
   }, [rasterLayers]);
@@ -297,6 +311,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
       utils.geometries.list.invalidate({ projectId }),
       utils.gisAnalysis.list.invalidate({ projectId }),
       utils.raster.listForMap.invalidate({ projectId }),
+      utils.layers.list.invalidate({ projectId }),
     ]);
   };
 
@@ -415,13 +430,12 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
       return;
     }
     if (kind === "vector") {
-      updateVectorVisibility.mutate({ projectId, layerId: Number(rawId), isVisible: visible });
+      setPersonalLayerVisibility.mutate({ id: Number(rawId), visible });
       return;
     }
     if (kind === "raster" || kind === "result") {
       const layerId = Number(rawId);
-      updateLayerPresentation.mutate({ projectId, layerId, isVisible: visible });
-      if (kind === "raster") setVisibleRasterIds((current) => visible ? Array.from(new Set([...current, layerId])) : current.filter((id) => id !== layerId));
+      setPersonalLayerVisibility.mutate({ id: layerId, visible });
       return;
     }
     if (kind === "ogc") {
@@ -464,14 +478,14 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
       <Card className="flex min-h-[480px] min-w-0 flex-col overflow-hidden lg:min-h-0">
         <CardHeader className="border-b bg-slate-50 dark:bg-slate-900">
           <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5 text-blue-600" />Mapa e análise do projeto</CardTitle>
-          <CardDescription>Desenhe, edite, selecione e gere resultados espaciais versionados com proveniência.</CardDescription>
+          <CardDescription>Desenhe, edite, selecione e gere resultados espaciais persistidos com proveniência.</CardDescription>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 p-0">
           <MapContainer center={center} zoom={11} style={{ height: "100%", width: "100%" }} className="min-h-[420px] flex-1 lg:min-h-0">
             <InvalidateMapOnResize />
             <TileLayer attribution={activeBasemap.attribution} url={activeBasemap.url!} />
             {thematicItems.map((item) => <MapPane key={item.id} name={thematicPaneName(item.id)} style={{ zIndex: thematicZIndex(item.id) }} />)}
-            {rasterLayers.filter((layer) => visibleRasterIds.includes(layer.id)).map((layer) => (
+            {rasterLayers.filter((layer) => layer.isVisible && visibleRasterIds.includes(layer.id)).map((layer) => (
               <TileLayer key={`raster-${layer.id}`} pane={thematicPaneName(`raster-${layer.id}`)} url={layer.tileTemplate} minZoom={layer.minZoom} maxZoom={layer.maxZoom} opacity={rasterOpacity / 100} />
             ))}
             {visibleOgcLayers.map((layer) => layer.selected && <WMSTileLayer key={`ogc-${layer.logicalLayer}`} pane={thematicPaneName(`ogc-${layer.logicalLayer}`)} url={layer.selected.endpoint} layers={layer.selected.remoteLayer} format="image/png" transparent version="1.1.1" />)}
@@ -525,6 +539,10 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
 
       <aside className="min-h-0 space-y-4 overflow-y-auto pr-1 lg:pb-2">
         <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Grupos e camadas do projeto</CardTitle><CardDescription>Hierarquia compartilhada; visibilidade pessoal em cascata, independente da seleção para análise.</CardDescription></CardHeader>
+          <CardContent>{hierarchy.error ? <p role="alert" className="text-sm text-destructive">{hierarchy.error.message}</p> : <LayersTree projectId={projectId} canEdit={canEdit} onChanged={() => { void invalidate(); }} />}</CardContent>
+        </Card>
+        <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Árvore temática e legenda</CardTitle><CardDescription>Olho controla visualização; “usar na análise” é independente e só se aplica a vetores próprios.</CardDescription></CardHeader>
           <CardContent className="space-y-3">{geometriesLoading || layersLoading || rastersLoading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : <ThematicLayerTree items={thematicItems} order={thematicOrder} disabled={!canEdit} onVisibilityChange={toggleThematicVisibility} onAnalysisSelectionChange={toggleThematicAnalysis} onMove={moveThematicLayer} />}{selectedVectorLayerIds.length > 0 && <Button variant="outline" className="w-full" disabled={exportVectorLayer.isPending} onClick={() => exportVectorLayer.mutate({ projectId, layerId: selectedVectorLayerIds[0] })}><Download className="mr-2 h-4 w-4" />Exportar primeiro vetor selecionado</Button>}<p className="text-xs text-muted-foreground">A ordem é visual nesta sessão; visibilidade de camadas próprias é persistida e auditada. WFS exige importação controlada antes de análise.</p></CardContent>
         </Card>
@@ -536,7 +554,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
           <CardContent className="space-y-2"><Select value={basemapId} onValueChange={setBasemapId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SELECTABLE_BASEMAPS.map((basemap) => <SelectItem key={basemap.id} value={basemap.id}>{basemap.name}{basemap.availability === "legacy-available" ? " — legado" : ""}</SelectItem>)}</SelectContent></Select>{activeBasemap.availability === "legacy-available" && <p className="text-xs text-amber-700">Base raster Esri em suporte maduro, com retirada prevista em dezembro de 2029.</p>}</CardContent>
         </Card>
 
-        {historicalImagery.length > 0 && <Card><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Clock className="h-4 w-4 text-violet-600" />Catálogo histórico de imagens</CardTitle><CardDescription>Somente COGs processados, ordenados por aquisição. A visibilidade não altera a seleção analítica.</CardDescription></CardHeader><CardContent className="space-y-2">{historicalImagery.map((item) => <div key={item.layerId} className="rounded border p-2"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-medium">{item.name}</p><p className="text-xs text-muted-foreground">{new Date(item.acquisitionAt).toLocaleDateString("pt-BR")} · {item.sourceLabel || "Origem não informada"}</p><p className="text-[11px] text-muted-foreground">{item.crs} · COG {item.cogSha256.slice(0, 12)}…</p></div><Button size="sm" variant={visibleRasterIds.includes(item.layerId) ? "secondary" : "outline"} onClick={() => { const nextVisible = !visibleRasterIds.includes(item.layerId); updateLayerPresentation.mutate({ projectId, layerId: item.layerId, isVisible: nextVisible }); setVisibleRasterIds((current) => nextVisible ? Array.from(new Set([...current, item.layerId])) : current.filter((id) => id !== item.layerId)); }}>{visibleRasterIds.includes(item.layerId) ? "Ocultar" : "Exibir"}</Button></div></div>)}</CardContent></Card>}
+        {historicalImagery.length > 0 && <Card><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Clock className="h-4 w-4 text-violet-600" />Catálogo histórico de imagens</CardTitle><CardDescription>Somente COGs processados, ordenados por aquisição. A visibilidade não altera a seleção analítica.</CardDescription></CardHeader><CardContent className="space-y-2">{historicalImagery.map((item) => <div key={item.layerId} className="rounded border p-2"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-medium">{item.name}</p><p className="text-xs text-muted-foreground">{new Date(item.acquisitionAt).toLocaleDateString("pt-BR")} · {item.sourceLabel || "Origem não informada"}</p><p className="text-[11px] text-muted-foreground">{item.crs} · COG {item.cogSha256.slice(0, 12)}…</p></div><Button size="sm" variant={visibleRasterIds.includes(item.layerId) ? "secondary" : "outline"} onClick={() => { const nextVisible = !visibleRasterIds.includes(item.layerId); setPersonalLayerVisibility.mutate({ id: item.layerId, visible: nextVisible }); }}>{visibleRasterIds.includes(item.layerId) ? "Ocultar" : "Exibir"}</Button></div></div>)}</CardContent></Card>}
 
         {rasterLayers.length > 0 && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Opacidade raster</CardTitle></CardHeader><CardContent className="space-y-2"><Label>Sobreposição: {rasterOpacity}%</Label><Slider value={[rasterOpacity]} min={10} max={100} step={1} onValueChange={([value]) => setRasterOpacity(value)} /></CardContent></Card>}
 

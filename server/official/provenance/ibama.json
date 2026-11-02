@@ -1,0 +1,16 @@
+{
+  "id": "ibama",
+  "institution": "Instituto Brasileiro do Meio Ambiente e dos Recursos Naturais Renováveis (IBAMA)",
+  "state": "RESTRICTED",
+  "serviceUrl": "https://pamgia.ibama.gov.br/server/services/01_Publicacoes_Bases/adm_embargos_ibama_a/MapServer/WFSServer",
+  "layerName": "adm_embargos_ibama_a (catálogo: Termos de Embargo; ArcGIS FeatureServer/0)",
+  "serviceType": "WFS (também anunciado como WMS, ArcGIS REST FeatureServer e download SHP/KML)",
+  "license": "Não confirmada: a página oficial informa serviço gratuito e referencia legislação, mas não apresenta licença de dados explícita ou termos de redistribuição.",
+  "version": "Página oficial atualizada em 2026-06-17; endpoint sem versão explícita; validação HTTP realizada em 2026-11-01.",
+  "crs": "Não confirmado; a consulta espacial foi preparada em EPSG:4326 (inSR/outSR=4326), mas capabilities e metadados não foram retornados.",
+  "attributeNames": [],
+  "reportPath": "/home/ubuntu/atena_review/v3-20261101/official/ibama.md",
+  "dataPath": "",
+  "evidence": "A fonte oficial do serviço aponta para o Portal de Consultas do IBAMA e descreve autuações, embargos, painel geoespacial e exportação multiformato. O catálogo geosserviços oficial identifica a camada como Termos de Embargo e publica WMS, WFS, SHP, KML e ArcGIS FeatureServer. GET de WFS GetCapabilities retornou HTTP/2 403; GET do ArcGIS FeatureServer/0?f=pjson retornou HTTP/2 403; GET da consulta /query com bbox (-46.65,-23.55,-46.55,-23.45), inSR=4326, outSR=4326 e resultRecordCount=5 retornou HTTP/2 403; GET do download SHP retornou HTTP/2 403. Os quatro corpos têm título 'Acesso Bloqueado - Segurança IBAMA'. Evidências locais: /home/ubuntu/atena_review/v3-20261101/official/ibama_wfs_capabilities.headers, ibama_wfs_capabilities_blocked.html, ibama_featureserver_layer.headers, ibama_featureserver_layer_blocked.html, ibama_featureserver_query.headers, ibama_sample_blocked.html, ibama_download.headers e ibama_download_blocked.html. Nenhuma amostra GeoJSON autorizada foi obtida.",
+  "restriction": "RESTRICTED: o catálogo é público e documenta os endpoints, mas o acesso HTTP direto a capabilities, metadados, consulta vetorial e download foi bloqueado por HTTP 403 pela segurança do IBAMA/Cloudflare neste ambiente. WMS é somente imagem e não deve ser usado como fonte de análise vetorial. Não atribuir estado OPERACIONAL à aplicação; requer desbloqueio/autorização do endpoint e nova validação antes da integração. Licença, CRS e nomes de campos permanecem não confirmados."
+}

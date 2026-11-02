@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { backupTableRegistry, type BackupTableName } from "./backupTableRegistry";
+import { backupTableRegistry, legacyBackupTableRegistry, type BackupTableName } from "./backupTableRegistry";
 
 export type BackupRows = Partial<Record<BackupTableName, Array<Record<string, unknown>>>>;
 export type ObjectReference = {
@@ -11,7 +11,7 @@ export type ObjectReference = {
 export type GroupedObjectReferences = Array<{ logicalKey: string; references: ObjectReference[] }>;
 
 export type BackupManifest = {
-  formatVersion: "2.0-local-rehearsal";
+  formatVersion: "2.0-local-rehearsal" | "2.1-local-rehearsal";
   backupId: string;
   createdAt: string;
   schemaFingerprint: string;
@@ -52,6 +52,7 @@ export function inventoryObjectReferences(tables: BackupRows): ObjectReference[]
     { table: "gis_uploads", field: "s3Key" },
     { table: "print_jobs", field: "outputS3Key" },
     { table: "atlas_jobs", field: "outputS3Key" },
+    { table: "atena_runs", field: "artifactKey" },
   ];
   for (const entry of fields) {
     for (const row of tables[entry.table] || []) {
@@ -94,7 +95,7 @@ export function buildBackupArtifact(tables: BackupRows, options?: { backupId?: s
   const payload = canonicalize(normalized);
   return {
     manifest: {
-      formatVersion: "2.0-local-rehearsal",
+      formatVersion: "2.1-local-rehearsal",
       backupId: options?.backupId || randomUUID(),
       createdAt: options?.createdAt || new Date().toISOString(),
       schemaFingerprint: options?.schemaFingerprint || sha256(backupTableRegistry.map((table) => `${table.name}:${table.primaryKey}`).join("|")),
@@ -110,7 +111,10 @@ export function buildBackupArtifact(tables: BackupRows, options?: { backupId?: s
 
 export function verifyBackupArtifact(artifact: BackupArtifact): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  const expectedTables = new Map(backupTableRegistry.map((entry) => [entry.name, entry.primaryKey]));
+  const registry = artifact.manifest.formatVersion === "2.0-local-rehearsal" ? legacyBackupTableRegistry : backupTableRegistry;
+  if (!["2.0-local-rehearsal", "2.1-local-rehearsal"].includes(artifact.manifest.formatVersion)) errors.push("Versão de manifesto não suportada");
+  const expectedTables = new Map<string, string>(registry.map((entry) => [entry.name, entry.primaryKey]));
+  for (const name of Object.keys(artifact.tables)) if (!expectedTables.has(name)) errors.push(`Tabela fora do registro desta versão: ${name}`);
   const manifestCounts = new Map<BackupTableName, number>();
   for (const table of artifact.manifest.tables) {
     const expectedPrimaryKey = expectedTables.get(table.name);
@@ -124,11 +128,11 @@ export function verifyBackupArtifact(artifact: BackupArtifact): { valid: boolean
     if (rows.length !== table.rowCount) errors.push(`Contagem divergente: ${table.name}`);
     if (sha256(canonicalize(rows)) !== table.sha256) errors.push(`Hash divergente: ${table.name}`);
   }
-  for (const table of backupTableRegistry) {
+  for (const table of registry) {
     const count = manifestCounts.get(table.name) || 0;
     if (count !== 1) errors.push(count === 0 ? `Tabela ausente no manifesto: ${table.name}` : `Tabela duplicada no manifesto: ${table.name}`);
   }
-  const payload = canonicalize(Object.fromEntries(backupTableRegistry.map((table) => [table.name, normalizeRows(artifact.tables[table.name])])))
+  const payload = canonicalize(Object.fromEntries(registry.map((table) => [table.name, normalizeRows(artifact.tables[table.name])])))
   if (sha256(payload) !== artifact.manifest.integrity.payloadSha256) errors.push("Hash global divergente");
   if (artifact.manifest.completeness !== "complete") errors.push("Manifesto marcado como incompleto");
   return { valid: errors.length === 0, errors };

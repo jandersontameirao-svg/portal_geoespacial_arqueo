@@ -1,0 +1,18 @@
+{
+  "id": "funai-terras-indigenas-wfs",
+  "institution": "Fundação Nacional dos Povos Indígenas (FUNAI)",
+  "state": "PARTIAL",
+  "serviceUrl": "https://geoserver.funai.gov.br/geoserver/Funai/ows?service=WFS&version=1.0.0&request=GetCapabilities",
+  "layerName": "Funai:tis_poligonais",
+  "serviceType": "WFS",
+  "license": "A página oficial declara que os arquivos de geoprocessamento e mapas podem ser reproduzidos desde que citada a fonte, exceto casos especificados em contrário e conteúdos replicados de outras fontes; a FUNAI não se responsabiliza por danos causados por conteúdo hospedado por terceiros. O capabilities declara Fees=NONE e AccessConstraints=NONE.",
+  "version": "WFS 1.0.0; página oficial modificada em 2026-07-29",
+  "crs": "EPSG:4674",
+  "attributeNames": [
+    "uf_sigla"
+  ],
+  "reportPath": "/home/ubuntu/atena_review/v3-20261101/official/funai.md",
+  "dataPath": "/home/ubuntu/atena_review/v3-20261101/official/funai_sample_status.json",
+  "evidence": "GET real de GetCapabilities no endpoint acima respondeu HTTP 200, Content-Type application/xml; o XML lista Funai:tis_poligonais como 'Terras indígenas (poligonais)', SRS EPSG:4674, operações Query, formatos JSON/CSV/KML/SHAPE-ZIP/GML e o texto de licença. A página oficial usa uf_sigla em links WFS por UF, portanto esse é o único atributo não geométrico confirmado sem inventar o restante do esquema. A consulta limitada foi GET https://geoserver.funai.gov.br/geoserver/Funai/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=Funai%3Atis_poligonais&bbox=-46.65,-23.55,-46.55,-23.45,EPSG%3A4326&maxFeatures=5&outputFormat=application%2Fjson; após uma falha local de validação TLS, a única repetição com TLS permissivo respondeu HTTP 403 Forbidden do nginx. DescribeFeatureType da mesma camada também respondeu HTTP 403. Evidências locais: wfs_capabilities.xml, wfs_capabilities_headers.txt, funai_tis_poligonais_sp_sample_403.html, funai_tis_poligonais_describe_feature_type_403.html, funai_sample_status.json.",
+  "restriction": "A fonte foi validada parcialmente: capabilities está publicamente legível, mas a consulta vetorial pequena e o DescribeFeatureType estão bloqueados por HTTP 403; não existe amostra GeoJSON autorizada salva. O arquivo funai_tis_poligonais_sp_sample_403.html é apenas o corpo HTML do bloqueio e não deve ser ingerido como GeoJSON. A tentativa inicial falhou na CA local do certificado (curl 60), registrada na evidência operacional; não foram usadas credenciais, login, bypass, banco, storage, UI ou dados IPHAN/Palmares. WMS não foi tratado como análise vetorial."
+}

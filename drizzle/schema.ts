@@ -260,6 +260,10 @@ export const layers = mysqlTable("layers", {
   // Controle de visibilidade
   isVisible: boolean("isVisible").default(true).notNull(),
   isPublic: boolean("isPublic").default(false).notNull(),
+  // Hierarquia aditiva: camadas legadas continuam folhas na raiz.
+  parentId: int("parentId"),
+  isGroup: boolean("isGroup").default(false).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
   // Metadados
   metadata: json("metadata").$type<Record<string, any>>(),
   createdBy: int("createdBy").notNull(),
@@ -269,6 +273,7 @@ export const layers = mysqlTable("layers", {
   projectIdx: index("project_idx").on(table.projectId),
   fileIdx: index("file_idx").on(table.fileId),
   layerTypeIdx: index("layer_type_idx").on(table.layerType),
+  hierarchyIdx: index("layers_project_parent_sort_idx").on(table.projectId, table.parentId, table.sortOrder, table.id),
 }));
 
 export const styles = mysqlTable("styles", {
@@ -572,9 +577,13 @@ export const geometries = mysqlTable("geometries", {
   color: varchar("color", { length: 7 }).default("#3b82f6"),
   visible: int("visible").default(1).notNull(),
   opacity: int("opacity").default(100).notNull(), // 0-100
+  layerId: int("layerId"), // null = geometria solta, continua visível pela própria flag
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({
+  projectLayerIdx: index("geometries_project_layer_idx").on(table.projectId, table.layerId),
+  layerIdx: index("geometries_layer_idx").on(table.layerId),
+}));
 
 export type Geometry = typeof geometries.$inferSelect;
 export type InsertGeometry = typeof geometries.$inferInsert;
@@ -633,3 +642,65 @@ export const notifications = mysqlTable("notifications", {
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
+// Seleção pessoal; sempre revalidada contra projetos/membros no momento da leitura.
+export const userProjectSelection = mysqlTable("user_project_selection", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  projectId: int("projectId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userProjectUnique: unique("user_project_sel_unique").on(table.userId, table.projectId),
+  projectIdx: index("user_project_sel_project_idx").on(table.projectId),
+}));
+
+export const userLayerVisibility = mysqlTable("user_layer_visibility", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  layerId: int("layerId").notNull(),
+  visible: boolean("visible").notNull(),
+}, (table) => ({
+  userLayerUnique: unique("user_layer_vis_unique").on(table.userId, table.layerId),
+  layerIdx: index("user_layer_vis_layer_idx").on(table.layerId),
+}));
+
+export const userBaseLayerVisibility = mysqlTable("user_base_layer_visibility", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  baseLayerId: int("baseLayerId").notNull(),
+  visible: boolean("visible").notNull(),
+}, (table) => ({
+  userBaseLayerUnique: unique("user_base_layer_vis_unique").on(table.userId, table.baseLayerId),
+  baseLayerIdx: index("user_base_layer_vis_base_idx").on(table.baseLayerId),
+}));
+
+// Campos e defaults exatos da PR8; apenas índices adicionais para histórico/fila.
+export const atenaRuns = mysqlTable("atena_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  userId: int("userId").notNull(),
+  status: mysqlEnum("status", ["queued", "running", "completed", "failed", "cancel_requested", "cancelled"]).default("queued").notNull(),
+  requestText: text("requestText"),
+  plan: json("plan").notNull(),
+  idempotencyKey: varchar("idempotencyKey", { length: 64 }).notNull(),
+  codeVersion: varchar("codeVersion", { length: 40 }).notNull(),
+  skillVersions: json("skillVersions"),
+  inputs: json("inputs"),
+  outputs: json("outputs"),
+  steps: json("steps"),
+  alerts: json("alerts"),
+  errorMessage: text("errorMessage"),
+  artifactKey: varchar("artifactKey", { length: 500 }),
+  artifactCreatedAt: timestamp("artifactCreatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  startedAt: timestamp("startedAt"),
+  finishedAt: timestamp("finishedAt"),
+}, (table) => ({
+  projectKeyIdx: index("atena_runs_project_key_idx").on(table.projectId, table.idempotencyKey),
+  projectHistoryIdx: index("atena_runs_project_created_idx").on(table.projectId, table.createdAt, table.id),
+  statusIdx: index("atena_runs_status_created_idx").on(table.status, table.createdAt),
+  userIdx: index("atena_runs_user_idx").on(table.userId),
+}));
+
+export type AtenaRun = typeof atenaRuns.$inferSelect;
+export type InsertAtenaRun = typeof atenaRuns.$inferInsert;

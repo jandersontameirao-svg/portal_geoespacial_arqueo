@@ -1,0 +1,13 @@
+server/atenaBackupManifest.test.ts
+server/atenaChatCommands.test.ts
+server/atenaOfficial.test.ts
+server/atenaPR8-areas.test.ts
+server/atenaPR8-composition.test.ts
+server/atenaPR8-geo.test.ts
+server/atenaPR8-plan.test.ts
+server/atenaPR8-templates.test.ts
+server/atenaWorkspace.test.ts
+server/layerHierarchy.synthetic.test.ts
+server/layerHierarchy.test.ts
+server/panelsAtena.synthetic.test.ts
+server/workspaceHierarchy.test.ts

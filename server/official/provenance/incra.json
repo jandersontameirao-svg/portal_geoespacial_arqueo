@@ -1,0 +1,16 @@
+{
+  "id": "incra-acervo-fundiario-v3-20261101",
+  "institution": "Instituto Nacional de Colonização e Reforma Agrária (INCRA)",
+  "state": "UNAVAILABLE",
+  "serviceUrl": "https://acervofundiario.incra.gov.br/Conversao01/faces/index.xhtml",
+  "layerName": "Não determinável: catálogo oficial não alcançável",
+  "serviceType": "UNAVAILABLE: WMS/WFS/OGC API/ArcGIS REST/download não determinável",
+  "license": "Não confirmada. A fonte não respondeu e nenhum termo de licença/reuso foi localizado; não assumir licença.",
+  "version": "Não confirmada; tentativa pública realizada em 2026-11-01 (rodada V3)",
+  "crs": "Não determinável",
+  "attributeNames": [],
+  "reportPath": "/home/ubuntu/atena_review/v3-20261101/official/incra.md",
+  "dataPath": "N/A: nenhuma amostra GeoJSON autorizada foi obtida; host oficial não resolveu DNS",
+  "evidence": "Na URL oficial fornecida, o extrator fetch retornou 'webpage_extract could not resolve hostname to public IPs'. A confirmação independente via getent ahosts não retornou endereço e curl -L --max-time 25 --connect-timeout 10 retornou exatamente 'curl: (6) Could not resolve host: acervofundiario.incra.gov.br'. Não houve status HTTP, headers, corpo, capabilities ou camada para consultar. A página oficial do SIGEF/INCRA foi lida apenas como contexto institucional e informa que consultas públicas do SIGEF exigem login Gov.br; ela não confirma um endpoint OGC do Acervo.",
+  "restriction": "Indisponibilidade de resolução DNS do hostname oficial no ambiente de validação. Sem login, credenciais ou bypass. Por isso não foi possível descobrir/validar endpoint WMS, WFS, OGC API, ArcGIS REST ou download; a consulta pequena de até 5 feições na bbox São Paulo (-46.65,-23.55,-46.55,-23.45) não foi executada. Não há base para distinguir descontinuação, bloqueio de rede ou indisponibilidade transitória. Nenhum dado IPHAN foi consultado ou divulgado."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "icmbio-limite-ucs-federais-2026",
+  "institution": "ICMBio",
+  "state": "PARTIAL",
+  "serviceUrl": "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows?service=wfs&version=2.0.0&request=GetCapabilities",
+  "layerName": "ICMBio:limiteucsfederais_a",
+  "serviceType": "WFS 2.0.0 (GeoJSON; WMS 1.3.0 validado somente para renderização)",
+  "license": "Não confirmada: a página oficial e as capabilities consultadas não exibem licença aberta ou termos de redistribuição. Acesso HTTPS público sem autenticação foi observado, mas não equivale a licença.",
+  "version": "Ago/2026; dados de limites criados, ampliados ou demarcados até 30/06/2026; página temática atualizada em 15/10/2026",
+  "crs": "EPSG:4674 (urn:ogc:def:crs:EPSG::4674; SIRGAS 2000)",
+  "attributeNames": [],
+  "reportPath": "/home/ubuntu/atena_review/v3-20261101/official/icmbio.md",
+  "dataPath": "/home/ubuntu/atena_review/v3-20261101/official/icmbio_wfs_sp_sample.geojson",
+  "evidence": "Página oficial do ICMBio consultada: https://www.gov.br/icmbio/pt-br/dados-icmbio/dados_geoespaciais e página temática atualizada em 15/10/2026: https://www.gov.br/icmbio/pt-br/dados-icmbio/dados_geoespaciais/mapa-tematico-e-dados-geoestatisticos-das-unidades-de-conservacao-federais. WFS GetCapabilities retornou HTTP 200 em 2026-11-01 13:03:35 GMT; WMS GetCapabilities retornou HTTP 200 em 13:03:40 GMT. A camada WFS foi identificada como ICMBio:limiteucsfederais_a, título Limites das Unidades de Conservação Federais - ICMBio (Ago/2026), DefaultCRS EPSG:4674. Duas consultas GetFeature limitadas a count=5 no bbox solicitado retornaram HTTP 200 e FeatureCollection vazia (numberMatched=0, numberReturned=0), portanto não houve atributos para listar. Capabilities, cabeçalhos e ambas as respostas foram preservados em /home/ubuntu/atena_review/v3-20261101/official/.",
+  "restriction": "Fonte pública acessível sem login; estado PARTIAL porque o endpoint foi validado, mas o recorte de São Paulo não retornou feições e não permitiu confirmar o schema de atributos. WMS é imagem, não usar para análise vetorial. Não baixar nem divulgar informações restritas do IPHAN. A aplicação não está conectada e não deve ser marcada como OPERACIONAL. Nenhum código, banco, storage, stage, produção ou UI foi alterado."
+}

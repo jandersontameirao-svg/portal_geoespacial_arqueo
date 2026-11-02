@@ -16,6 +16,12 @@ import { gisDiagnosticsRouter } from "./gisDiagnosticsRouter";
 import { gisAnalysisRouter } from "./gisAnalysisRouter";
 import { ogcCatalogRouter } from "./ogcCatalogRouter";
 import { rasterRouter } from "./rasterRouter";
+import { layersRouter } from "./layersRouter";
+import { projectSelectionRouter } from "./projectSelectionRouter";
+import { atenaRouter } from "./atenaRouter";
+import { prospectRouter } from "./prospectRouter";
+import { influenceRouter } from "./influenceRouter";
+import { officialRouter } from "./officialRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -643,6 +649,12 @@ export const appRouter = router({
   gisAnalysis: gisAnalysisRouter,
   ogcCatalog: ogcCatalogRouter,
   raster: rasterRouter,
+  layers: layersRouter,
+  projectSelection: projectSelectionRouter,
+  atena: atenaRouter,
+  prospect: prospectRouter,
+  influence: influenceRouter,
+  official: officialRouter,
 });
 
 export type AppRouter = typeof appRouter;

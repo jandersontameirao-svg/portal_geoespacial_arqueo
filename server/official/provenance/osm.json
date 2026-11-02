@@ -1,0 +1,65 @@
+{
+  "id": "osm-v3-20261101",
+  "institution": "OpenStreetMap Foundation / OpenStreetMap",
+  "state": "PARTIAL",
+  "serviceUrl": "https://api.openstreetmap.org/api/0.6/map?bbox=-46.600100,-23.500100,-46.599900,-23.499900",
+  "layerName": "OpenStreetMap map data elements (nodes/ways/relations; sampled nodes/ways)",
+  "serviceType": "OpenStreetMap API v0.6 map download (XML; not WMS/WFS/OGC API/ArcGIS REST)",
+  "license": "Open Database License 1.0 (ODbL); attribution to OpenStreetMap and contributors required. API documentation is CC BY-SA 2.0.",
+  "version": "0.6 (response generator: openstreetmap-cgimap 2.1.0 (630969 spike-06.openstreetmap.org))",
+  "crs": "EPSG:4326 / WGS 84 (GeoJSON emitted as CRS84 lon,lat order)",
+  "attributeNames": [
+    "id",
+    "osm_type",
+    "visible",
+    "version",
+    "changeset",
+    "timestamp",
+    "lat",
+    "lon",
+    "node_refs",
+    "tags",
+    "geometry"
+  ],
+  "reportPath": "/home/ubuntu/atena_review/v3-20261101/official/osm.md",
+  "dataPath": "/home/ubuntu/atena_review/v3-20261101/official/osm_sample.geojson",
+  "evidence": "GET oficial do bbox solicitado https://api.openstreetmap.org/api/0.6/map?bbox=-46.65,-23.55,-46.55,-23.45 em 2026-11-01T13:03:51.061419+00:00 retornou HTTP 400 e a mensagem \"You requested too many nodes (limit is 50000). Either request a smaller area, or use planet.osm\". A única tentativa adicional, em sub-bbox contido https://api.openstreetmap.org/api/0.6/map?bbox=-46.600100,-23.500100,-46.599900,-23.499900 em 2026-11-01T13:04:03.742094+00:00, retornou HTTP 200 / application/xml; charset=utf-8 com XML OSM real (nós, vias e tags); a amostra GeoJSON foi convertida localmente e limitada a 5 feições. Documentação e licença foram conferidas nas páginas oficiais citadas no relatório.",
+  "restriction": "PARTIAL: o endpoint é público e validado, mas o bbox de integração pedido é recusado pelo limite de 50.000 nós. A política oficial diz que a API é a API de edição e não deve ser usada para projetos somente de leitura; uso frequente/grande deve usar planet.osm ou alternativa, com User-Agent válido, no máximo dois threads de download e atribuição ODbL. Não há estado OPERACIONAL: nenhuma aplicação foi conectada. Nenhuma WMS/WFS/OGC API/ArcGIS REST foi confirmada nas fontes oficiais consultadas.",
+  "retrievedAtUtc": "2026-11-01T13:04:33.963524+00:00",
+  "endpointTemplate": "https://api.openstreetmap.org/api/0.6/map?bbox={left},{bottom},{right},{top}",
+  "requestedBbox": {
+    "left": -46.65,
+    "bottom": -23.55,
+    "right": -46.55,
+    "top": -23.45
+  },
+  "sampleBbox": {
+    "left": -46.6001,
+    "bottom": -23.5001,
+    "right": -46.5999,
+    "top": -23.4999
+  },
+  "httpEvidence": {
+    "broadRequest": "/home/ubuntu/atena_review/v3-20261101/official/osm_map_bbox_full_http.json",
+    "broadStatus": 400,
+    "broadDate": "Sun, 01 Nov 2026 13:03:49 GMT",
+    "broadContentType": "text/plain; charset=utf-8",
+    "sampleRequest": "/home/ubuntu/atena_review/v3-20261101/official/osm_map_bbox_sample_http.json",
+    "sampleStatus": 200,
+    "sampleDate": "Sun, 01 Nov 2026 13:04:03 GMT",
+    "sampleContentType": "application/xml; charset=utf-8"
+  },
+  "sourceResponseElements": {
+    "nodes": 42,
+    "ways": 5,
+    "relations": 0
+  },
+  "sampleFeatureCount": 5,
+  "rawSourcePath": "/home/ubuntu/atena_review/v3-20261101/official/osm_map_bbox_sample.osm",
+  "conversionNotes": "GeoJSON não foi resposta nativa do endpoint. É uma derivação local determinística do XML HTTP 200; user/uid e contact:phone não foram copiados para reduzir dados pessoais desnecessários; geometria de ways foi montada a partir dos node refs retornados.",
+  "sourcePages": [
+    "https://www.openstreetmap.org/copyright",
+    "https://operations.osmfoundation.org/policies/api/",
+    "https://wiki.openstreetmap.org/wiki/API_v0.6"
+  ]
+}

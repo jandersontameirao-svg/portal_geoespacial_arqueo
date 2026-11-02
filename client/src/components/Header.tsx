@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Layers,
   Map as MapIcon,
+  Sparkles,
   Server
 } from "lucide-react";
 import GlobalSearch from "./GlobalSearch";
@@ -107,7 +108,7 @@ export default function Header() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button data-tour="tools-menu" className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
-                  isActive("/maps") || isActive("/atlas") || isActive("/files")
+                  isActive("/maps") || isActive("/atlas") || isActive("/files") || isActive("/atena")
                     ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
                     : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}>
@@ -120,6 +121,15 @@ export default function Header() {
                 <DropdownMenuLabel>Ferramentas Geoespaciais</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
+                  <Link href="/atena">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Sparkles className="mr-2 h-4 w-4 text-orange-500" />
+                      <div>
+                        <span>Atena Cartógrafa</span>
+                        <p className="text-xs text-slate-500">Planos, análises e modelos por projeto</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
                   <Link href="/technical-maps">
                     <DropdownMenuItem className="cursor-pointer">
                       <Printer className="mr-2 h-4 w-4 text-blue-500" />
@@ -330,6 +340,12 @@ export default function Header() {
                 </Link>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Ferramentas</DropdownMenuLabel>
+                <Link href="/atena">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Sparkles className="mr-2 h-4 w-4 text-orange-500" />
+                    Atena Cartógrafa
+                  </DropdownMenuItem>
+                </Link>
                 <Link href="/technical-maps">
                   <DropdownMenuItem className="cursor-pointer">
                     <Printer className="mr-2 h-4 w-4" />
