@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
 import { 
   BookOpen, 
@@ -15,17 +16,25 @@ import {
   Loader2,
   ArrowLeft,
   Layers,
-  Map as MapIcon
+  Map as MapIcon,
+  Save,
+  Trash2,
+  Star,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import RasterRealPixelExport from "@/components/RasterRealPixelExport";
 
 export default function Atlas() {
   const { user } = useAuth();
   const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [selectedRasterLayer, setSelectedRasterLayer] = useState<string>("");
+  const [selectedVectorLayerIds, setSelectedVectorLayerIds] = useState<number[]>([]);
+  const [templateName, setTemplateName] = useState<string>("");
   const [atlasConfig, setAtlasConfig] = useState({
     name: "",
     title: "",
@@ -58,6 +67,19 @@ export default function Atlas() {
     { projectId: parseInt(selectedProject) },
     { enabled: !!selectedProject && !isNaN(parseInt(selectedProject)) }
   );
+  const { data: atlasTemplates, refetch: refetchTemplates } = trpc.atlas.templates.list.useQuery(
+    { projectId: parseInt(selectedProject) },
+    { enabled: !!selectedProject && !isNaN(parseInt(selectedProject)) }
+  );
+  const { data: rasterLayers } = trpc.raster.listForMap.useQuery(
+    { projectId: parseInt(selectedProject) },
+    { enabled: !!selectedProject && !isNaN(parseInt(selectedProject)) }
+  );
+  const { data: rawProjectLayers } = trpc.gisAnalysis.list.useQuery(
+    { projectId: parseInt(selectedProject) },
+    { enabled: !!selectedProject && !isNaN(parseInt(selectedProject)) }
+  );
+  const atlasVectorLayers = useMemo(() => (rawProjectLayers || []).filter((layer: any) => layer.layerType === "vector" && layer.layerData?.type === "FeatureCollection"), [rawProjectLayers]);
 
   // Mutations
   const createAtlasMutation = trpc.atlas.create.useMutation({
@@ -70,6 +92,43 @@ export default function Atlas() {
       toast.error(`Erro ao criar atlas: ${error.message}`);
     },
   });
+
+  const createTemplateMutation = trpc.atlas.templates.create.useMutation({
+    onSuccess: () => { toast.success("Template salvo no projeto"); setTemplateName(""); refetchTemplates(); },
+    onError: (error) => toast.error(`Não foi possível salvar o template: ${error.message}`),
+  });
+  const updateTemplateMutation = trpc.atlas.templates.update.useMutation({
+    onSuccess: () => { toast.success("Template atualizado"); refetchTemplates(); },
+    onError: (error) => toast.error(`Não foi possível atualizar o template: ${error.message}`),
+  });
+  const deleteTemplateMutation = trpc.atlas.templates.delete.useMutation({
+    onSuccess: () => { toast.success("Template excluído"); setSelectedTemplate(""); refetchTemplates(); },
+    onError: (error) => toast.error(`Não foi possível excluir o template: ${error.message}`),
+  });
+  const renderAtlasMutation = trpc.atlas.render.useMutation({
+    onSuccess: () => { toast.success("Atlas renderizado com PDF real e hash verificado"); refetchJobs(); },
+    onError: (error) => toast.error(`Renderização não iniciada: ${error.message}`),
+  });
+
+  const currentTemplateConfig = () => ({
+    pageSize: atlasConfig.pageSize, orientation: atlasConfig.orientation, scale: atlasConfig.scale, overlap: atlasConfig.overlap,
+    templateType: atlasConfig.templateType,
+  });
+
+  const applyTemplate = (id: string) => {
+    setSelectedTemplate(id);
+    const template = atlasTemplates?.find((item) => item.id.toString() === id);
+    const config = (template?.config || {}) as Record<string, unknown>;
+    if (!template) return;
+    setAtlasConfig((current) => ({
+      ...current,
+      pageSize: typeof config.pageSize === "string" ? config.pageSize : current.pageSize,
+      orientation: typeof config.orientation === "string" ? config.orientation : current.orientation,
+      scale: typeof config.scale === "string" ? config.scale : current.scale,
+      overlap: typeof config.overlap === "string" ? config.overlap : current.overlap,
+      templateType: template.templateType,
+    }));
+  };
 
   const handleCreateAtlas = () => {
     if (!selectedProject) {
@@ -88,6 +147,7 @@ export default function Atlas() {
     createAtlasMutation.mutate({
       projectId: parseInt(selectedProject),
       name: atlasConfig.name,
+      ...(selectedTemplate ? { templateId: parseInt(selectedTemplate) } : {}),
       title: atlasConfig.title,
       pageSize: atlasConfig.pageSize as "A4" | "A3" | "A1" | "A0",
       orientation: atlasConfig.orientation as "portrait" | "landscape",
@@ -95,6 +155,7 @@ export default function Atlas() {
       overlap: parseFloat(atlasConfig.overlap),
       templateType: atlasConfig.templateType as "abnt_tecnico" | "cliente",
       bounds: atlasConfig.bounds,
+      layersConfig: selectedVectorLayerIds.map((layerId) => ({ layerId, opacity: 0.75, includeInLegend: true })),
     });
   };
 
@@ -155,7 +216,7 @@ export default function Atlas() {
                   <Label className={errors.project ? "text-red-500" : ""}>Projeto *</Label>
                   <Select 
                     value={selectedProject} 
-                    onValueChange={setSelectedProject}
+                    onValueChange={(value) => { setSelectedProject(value); setSelectedTemplate(""); setSelectedRasterLayer(""); setSelectedVectorLayerIds([]); }}
                     onOpenChange={() => setTouched(prev => ({ ...prev, project: true }))}
                   >
                     <SelectTrigger className={errors.project ? "border-red-500 focus:ring-red-500" : ""}>
@@ -170,6 +231,25 @@ export default function Atlas() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {selectedProject && (
+                  <div className="rounded-lg border bg-slate-50/70 p-4 dark:bg-slate-900/30">
+                    <div className="mb-3 flex items-center gap-2"><Layers className="h-4 w-4 text-green-600" /><Label>Templates do projeto</Label></div>
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+                      <Select value={selectedTemplate} onValueChange={applyTemplate}>
+                        <SelectTrigger><SelectValue placeholder="Configuração nova ou selecione um template" /></SelectTrigger>
+                        <SelectContent>{atlasTemplates?.map((template) => <SelectItem key={template.id} value={template.id.toString()}>{template.name}{template.isDefault ? " · padrão" : ""}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Button type="button" variant="outline" disabled={!selectedTemplate || updateTemplateMutation.isPending} onClick={() => selectedTemplate && updateTemplateMutation.mutate({ id: parseInt(selectedTemplate), isDefault: true })}><Star className="mr-1 h-4 w-4" />Padrão</Button>
+                      <Button type="button" variant="outline" className="text-red-600" disabled={!selectedTemplate || deleteTemplateMutation.isPending} onClick={() => selectedTemplate && confirm("Excluir o template selecionado?") && deleteTemplateMutation.mutate({ id: parseInt(selectedTemplate) })}><Trash2 className="mr-1 h-4 w-4" />Excluir</Button>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="Nome para salvar a configuração atual" maxLength={255} />
+                      <Button type="button" variant="outline" disabled={templateName.trim().length < 3 || createTemplateMutation.isPending} onClick={() => createTemplateMutation.mutate({ projectId: parseInt(selectedProject), name: templateName.trim(), templateType: atlasConfig.templateType as "abnt_tecnico" | "cliente", config: currentTemplateConfig(), isDefault: !atlasTemplates?.length })}><Save className="mr-1 h-4 w-4" />Salvar</Button>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">O job congela a configuração do template no momento da criação; mudanças futuras não alteram Atlas já solicitados.</p>
+                  </div>
+                )}
 
                 {/* Nome e Título */}
                 <div className="grid md:grid-cols-2 gap-4">
@@ -198,6 +278,8 @@ export default function Atlas() {
                 </div>
 
                 <Separator />
+
+                {selectedProject && <RasterRealPixelExport projectId={parseInt(selectedProject)} bounds={atlasConfig.bounds} title="Raster real para folha do Atlas" compact />}
 
                 {/* Configurações de Página */}
                 <div className="grid md:grid-cols-2 gap-4">
@@ -334,6 +416,8 @@ export default function Atlas() {
                   </p>
                 </div>
 
+                {selectedProject && <div className="space-y-3 rounded-lg border bg-slate-50/70 p-4 dark:bg-slate-900/30"><div><Label>Vetores e resultados para composição</Label><p className="mt-1 text-xs text-muted-foreground">As camadas selecionadas serão desenhadas sobre o COG, incluídas na legenda e congeladas no job.</p></div>{atlasVectorLayers.length ? <div className="grid gap-2 md:grid-cols-2">{atlasVectorLayers.map((layer: any) => <label key={layer.id} className="flex cursor-pointer items-center gap-2 rounded border bg-background p-2 text-sm"><Checkbox checked={selectedVectorLayerIds.includes(layer.id)} onCheckedChange={(checked) => setSelectedVectorLayerIds((current) => checked ? Array.from(new Set([...current, layer.id])) : current.filter((id) => id !== layer.id))} /><span className="min-w-0 truncate">{layer.name}</span><span className="ml-auto text-xs text-muted-foreground">{layer.metadata?.kind === "gis-analysis-result" ? "resultado" : "vetor"}</span></label>)}</div> : <p className="text-sm text-muted-foreground">Não há camadas vetoriais ou resultados persistidos neste projeto.</p>}<p className="text-xs text-muted-foreground">Limite do renderizador: 20 camadas e 5.000 feições vetoriais por Atlas.</p></div>}
+
                 {/* Botão de Gerar */}
                 <Button 
                   onClick={handleCreateAtlas}
@@ -383,6 +467,7 @@ export default function Atlas() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {selectedProject && <div className="mb-4 space-y-2"><Label className="text-xs">COG para renderização real</Label><Select value={selectedRasterLayer} onValueChange={setSelectedRasterLayer}><SelectTrigger><SelectValue placeholder="Selecione uma camada raster processada" /></SelectTrigger><SelectContent>{rasterLayers?.map((layer) => <SelectItem key={layer.id} value={layer.id.toString()}>{layer.name}</SelectItem>)}</SelectContent></Select><p className="text-[11px] text-muted-foreground">O servidor só encaminha IDs do projeto; o worker resolve o COG dentro do volume GIS autorizado.</p></div>}
                 {!selectedProject ? (
                   <p className="text-sm text-slate-500 text-center py-8">
                     Selecione um projeto para ver os atlas
@@ -406,6 +491,12 @@ export default function Atlas() {
                           </div>
                           {getStatusBadge(job.status)}
                         </div>
+                        {job.status === "pending" && (
+                          <Button variant="outline" size="sm" className="w-full mt-2" disabled={!selectedRasterLayer || renderAtlasMutation.isPending} onClick={() => renderAtlasMutation.mutate({ id: job.id, rasterLayerId: parseInt(selectedRasterLayer) })}>
+                            {renderAtlasMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <MapIcon className="w-4 h-4 mr-1" />}
+                            Renderizar PDF real
+                          </Button>
+                        )}
                         {job.status === "completed" && job.outputUrl && (
                           <Button variant="outline" size="sm" className="w-full mt-2" asChild>
                             <a href={job.outputUrl} target="_blank" rel="noopener noreferrer">

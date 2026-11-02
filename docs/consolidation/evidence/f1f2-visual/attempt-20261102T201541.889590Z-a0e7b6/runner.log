@@ -1,0 +1,22 @@
+CASE_START=01-raster-unavailable
+CASE_PASS=01-raster-unavailable; assertions=7
+CASE_START=02-original-tiff
+CASE_PASS=02-original-tiff; assertions=9
+CASE_START=03-original-image-geotiff
+CASE_PASS=03-original-image-geotiff; assertions=9
+CASE_START=04-original-application-geotiff
+CASE_PASS=04-original-application-geotiff; assertions=9
+CASE_START=05-original-empty-mime
+CASE_PASS=05-original-empty-mime; assertions=9
+CASE_START=06-conflicting-mime-original
+CASE_PASS=06-conflicting-mime-original; assertions=7
+CASE_START=07-conflicting-mime-raster
+CASE_PASS=07-conflicting-mime-raster; assertions=7
+CASE_START=08-short-raster-name
+CASE_PASS=08-short-raster-name; assertions=11
+CASE_START=09-raster-rejection-no-fallback
+CASE_PASS=09-raster-rejection-no-fallback; assertions=12
+CASE_START=10-panel-short-empty-mime
+CASE_PASS=10-panel-short-empty-mime; assertions=11
+F1F2_VISUAL_HARNESS=PASSED
+REPORT_DIR=/home/ubuntu/atena_geoportal_f1f2_isolado/docs/consolidation/evidence/f1f2-visual/attempt-20261102T201541.889590Z-a0e7b6

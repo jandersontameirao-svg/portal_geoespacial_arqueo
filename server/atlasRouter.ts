@@ -2,9 +2,13 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
-import { atlasJobs, projects, projectMembers, layers } from "../drizzle/schema";
+import { atlasJobs, atlasTemplates, projects, projectMembers, layers } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import * as db from "./db";
+import { summarizeRasterLayers } from "./rasterLayerMetadata";
+import { atlasRenderAvailability, renderAtlasWithConfiguredAdapter } from "./atlasRenderAdapter";
+import { storagePut } from "./storage";
+import { buildAtlasVectorOverlays } from "./atlasVectorOverlay";
 
 /**
  * Router para Atlas Automático
@@ -23,6 +27,12 @@ async function checkProjectAccess(projectId: number, userId: number, userRole: s
     });
   }
   return true;
+}
+
+function requireAtlasEditor(userRole: string) {
+  if (userRole === "client") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Clientes não podem alterar templates ou jobs de atlas" });
+  }
 }
 
 // Configurações de tamanho de página em mm
@@ -117,7 +127,68 @@ function calculateGrid(
   };
 }
 
+function boundsFromCoverageArea(rawCoverage: any): { north: number; south: number; east: number; west: number } {
+  if (rawCoverage?.type && rawCoverage?.coordinates) {
+    const pairs: number[][] = (rawCoverage.coordinates.flat(Infinity) as unknown[]).reduce((acc: number[][], value: unknown, index: number, all: unknown[]) => {
+      if (index % 2 === 0 && Number.isFinite(Number(value)) && Number.isFinite(Number(all[index + 1]))) acc.push([Number(value), Number(all[index + 1])]);
+      return acc;
+    }, []);
+    if (!pairs.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Área de cobertura inválida" });
+    return { north: Math.max(...pairs.map((p) => p[1])), south: Math.min(...pairs.map((p) => p[1])), east: Math.max(...pairs.map((p) => p[0])), west: Math.min(...pairs.map((p) => p[0])) };
+  }
+  if (!rawCoverage || !["north", "south", "east", "west"].every((key) => Number.isFinite(Number(rawCoverage[key])))) throw new TRPCError({ code: "BAD_REQUEST", message: "Área de cobertura inválida" });
+  return { north: Number(rawCoverage.north), south: Number(rawCoverage.south), east: Number(rawCoverage.east), west: Number(rawCoverage.west) };
+}
+
 export const atlasRouter = router({
+  templates: router({
+    list: protectedProcedure.input(z.object({ projectId: z.number() })).query(async ({ ctx, input }) => {
+      await checkProjectAccess(input.projectId, ctx.user.id, ctx.user.role);
+      const database = await getDb();
+      if (!database) return [];
+      return database.select().from(atlasTemplates).where(eq(atlasTemplates.projectId, input.projectId)).orderBy(desc(atlasTemplates.updatedAt));
+    }),
+    create: protectedProcedure.input(z.object({
+      projectId: z.number(), name: z.string().trim().min(3).max(255), templateType: z.enum(["abnt_tecnico", "cliente"]),
+      config: z.record(z.string(), z.unknown()), isDefault: z.boolean().default(false),
+    })).mutation(async ({ ctx, input }) => {
+      await checkProjectAccess(input.projectId, ctx.user.id, ctx.user.role);
+      requireAtlasEditor(ctx.user.role);
+      const database = await getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (input.isDefault) await database.update(atlasTemplates).set({ isDefault: false }).where(eq(atlasTemplates.projectId, input.projectId));
+      const [result] = await database.insert(atlasTemplates).values({ ...input, config: input.config as Record<string, any>, createdBy: ctx.user.id }).$returningId();
+      await db.createAuditLog({ userId: ctx.user.id, userEmail: ctx.user.email || null, userName: ctx.user.name || null, action: "atlas.template.create", entityType: "atlas_template", entityId: result.id, projectId: input.projectId, details: { name: input.name, templateType: input.templateType, isDefault: input.isDefault }, ipAddress: ctx.req.ip || null, userAgent: ctx.req.headers?.["user-agent"] || null });
+      return { success: true, id: result.id };
+    }),
+    update: protectedProcedure.input(z.object({
+      id: z.number(), name: z.string().trim().min(3).max(255).optional(), templateType: z.enum(["abnt_tecnico", "cliente"]).optional(),
+      config: z.record(z.string(), z.unknown()).optional(), isDefault: z.boolean().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [template] = await database.select().from(atlasTemplates).where(eq(atlasTemplates.id, input.id));
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template não encontrado" });
+      await checkProjectAccess(template.projectId, ctx.user.id, ctx.user.role);
+      requireAtlasEditor(ctx.user.role);
+      const { id, ...updates } = input;
+      if (updates.isDefault) await database.update(atlasTemplates).set({ isDefault: false }).where(eq(atlasTemplates.projectId, template.projectId));
+      await database.update(atlasTemplates).set({ ...updates, ...(updates.config ? { config: updates.config as Record<string, any> } : {}) }).where(eq(atlasTemplates.id, id));
+      await db.createAuditLog({ userId: ctx.user.id, userEmail: ctx.user.email || null, userName: ctx.user.name || null, action: "atlas.template.update", entityType: "atlas_template", entityId: id, projectId: template.projectId, details: { fields: Object.keys(updates) }, ipAddress: ctx.req.ip || null, userAgent: ctx.req.headers?.["user-agent"] || null });
+      return { success: true };
+    }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [template] = await database.select().from(atlasTemplates).where(eq(atlasTemplates.id, input.id));
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template não encontrado" });
+      await checkProjectAccess(template.projectId, ctx.user.id, ctx.user.role);
+      requireAtlasEditor(ctx.user.role);
+      await database.delete(atlasTemplates).where(eq(atlasTemplates.id, input.id));
+      await db.createAuditLog({ userId: ctx.user.id, userEmail: ctx.user.email || null, userName: ctx.user.name || null, action: "atlas.template.delete", entityType: "atlas_template", entityId: input.id, projectId: template.projectId, details: { name: template.name }, ipAddress: ctx.req.ip || null, userAgent: ctx.req.headers?.["user-agent"] || null });
+      return { success: true };
+    }),
+  }),
   /**
    * Listar jobs de atlas de um projeto
    */
@@ -209,6 +280,7 @@ export const atlasRouter = router({
     .input(z.object({
       projectId: z.number(),
       name: z.string().min(1).max(255),
+      templateId: z.number().int().positive().optional(),
       templateType: z.enum(["abnt_tecnico", "cliente"]),
       pageSize: z.enum(["A4", "A3", "A1", "A0"]),
       orientation: z.enum(["portrait", "landscape"]).default("landscape"),
@@ -237,17 +309,20 @@ export const atlasRouter = router({
     .mutation(async ({ ctx, input }) => {
       await checkProjectAccess(input.projectId, ctx.user.id, ctx.user.role);
 
-      // Verificar se é editor ou admin
-      if (ctx.user.role === "client") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Clientes não podem criar jobs de atlas",
-        });
-      }
+      requireAtlasEditor(ctx.user.role);
 
       const database = await getDb();
       if (!database) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      let templateConfig: Record<string, any> = {};
+      if (input.templateId) {
+        const [template] = await database.select().from(atlasTemplates).where(eq(atlasTemplates.id, input.templateId));
+        if (!template || template.projectId !== input.projectId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Template do projeto não encontrado" });
+        }
+        templateConfig = (template.config || {}) as Record<string, any>;
       }
 
       // Calcular grid
@@ -266,6 +341,7 @@ export const atlasRouter = router({
       const result = await database.insert(atlasJobs).values({
         projectId: input.projectId,
         name: input.name,
+        templateId: input.templateId || null,
         templateType: input.templateType,
         pageSize: input.pageSize,
         orientation: input.orientation,
@@ -287,7 +363,18 @@ export const atlasRouter = router({
           cellWidth: 0,
           cellHeight: 0,
         } as any,
-        // title, subtitle, author stored in gridConfig as metadata
+        renderConfig: {
+          ...templateConfig,
+          title: input.title,
+          subtitle: input.subtitle || null,
+          author: input.author || null,
+          showNorthArrow: input.showNorthArrow,
+          showScaleBar: input.showScaleBar,
+          showLegend: input.showLegend,
+          showGrid: input.showGrid,
+          showFrame: input.showFrame,
+          overlap: input.overlap,
+        },
         crs: `EPSG:319${80 + utmZone}`,
         utmZone,
         layersConfig: input.layersConfig ? [
@@ -323,6 +410,52 @@ export const atlasRouter = router({
         success: true,
         grid,
       };
+    }),
+
+  render: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), rasterLayerId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [job] = await database.select().from(atlasJobs).where(eq(atlasJobs.id, input.id));
+      if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Atlas não encontrado" });
+      await checkProjectAccess(job.projectId, ctx.user.id, ctx.user.role);
+      requireAtlasEditor(ctx.user.role);
+      const availability = atlasRenderAvailability();
+      if (!availability.available) throw new TRPCError({ code: "PRECONDITION_FAILED", message: availability.reason });
+      const rasterLayer = await db.getLayerById(input.rasterLayerId);
+      if (!rasterLayer || rasterLayer.projectId !== job.projectId || rasterLayer.layerType !== "raster" || (rasterLayer.metadata as any)?.rasterIngestion?.status !== "completed") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Selecione uma camada raster COG processada deste projeto" });
+      }
+      const bounds = boundsFromCoverageArea(job.coverageArea);
+      const renderConfig = (job.renderConfig || {}) as Record<string, any>;
+      const grid = calculateGrid(bounds, job.pageSize as keyof typeof PAGE_SIZES, job.orientation as "portrait" | "landscape", job.scale, Number(renderConfig.overlap || 0.1));
+      const selectedLayerIds = Array.from(new Set(((job.layersConfig || []) as Array<{ layerId: number }>).map((item) => item.layerId).filter((id) => Number.isInteger(id) && id > 0)));
+      const projectLayers = selectedLayerIds.length ? await database.select().from(layers).where(eq(layers.projectId, job.projectId)) : [];
+      let overlays;
+      try {
+        overlays = buildAtlasVectorOverlays(projectLayers.filter((layer) => selectedLayerIds.includes(layer.id) && layer.layerType === "vector"), job.layersConfig as Array<{ layerId: number; opacity: number; includeInLegend: boolean }> | null);
+      } catch (error) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: error instanceof Error ? error.message : "Overlays vetoriais inválidos" });
+      }
+      await database.update(atlasJobs).set({ status: "processing", progress: 5, currentPage: 0, errorMessage: null }).where(eq(atlasJobs.id, job.id));
+      try {
+        const rendered = await renderAtlasWithConfiguredAdapter({
+          atlasId: job.id, projectId: job.projectId, rasterLayerId: rasterLayer.id,
+          pages: grid.pages.map((page) => ({ bounds: page.bounds })), title: String(renderConfig.title || job.name), pageSize: job.pageSize as "A4" | "A3" | "A1" | "A0", orientation: job.orientation as "portrait" | "landscape", scale: job.scale, crs: job.crs,
+          showNorthArrow: renderConfig.showNorthArrow !== false, showFrame: renderConfig.showFrame !== false, showLegend: renderConfig.showLegend !== false, showScaleBar: renderConfig.showScaleBar !== false, overlays,
+        });
+        const storageKey = `projects/${job.projectId}/atlas/${job.id}-${rendered.outputSha256.slice(0, 16)}.pdf`;
+        const uploaded = await storagePut(storageKey, rendered.pdfBytes, "application/pdf");
+        await database.update(atlasJobs).set({ status: "completed", progress: 100, currentPage: grid.totalPages, outputS3Key: uploaded.key, outputUrl: uploaded.url, individualPagesUrls: rendered.pages.map((page) => ({ page: page.page, url: "", s3Key: `${rendered.outputKey}#${page.png}` })), completedAt: new Date(), errorMessage: null }).where(eq(atlasJobs.id, job.id));
+        await db.createAuditLog({ userId: ctx.user.id, userEmail: ctx.user.email || null, userName: ctx.user.name || null, action: "atlas.render.completed", entityType: "atlas", entityId: job.id, projectId: job.projectId, details: { rasterLayerId: rasterLayer.id, pages: grid.totalPages, outputSha256: rendered.outputSha256, sourceCogSha256: rendered.sourceCogSha256, outputBytes: rendered.outputBytes, overlays: overlays.length, pageSize: job.pageSize }, ipAddress: ctx.req.ip || null, userAgent: ctx.req.headers?.["user-agent"] || null });
+        return { success: true, outputUrl: uploaded.url, outputSha256: rendered.outputSha256, outputBytes: rendered.outputBytes, pages: grid.totalPages };
+      } catch (error) {
+        const message = error instanceof Error ? error.message.slice(0, 1000) : "Falha desconhecida no worker cartográfico";
+        await database.update(atlasJobs).set({ status: "failed", errorMessage: message, progress: 0 }).where(eq(atlasJobs.id, job.id));
+        await db.createAuditLog({ userId: ctx.user.id, userEmail: ctx.user.email || null, userName: ctx.user.name || null, action: "atlas.render.failed", entityType: "atlas", entityId: job.id, projectId: job.projectId, details: { rasterLayerId: input.rasterLayerId, error: message }, ipAddress: ctx.req.ip || null, userAgent: ctx.req.headers?.["user-agent"] || null });
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+      }
     }),
 
   /**
@@ -377,13 +510,14 @@ export const atlasRouter = router({
         coverageArea = rawCoverage;
       }
       const gridConfig = job.gridConfig as { rows: number; cols: number; totalPages?: number; overlap?: number; title?: string; subtitle?: string; author?: string } | null;
+      const renderConfig = (job.renderConfig || gridConfig || {}) as { overlap?: number; title?: string; subtitle?: string; author?: string; showNorthArrow?: boolean; showScaleBar?: boolean; showLegend?: boolean; showGrid?: boolean; showFrame?: boolean };
       
       const grid = calculateGrid(
         coverageArea,
         job.pageSize as keyof typeof PAGE_SIZES,
         job.orientation as "portrait" | "landscape",
         job.scale,
-(gridConfig as any)?.overlap || 0.1
+renderConfig.overlap || 0.1
       );
 
       const page = grid.pages.find(p => p.pageNumber === input.pageNumber);
@@ -396,6 +530,10 @@ export const atlasRouter = router({
         .select()
         .from(projects)
         .where(eq(projects.id, job.projectId));
+      const projectLayers = await database
+        .select()
+        .from(layers)
+        .where(eq(layers.projectId, job.projectId));
 
       return {
         atlasId: job.id,
@@ -405,9 +543,9 @@ export const atlasRouter = router({
         bounds: page.bounds,
         row: page.row,
         col: page.col,
-        title: `${(gridConfig as any)?.title || job.name} - Folha ${String(input.pageNumber).padStart(2, "0")}/${String((gridConfig as any)?.totalPages || grid.totalPages).padStart(2, "0")}`,
-        subtitle: (gridConfig as any).subtitle,
-        author: (gridConfig as any).author,
+        title: `${renderConfig.title || job.name} - Folha ${String(input.pageNumber).padStart(2, "0")}/${String((gridConfig as any)?.totalPages || grid.totalPages).padStart(2, "0")}`,
+        subtitle: renderConfig.subtitle || null,
+        author: renderConfig.author || null,
         project: project?.name,
         client: project?.clientName,
         scale: job.scale,
@@ -415,12 +553,13 @@ export const atlasRouter = router({
         utmZone: job.utmZone,
         pageSize: job.pageSize,
         orientation: job.orientation,
-        showNorthArrow: true, // Default values since schema doesn't have these fields
-        showScaleBar: true,
-        showLegend: true,
-        showGrid: true,
-        showFrame: true,
+        showNorthArrow: renderConfig.showNorthArrow ?? true,
+        showScaleBar: renderConfig.showScaleBar ?? true,
+        showLegend: renderConfig.showLegend ?? true,
+        showGrid: renderConfig.showGrid ?? true,
+        showFrame: renderConfig.showFrame ?? true,
         layersConfig: job.layersConfig,
+        rasterLayers: summarizeRasterLayers(projectLayers),
       };
     }),
 

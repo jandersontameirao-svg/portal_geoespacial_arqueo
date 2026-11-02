@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
+import { getFileCategory } from "@shared/fileTypeCategories";
 import { 
   ArrowLeft, 
   Search, 
@@ -81,14 +82,10 @@ export default function Files() {
   };
 
   const getFileIcon = (fileType: string) => {
-    switch (fileType) {
-      case "kml":
-      case "kmz":
-      case "shp":
+    switch (getFileCategory(fileType)) {
+      case "geospatial":
         return <MapIcon className="w-5 h-5 text-green-500" />;
-      case "pdf":
-      case "docx":
-      case "xlsx":
+      case "document":
         return <FileText className="w-5 h-5 text-blue-500" />;
       case "image":
         return <ImageIcon className="w-5 h-5 text-purple-500" />;
@@ -98,14 +95,10 @@ export default function Files() {
   };
 
   const getCategoryBadge = (fileType: string) => {
-    switch (fileType) {
-      case "kml":
-      case "kmz":
-      case "shp":
+    switch (getFileCategory(fileType)) {
+      case "geospatial":
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Geoespacial</Badge>;
-      case "pdf":
-      case "docx":
-      case "xlsx":
+      case "document":
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Documento</Badge>;
       case "image":
         return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Imagem</Badge>;
@@ -189,7 +182,7 @@ export default function Files() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as categorias</SelectItem>
-                  <SelectItem value="geospatial">Geoespacial (KML, SHP)</SelectItem>
+                  <SelectItem value="geospatial">Geoespacial (KML, SHP, GeoJSON, GeoTIFF)</SelectItem>
                   <SelectItem value="document">Documentos (PDF, DOCX)</SelectItem>
                   <SelectItem value="image">Imagens</SelectItem>
                   <SelectItem value="other">Outros</SelectItem>

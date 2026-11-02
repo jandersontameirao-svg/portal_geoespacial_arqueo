@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -9,21 +9,36 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye } from "lucide-react";
+import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye, Map } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import FileList from "@/components/FileList";
-import { Link, useParams } from "wouter";
+import ProjectGeoWorkspace from "@/components/ProjectGeoWorkspace";
+import { Link, useLocation, useParams } from "wouter";
+
+const projectTabs = new Set(["overview", "members", "files", "map", "history"]);
+
+function tabFromLocation(location: string): string {
+  const query = location.split("?")[1] || "";
+  const tab = new URLSearchParams(query).get("tab");
+  return tab && projectTabs.has(tab) ? tab : "overview";
+}
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id || "0");
   const { user, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [location, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState(() => tabFromLocation(location));
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<"viewer" | "editor" | "owner">("viewer");
 
+  useEffect(() => {
+    setActiveTab(tabFromLocation(location));
+  }, [location]);
+
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const isMapWorkspace = activeTab === "map";
 
   // Queries
   const { data: project, isLoading: projectLoading, refetch: refetchProject } = trpc.projects.get.useQuery(
@@ -91,6 +106,12 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    const target = tab === "overview" ? `/projects/${projectId}` : `/projects/${projectId}?tab=${tab}`;
+    if (location !== target) setLocation(target);
+  };
+
   if (projectLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -118,21 +139,21 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-      <div className="container py-8">
+    <div className={`${isMapWorkspace ? "h-[calc(100dvh-4rem)] overflow-hidden" : "min-h-screen"} bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900`}>
+      <div className={`container ${isMapWorkspace ? "flex h-full min-h-0 flex-col py-3" : "py-8"}`}>
         {/* Header */}
-        <div className="mb-6">
-          <Button variant="ghost" size="sm" asChild className="mb-4">
+        <div className={isMapWorkspace ? "mb-2 flex shrink-0 items-center justify-between gap-3" : "mb-6"}>
+          <Button variant="ghost" size="sm" asChild className={isMapWorkspace ? "" : "mb-4"}>
             <Link href="/projects">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar para Projetos
             </Link>
           </Button>
 
-          <div className="flex items-start justify-between">
+          <div className="flex min-w-0 items-start justify-between gap-3">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50 mb-2">{project.name}</h1>
-              <div className="flex items-center gap-3">
+              <h1 className={`${isMapWorkspace ? "truncate text-xl" : "text-4xl mb-2"} font-bold text-slate-900 dark:text-slate-50`}>{project.name}</h1>
+              <div className={`flex items-center gap-3 ${isMapWorkspace ? "mt-1" : ""}`}>
                 <Badge variant="outline" className="font-mono">{project.code}</Badge>
                 <Badge
                   className={
@@ -158,8 +179,8 @@ export default function ProjectDetail() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className={isMapWorkspace ? "flex min-h-0 flex-1 flex-col space-y-2" : "space-y-6"}>
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
             <TabsTrigger value="overview" className="gap-2">
               <FileText className="w-4 h-4" />
               Visão Geral
@@ -171,6 +192,10 @@ export default function ProjectDetail() {
             <TabsTrigger value="files" className="gap-2">
               <Upload className="w-4 h-4" />
               Arquivos
+            </TabsTrigger>
+            <TabsTrigger value="map" className="gap-2">
+              <Map className="w-4 h-4" />
+              Mapa & Análise
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <History className="w-4 h-4" />
@@ -394,6 +419,10 @@ export default function ProjectDetail() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="map" className={isMapWorkspace ? "mt-0 min-h-0 flex-1" : "space-y-6"}>
+            <ProjectGeoWorkspace projectId={projectId} canEdit={canEdit} />
           </TabsContent>
 
           {/* Aba: Histórico */}

@@ -17,6 +17,11 @@ import {
   calculateCacheExpiration,
   isCacheExpired,
 } from "./geodataService";
+import { canRefreshBaseLayer, classifyBaseLayerCache, computeRetryAfter } from "./baseLayerCachePolicy";
+
+function withCacheState<T extends { downloadStatus: "pending" | "downloading" | "completed" | "failed"; dataUrl?: string | null; cacheExpiresAt?: Date | string | null; refreshFailureCount?: number | null; retryAfter?: Date | string | null; lastRefreshAttemptAt?: Date | string | null; errorMessage?: string | null }>(layer: T) {
+  return { ...layer, cacheState: classifyBaseLayerCache(layer), isCacheStale: classifyBaseLayerCache(layer) === "stale" };
+}
 
 export const baseLayersRouter = router({
   /**
@@ -26,7 +31,7 @@ export const baseLayersRouter = router({
     const db = await getDb();
     if (!db) throw new Error("Database connection failed");
     const layers = await db.select().from(baseLayers).where(eq(baseLayers.isActive, true));
-    return layers;
+    return layers.map(withCacheState);
   }),
 
   /**
@@ -46,7 +51,7 @@ export const baseLayersRouter = router({
         throw new Error("Camada não encontrada");
       }
       
-      return layer;
+      return withCacheState(layer);
     }),
 
   /**
@@ -79,8 +84,13 @@ export const baseLayersRouter = router({
         return {
           success: true,
           message: "Camada já está atualizada (cache válido)",
-          layer: existing,
+          layer: withCacheState(existing),
         };
+      }
+
+      const refreshGate = canRefreshBaseLayer(existing, Boolean(forceUpdate));
+      if (!refreshGate.allowed) {
+        return { success: false, blockedByBackoff: true, message: refreshGate.reason, retryAfter: refreshGate.retryAfter, layer: existing ? withCacheState(existing) : null };
       }
 
       // Atualizar status para "downloading"
@@ -89,6 +99,7 @@ export const baseLayersRouter = router({
           .update(baseLayers)
           .set({
             downloadStatus: "downloading",
+            lastRefreshAttemptAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));
@@ -105,6 +116,8 @@ export const baseLayersRouter = router({
             .set({
               downloadStatus: "failed",
               errorMessage: result.errorMessage,
+              refreshFailureCount: (existing.refreshFailureCount || 0) + 1,
+              retryAfter: computeRetryAfter((existing.refreshFailureCount || 0) + 1),
               updatedAt: new Date(),
             })
             .where(eq(baseLayers.id, existing.id));
@@ -129,6 +142,8 @@ export const baseLayersRouter = router({
             cacheExpiresAt,
             downloadStatus: "completed",
             errorMessage: null,
+            refreshFailureCount: 0,
+            retryAfter: null,
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));
@@ -198,8 +213,13 @@ export const baseLayersRouter = router({
         return {
           success: true,
           message: "Camada já está atualizada (cache válido)",
-          layer: existing,
+          layer: withCacheState(existing),
         };
+      }
+
+      const refreshGate = canRefreshBaseLayer(existing, Boolean(forceUpdate));
+      if (!refreshGate.allowed) {
+        return { success: false, blockedByBackoff: true, message: refreshGate.reason, retryAfter: refreshGate.retryAfter, layer: existing ? withCacheState(existing) : null };
       }
 
       // Atualizar status para "downloading"
@@ -208,6 +228,7 @@ export const baseLayersRouter = router({
           .update(baseLayers)
           .set({
             downloadStatus: "downloading",
+            lastRefreshAttemptAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));
@@ -224,6 +245,8 @@ export const baseLayersRouter = router({
             .set({
               downloadStatus: "failed",
               errorMessage: result.errorMessage,
+              refreshFailureCount: (existing.refreshFailureCount || 0) + 1,
+              retryAfter: computeRetryAfter((existing.refreshFailureCount || 0) + 1),
               updatedAt: new Date(),
             })
             .where(eq(baseLayers.id, existing.id));
@@ -248,6 +271,8 @@ export const baseLayersRouter = router({
             cacheExpiresAt,
             downloadStatus: "completed",
             errorMessage: null,
+            refreshFailureCount: 0,
+            retryAfter: null,
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));
@@ -265,7 +290,7 @@ export const baseLayersRouter = router({
             description: "Territórios quilombolas titulados pelo INCRA",
             source: "incra",
             layerType: "terras_quilombolas",
-            dataFormat: "shapefile",
+            dataFormat: "geojson",
             dataUrl: result.s3Url,
             s3Key: result.s3Key,
             featureCount: result.featureCount,
@@ -318,8 +343,13 @@ export const baseLayersRouter = router({
         return {
           success: true,
           message: "Camada já está atualizada (cache válido)",
-          layer: existing,
+          layer: withCacheState(existing),
         };
+      }
+
+      const refreshGate = canRefreshBaseLayer(existing, Boolean(forceUpdate));
+      if (!refreshGate.allowed) {
+        return { success: false, blockedByBackoff: true, message: refreshGate.reason, retryAfter: refreshGate.retryAfter, layer: existing ? withCacheState(existing) : null };
       }
 
       // Atualizar status para "downloading"
@@ -328,6 +358,7 @@ export const baseLayersRouter = router({
           .update(baseLayers)
           .set({
             downloadStatus: "downloading",
+            lastRefreshAttemptAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));
@@ -344,6 +375,8 @@ export const baseLayersRouter = router({
             .set({
               downloadStatus: "failed",
               errorMessage: result.errorMessage,
+              refreshFailureCount: (existing.refreshFailureCount || 0) + 1,
+              retryAfter: computeRetryAfter((existing.refreshFailureCount || 0) + 1),
               updatedAt: new Date(),
             })
             .where(eq(baseLayers.id, existing.id));
@@ -368,6 +401,8 @@ export const baseLayersRouter = router({
             cacheExpiresAt,
             downloadStatus: "completed",
             errorMessage: null,
+            refreshFailureCount: 0,
+            retryAfter: null,
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));
@@ -438,8 +473,13 @@ export const baseLayersRouter = router({
         return {
           success: true,
           message: "Camada já está atualizada (cache válido)",
-          layer: existing,
+          layer: withCacheState(existing),
         };
+      }
+
+      const refreshGate = canRefreshBaseLayer(existing, Boolean(forceUpdate));
+      if (!refreshGate.allowed) {
+        return { success: false, blockedByBackoff: true, message: refreshGate.reason, retryAfter: refreshGate.retryAfter, layer: existing ? withCacheState(existing) : null };
       }
 
       // Atualizar status para "downloading"
@@ -448,6 +488,7 @@ export const baseLayersRouter = router({
           .update(baseLayers)
           .set({
             downloadStatus: "downloading",
+            lastRefreshAttemptAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));
@@ -464,6 +505,8 @@ export const baseLayersRouter = router({
             .set({
               downloadStatus: "failed",
               errorMessage: result.errorMessage,
+              refreshFailureCount: (existing.refreshFailureCount || 0) + 1,
+              retryAfter: computeRetryAfter((existing.refreshFailureCount || 0) + 1),
               updatedAt: new Date(),
             })
             .where(eq(baseLayers.id, existing.id));
@@ -488,6 +531,8 @@ export const baseLayersRouter = router({
             cacheExpiresAt,
             downloadStatus: "completed",
             errorMessage: null,
+            refreshFailureCount: 0,
+            retryAfter: null,
             updatedAt: new Date(),
           })
           .where(eq(baseLayers.id, existing.id));

@@ -1,0 +1,42 @@
+{
+  "command": [
+    "sudo",
+    "-n",
+    "unshare",
+    "--net",
+    "/bin/sh",
+    "-ec",
+    "ip link set lo up; exec /usr/bin/env -i \"$@\"",
+    "f1f2-offline",
+    "HOME=/tmp",
+    "PATH=/home/ubuntu/.nvm/versions/node/v22.23.4/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "LANG=C.UTF-8",
+    "NO_PROXY=*",
+    "no_proxy=*",
+    "VITE_APP_ID=synthetic",
+    "VITE_API_URL=https://api.invalid",
+    "VITE_APP_URL=https://app.invalid",
+    "VITE_OAUTH_PORTAL_URL=https://oauth.invalid",
+    "VITE_OAUTH_SERVER_URL=https://oauth-server.invalid",
+    "VITE_FRONTEND_FORGE_API_URL=https://forge.invalid",
+    "/usr/bin/python3",
+    "/home/ubuntu/atena_geoportal_f1f2_isolado/infra/scripts/run_f1f2_visual_harness.py",
+    "--inside-offline-namespace",
+    "/home/ubuntu/atena_geoportal_f1f2_isolado/docs/consolidation/evidence/f1f2-visual/attempt-20261102T201412.747311Z-c2fa29"
+  ],
+  "cleanEnvironmentKeys": [
+    "HOME",
+    "PATH",
+    "LANG",
+    "NO_PROXY",
+    "no_proxy",
+    "VITE_APP_ID",
+    "VITE_API_URL",
+    "VITE_APP_URL",
+    "VITE_OAUTH_PORTAL_URL",
+    "VITE_OAUTH_SERVER_URL",
+    "VITE_FRONTEND_FORGE_API_URL"
+  ],
+  "finiteTimeoutSeconds": 240,
+  "parentNetworkNamespace": "net:[4026531833]"
+}

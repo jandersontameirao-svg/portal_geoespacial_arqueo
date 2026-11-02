@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Upload, X, FileText, Image as ImageIcon, File } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { effectiveUploadMime, resolveTiffUpload, type TiffUploadMode } from "@shared/tiffUploadPolicy";
 
 interface FileUploadProps {
   projectId: number;
@@ -26,6 +27,8 @@ const ACCEPTED_TYPES = {
   "application/vnd.google-earth.kmz": [".kmz"],
   "application/zip": [".zip"],
   "application/x-zip-compressed": [".zip"],
+  "application/geo+json": [".geojson"],
+  "application/json": [".geojson", ".json"],
   // Documentos
   "application/pdf": [".pdf"],
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
@@ -35,6 +38,8 @@ const ACCEPTED_TYPES = {
   "image/png": [".png"],
   "image/gif": [".gif"],
   "image/tiff": [".tif", ".tiff"],
+  "image/geotiff": [".tif", ".tiff"],
+  "application/geotiff": [".tif", ".tiff"],
 };
 
 export default function FileUpload({
@@ -46,8 +51,11 @@ export default function FileUpload({
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [tiffMode, setTiffMode] = useState<TiffUploadMode>("raster");
 
   const uploadMutation = trpc.files.upload.useMutation();
+  const rasterIngestMutation = trpc.raster.ingestGeoTiff.useMutation();
+  const { data: rasterAvailability, isLoading: availabilityLoading } = trpc.raster.ingestionAvailability.useQuery();
 
   const validateFile = (file: File): string | null => {
     // Validar tamanho
@@ -57,8 +65,14 @@ export default function FileUpload({
     }
 
     // Validar tipo
-    if (!acceptedTypes.includes(file.type)) {
+    if (!acceptedTypes.includes(effectiveUploadMime(file))) {
       return "Tipo de arquivo não permitido";
+    }
+    const policy = resolveTiffUpload(file, tiffMode);
+    if (policy.route === "raster" && !rasterAvailability?.available) {
+      return availabilityLoading
+        ? "Aguarde a verificação da ingestão raster ou escolha guardar somente o original."
+        : `${rasterAvailability?.reason || "Ingestão raster indisponível."} Para armazenar sem processamento, escolha guardar somente o original.`;
     }
 
     return null;
@@ -94,7 +108,8 @@ export default function FileUpload({
       try {
         // Converter arquivo para base64
         const reader = new FileReader();
-        const base64Promise = new Promise<string>((resolve) => {
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onerror = () => reject(new Error("Não foi possível ler o arquivo"));
           reader.onload = () => {
             const base64 = (reader.result as string).split(",")[1];
             resolve(base64);
@@ -106,19 +121,23 @@ export default function FileUpload({
 
         // Determinar categoria
         let category: "geospatial" | "document" | "image" | "other" = "other";
+        const policy = resolveTiffUpload(uploadFile.file, tiffMode);
+        const mimeType = policy.mime;
         if (
-          uploadFile.file.type.includes("kml") ||
-          uploadFile.file.type.includes("kmz") ||
-          uploadFile.file.type.includes("zip")
+          mimeType.includes("kml") ||
+          mimeType.includes("kmz") ||
+          mimeType.includes("zip") ||
+          mimeType.includes("json") ||
+          policy.route === "raster"
         ) {
           category = "geospatial";
         } else if (
-          uploadFile.file.type.includes("pdf") ||
-          uploadFile.file.type.includes("word") ||
-          uploadFile.file.type.includes("sheet")
+          mimeType.includes("pdf") ||
+          mimeType.includes("word") ||
+          mimeType.includes("sheet")
         ) {
           category = "document";
-        } else if (uploadFile.file.type.startsWith("image/")) {
+        } else if (mimeType.startsWith("image/") || policy.isTiff) {
           category = "image";
         }
 
@@ -132,29 +151,35 @@ export default function FileUpload({
         // Gerar descrição automática baseada no arquivo
         const autoDescription = `Arquivo ${category === "geospatial" ? "geoespacial" : category === "document" ? "documento" : category === "image" ? "imagem" : ""} ${uploadFile.file.name} enviado em ${new Date().toLocaleDateString("pt-BR")}`;
         
-        // Upload via tRPC (sem await para simular progresso)
-        const uploadPromise = uploadMutation.mutateAsync({
-          projectId,
-          filename: uploadFile.file.name,
-          mimeType: uploadFile.file.type,
-          size: uploadFile.file.size,
-          fileData,
-          category,
-          description: autoDescription,
-          tags: [category, uploadFile.file.name.split(".").pop() || "arquivo"],
-        });
+        // Resultado real da mutação; nunca tentar o upload genérico após falha raster.
+        const uploadPromise = policy.route === "raster"
+          ? rasterIngestMutation.mutateAsync({
+              projectId,
+              filename: uploadFile.file.name,
+              mimeType: mimeType as "image/tiff" | "image/geotiff" | "application/geotiff",
+              size: uploadFile.file.size,
+              fileData,
+              name: policy.rasterName,
+              description: autoDescription,
+              acquisitionAt: new Date().toISOString(),
+              sourceLabel: "Upload local autorizado pelo usuário do projeto",
+              minZoom: 12,
+              maxZoom: 14,
+              nodata: 0,
+              resampling: "cubic" as const,
+            })
+          : uploadMutation.mutateAsync({
+              projectId,
+              filename: uploadFile.file.name,
+              mimeType: policy.genericMime,
+              size: uploadFile.file.size,
+              fileData,
+              category,
+              description: autoDescription,
+              tags: [category, uploadFile.file.name.split(".").pop() || "arquivo"],
+            });
 
-        // Simular progresso enquanto faz upload
-        for (let progress = 50; progress <= 90; progress += 10) {
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          setUploadingFiles((prev) =>
-            prev.map((f) =>
-              f.file === uploadFile.file ? { ...f, progress } : f
-            )
-          );
-        }
-
-        // Aguardar conclusão do upload
+        // Aguardar imediatamente para capturar também rejeições rápidas.
         await uploadPromise;
 
         // Marcar como 100% e sucesso
@@ -173,16 +198,19 @@ export default function FileUpload({
           )
         );
 
-        toast.success(`${uploadFile.file.name} enviado com sucesso!`);
+        toast.success(policy.isTiff && policy.route === "generic"
+          ? `${uploadFile.file.name}: original armazenado; raster/COG não processado.`
+          : `${uploadFile.file.name} enviado com sucesso!`);
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Erro ao enviar arquivo";
         setUploadingFiles((prev) =>
           prev.map((f) =>
             f.file === uploadFile.file
-              ? { ...f, status: "error", error: "Erro ao enviar arquivo" }
+              ? { ...f, status: "error", error: message }
               : f
           )
         );
-        toast.error(`Erro ao enviar ${uploadFile.file.name}`);
+        toast.error(`${uploadFile.file.name}: ${message}`);
       }
     }
 
@@ -243,6 +271,18 @@ export default function FileUpload({
 
   return (
     <div className="space-y-4">
+      <div className="rounded border p-3 space-y-2">
+        <label className="text-sm font-medium" htmlFor={`tiff-mode-${projectId}`}>Tratamento dos arquivos TIFF / GeoTIFF</label>
+        <select id={`tiff-mode-${projectId}`} data-testid="tiff-upload-mode" className="block w-full rounded border bg-background text-foreground p-2 text-sm" value={tiffMode} onChange={(event) => setTiffMode(event.target.value as TiffUploadMode)} disabled={uploadingFiles.some((file) => file.status === "uploading")}>
+          <option value="raster">Processar como raster / COG (requer serviço disponível)</option>
+          <option value="original">Guardar somente o TIFF original (sem camada raster / COG)</option>
+        </select>
+        <p className="text-xs text-muted-foreground">{tiffMode === "original"
+          ? "O original é armazenado como imagem, com scanner e controle de acesso normais. Não cria camada, tiles nem georreferenciamento."
+          : availabilityLoading ? "Verificando disponibilidade do serviço raster…"
+            : rasterAvailability?.available ? "Serviço raster disponível. O servidor valida e processa o arquivo."
+              : `${rasterAvailability?.reason || "Ingestão raster indisponível."} Você pode escolher guardar somente o original. Não há conversão automática para esse modo.`}</p>
+      </div>
       {/* Área de Drop */}
       <Card
         className={`border-2 border-dashed transition-colors ${
@@ -278,7 +318,7 @@ export default function FileUpload({
             onChange={handleFileInputChange}
           />
           <p className="text-xs text-slate-500 dark:text-slate-500 mt-4">
-            Tipos aceitos: KML, KMZ, SHP (ZIP), PDF, DOCX, XLSX, Imagens
+            Tipos aceitos: KML, KMZ, SHP (ZIP), GeoTIFF/COG, PDF, DOCX, XLSX, Imagens
             <br />
             Tamanho máximo: {maxSizeMB}MB por arquivo
           </p>

@@ -1,0 +1,254 @@
+[
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "id",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "projectId",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "name",
+    "COLUMN_TYPE": "varchar(255)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "originalName",
+    "COLUMN_TYPE": "varchar(255)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "fileType",
+    "COLUMN_TYPE": "enum('kml','kmz','shp','geojson','geotiff','pdf','docx','xlsx','image','other')",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "mimeType",
+    "COLUMN_TYPE": "varchar(100)",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "fileSize",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "s3Key",
+    "COLUMN_TYPE": "varchar(500)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "s3Url",
+    "COLUMN_TYPE": "text",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "isGeospatial",
+    "COLUMN_TYPE": "tinyint(1)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "0"
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "crs",
+    "COLUMN_TYPE": "varchar(50)",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "bounds",
+    "COLUMN_TYPE": "json",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "metadata",
+    "COLUMN_TYPE": "json",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "currentVersion",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "1"
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "uploadedBy",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "uploadedAt",
+    "COLUMN_TYPE": "timestamp",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP"
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "updatedAt",
+    "COLUMN_TYPE": "timestamp",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP"
+  },
+  {
+    "TABLE_NAME": "files",
+    "COLUMN_NAME": "deletedAt",
+    "COLUMN_TYPE": "timestamp",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "id",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "revision",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "1"
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "name",
+    "COLUMN_TYPE": "varchar(255)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "publisher",
+    "COLUMN_TYPE": "varchar(255)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "serviceType",
+    "COLUMN_TYPE": "enum('wms','wfs')",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "sourceClass",
+    "COLUMN_TYPE": "enum('official','approved_custom')",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "official"
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "endpoint",
+    "COLUMN_TYPE": "varchar(1000)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "endpointHash",
+    "COLUMN_TYPE": "varchar(64)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "status",
+    "COLUMN_TYPE": "enum('draft','validated','published','degraded','unhealthy','disabled')",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "draft"
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "enabled",
+    "COLUMN_TYPE": "tinyint(1)",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "0"
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "health",
+    "COLUMN_TYPE": "enum('healthy','timeout','tls_error','http_error','invalid_capabilities','blocked')",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "blocked"
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "lastValidatedAt",
+    "COLUMN_TYPE": "timestamp",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "lastHealthyAt",
+    "COLUMN_TYPE": "timestamp",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "lastError",
+    "COLUMN_TYPE": "varchar(500)",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "capabilities",
+    "COLUMN_TYPE": "json",
+    "IS_NULLABLE": "YES",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "createdBy",
+    "COLUMN_TYPE": "int",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": null
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "createdAt",
+    "COLUMN_TYPE": "timestamp",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP"
+  },
+  {
+    "TABLE_NAME": "ogc_services",
+    "COLUMN_NAME": "updatedAt",
+    "COLUMN_TYPE": "timestamp",
+    "IS_NULLABLE": "NO",
+    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP"
+  }
+]

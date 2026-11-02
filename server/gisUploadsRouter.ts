@@ -4,6 +4,7 @@ import * as db from "./db.js";
 import { storagePut } from "./storage.js";
 import { invokeLLM } from "./_core/llm.js";
 import AdmZip from "adm-zip";
+import { requireProjectEditor } from "./projectAccess";
 
 export const gisUploadsRouter = router({
   // Listar uploads do usuário
@@ -40,10 +41,11 @@ export const gisUploadsRouter = router({
         fileType: z.enum(["shp", "kml", "kmz", "geojson", "gpx", "gml", "dxf"]),
         fileSize: z.number(),
         mimeType: z.string(),
-        projectId: z.number().optional(),
+        projectId: z.number(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await requireProjectEditor(input.projectId, ctx.user);
       // Validar tamanho do arquivo (máximo 100MB)
       if (input.fileSize > 100 * 1024 * 1024) {
         throw new Error("File size exceeds 100MB limit");
@@ -89,6 +91,10 @@ export const gisUploadsRouter = router({
       if (!upload) {
         throw new Error("Upload not found");
       }
+      if (!upload.projectId) {
+        throw new Error("Upload legado sem projeto não pode ser confirmado. Use Projeto → Arquivos.");
+      }
+      await requireProjectEditor(upload.projectId, ctx.user);
 
       // Atualizar URL do S3
       await db.updateGisUploadStatus(input.uploadId, "processing", input.s3Url);

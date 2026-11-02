@@ -1,0 +1,143 @@
+{
+  "before": [
+    {
+      "id": 1,
+      "fileType": "kml",
+      "ordinal": 1
+    },
+    {
+      "id": 2,
+      "fileType": "kmz",
+      "ordinal": 2
+    },
+    {
+      "id": 3,
+      "fileType": "shp",
+      "ordinal": 3
+    },
+    {
+      "id": 4,
+      "fileType": "pdf",
+      "ordinal": 4
+    },
+    {
+      "id": 5,
+      "fileType": "docx",
+      "ordinal": 5
+    },
+    {
+      "id": 6,
+      "fileType": "xlsx",
+      "ordinal": 6
+    },
+    {
+      "id": 7,
+      "fileType": "image",
+      "ordinal": 7
+    },
+    {
+      "id": 8,
+      "fileType": "other",
+      "ordinal": 8
+    }
+  ],
+  "after0008": [
+    {
+      "id": 1,
+      "fileType": "kml",
+      "ordinal": 1
+    },
+    {
+      "id": 2,
+      "fileType": "kmz",
+      "ordinal": 2
+    },
+    {
+      "id": 3,
+      "fileType": "shp",
+      "ordinal": 3
+    },
+    {
+      "id": 4,
+      "fileType": "pdf",
+      "ordinal": 5
+    },
+    {
+      "id": 5,
+      "fileType": "docx",
+      "ordinal": 6
+    },
+    {
+      "id": 6,
+      "fileType": "xlsx",
+      "ordinal": 7
+    },
+    {
+      "id": 7,
+      "fileType": "image",
+      "ordinal": 8
+    },
+    {
+      "id": 8,
+      "fileType": "other",
+      "ordinal": 9
+    },
+    {
+      "id": 9,
+      "fileType": "geotiff",
+      "ordinal": 4
+    }
+  ],
+  "after0009": [
+    {
+      "id": 1,
+      "fileType": "kml",
+      "ordinal": 1
+    },
+    {
+      "id": 2,
+      "fileType": "kmz",
+      "ordinal": 2
+    },
+    {
+      "id": 3,
+      "fileType": "shp",
+      "ordinal": 3
+    },
+    {
+      "id": 4,
+      "fileType": "pdf",
+      "ordinal": 6
+    },
+    {
+      "id": 5,
+      "fileType": "docx",
+      "ordinal": 7
+    },
+    {
+      "id": 6,
+      "fileType": "xlsx",
+      "ordinal": 8
+    },
+    {
+      "id": 7,
+      "fileType": "image",
+      "ordinal": 9
+    },
+    {
+      "id": 8,
+      "fileType": "other",
+      "ordinal": 10
+    },
+    {
+      "id": 9,
+      "fileType": "geotiff",
+      "ordinal": 5
+    },
+    {
+      "id": 10,
+      "fileType": "geojson",
+      "ordinal": 4
+    }
+  ]
+}

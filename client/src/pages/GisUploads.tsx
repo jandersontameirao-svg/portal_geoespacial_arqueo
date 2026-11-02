@@ -4,8 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { FileIcon, Trash2, Download, Eye, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { FileIcon, Trash2, Download, Loader2 } from "lucide-react";
 
 export default function GisUploads() {
   const { data: uploads, isLoading, refetch } = trpc.gisUploads.list.useQuery({});
@@ -46,9 +45,9 @@ export default function GisUploads() {
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Arquivos GIS</h1>
+        <h1 className="text-3xl font-bold mb-2">Histórico de uploads GIS legados</h1>
         <p className="text-muted-foreground">
-          Faça upload e gerencie seus arquivos geoespaciais
+          Registros anteriores não são automaticamente camadas de projeto. Novos envios devem ser feitos em Projeto → Arquivos.
         </p>
       </div>
 
@@ -56,9 +55,9 @@ export default function GisUploads() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Arquivos Enviados</CardTitle>
+          <CardTitle>Registros anteriores</CardTitle>
           <CardDescription>
-            Lista de todos os arquivos GIS enviados e validados
+            O histórico é preservado; arquivos sem vínculo de projeto não podem ser abertos como camada de mapa.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -108,19 +107,7 @@ export default function GisUploads() {
                   <div className="flex items-center gap-2">
                     {upload.status === "completed" && (
                       <>
-                        <Link href="/base-layers-viewer">
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4 mr-1" />
-                            Ver no Mapa
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(upload.s3Url, "_blank")}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        {upload.s3Url.includes("storage.example.com") ? <Badge variant="outline">URL de teste indisponível</Badge> : <Button variant="outline" size="sm" onClick={() => window.open(upload.s3Url, "_blank")}><Download className="h-4 w-4" /></Button>}
                       </>
                     )}
                     <Button

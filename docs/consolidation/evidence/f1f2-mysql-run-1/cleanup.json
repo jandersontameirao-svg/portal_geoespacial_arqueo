@@ -1,0 +1,7 @@
+{
+  "exitCode": 0,
+  "temporaryRootRemoved": true,
+  "mysqlSocketRemoved": true,
+  "sqlTransport": "Unix socket only, skip-networking/mysqlx OFF",
+  "noProductionStageOperation": true
+}

@@ -50,6 +50,55 @@
       "when": 1768233478885,
       "tag": "0006_same_the_spike",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1793296281264,
+      "tag": "0007_lonely_freak",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1793300171512,
+      "tag": "0008_early_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1793301923169,
+      "tag": "0009_quiet_runaways",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1793303605450,
+      "tag": "0010_lethal_expediter",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1793303892901,
+      "tag": "0011_abandoned_wraith",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1793304458759,
+      "tag": "0012_curved_justice",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1793307501973,
+      "tag": "0013_glamorous_betty_brant",
+      "breakpoints": true
     }
   ]
 }

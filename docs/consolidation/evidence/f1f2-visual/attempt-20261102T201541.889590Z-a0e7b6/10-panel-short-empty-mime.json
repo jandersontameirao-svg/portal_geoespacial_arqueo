@@ -1,0 +1,472 @@
+{
+  "id": "10-panel-short-empty-mime",
+  "specification": {
+    "id": "10-panel-short-empty-mime",
+    "available": true,
+    "rejectRaster": false,
+    "panel": true,
+    "filename": "a.tif",
+    "mime": "",
+    "expect": "raster-success"
+  },
+  "fixture": {
+    "name": "a.tif",
+    "type": "",
+    "size": 13,
+    "lastModified": 1700000000000,
+    "validGeoTiff": false
+  },
+  "before": {
+    "inspection": {
+      "caseId": "10-panel-short-empty-mime",
+      "flags": {
+        "available": true,
+        "rejectRaster": false
+      },
+      "calls": [
+        {
+          "index": 1,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": false,
+            "mode": "synthetic-memory-only",
+            "reason": "MOCK: serviço raster indisponível."
+          }
+        },
+        {
+          "index": 2,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": true,
+            "mode": "synthetic-memory-only"
+          }
+        }
+      ],
+      "completionCallbacks": 0,
+      "appId": "synthetic",
+      "mockedApis": [
+        "raster.ingestionAvailability",
+        "files.upload",
+        "raster.ingestGeoTiff"
+      ],
+      "limits": "No real storage, database, scanner, raster processing, OAuth or application authentication."
+    },
+    "body": "F1/F2 • EVIDÊNCIA VISUAL SINTÉTICA • LOOPBACK ISOLADO\n\nUpload TIFF — componentes reais, APIs simuladas\n\nFileUpload.tsx e RasterIngestionPanel.tsx sem substituições. Fixtures File do navegador; React Query + tRPC Provider com link em memória.\n\nNão prova storage, DB, scanner, COG, OAuth nem autorização real. As mensagens dos componentes abaixo refletem respostas simuladas.\n\nCaso: 10-panel-short-empty-mime · VITE_APP_ID: synthetic\n\nAPI simulada disponível\nAPI simulada rejeita raster\nFileUpload real\nTratamento dos arquivos TIFF / GeoTIFF\nProcessar como raster / COG (requer serviço disponível)\nGuardar somente o TIFF original (sem camada raster / COG)\n\nServiço raster disponível. O servidor valida e processa o arquivo.\n\nArraste arquivos aqui\n\nou clique no botão abaixo para selecionar\n\nSelecionar Arquivos\n\nTipos aceitos: KML, KMZ, SHP (ZIP), GeoTIFF/COG, PDF, DOCX, XLSX, Imagens\nTamanho máximo: 100MB por arquivo\n\nRasterIngestionPanel real\nIngerir GeoTIFF / COG\nO arquivo é validado, convertido para COG EPSG:4674, recebe pirâmides e tiles PNG protegidos por projeto.\nFonte/licença\nAquisição (UTC)\nSelecionar GeoTIFF\n\nAdapter: synthetic-memory-only. Limite: 100 MB. O navegador não envia paths; o worker usa apenas volume configurado.\n\nContratos inteiramente simulados\n\nraster.ingestionAvailability: flag local.\n\nfiles.upload: registra payload e responde em memória.\n\nraster.ingestGeoTiff: rejeição controlada; sem worker.\n\nNenhum App ou fluxo de autenticação é montado. Não há link HTTP tRPC.\n\nChamadas capturadas (simuladas)\n[\n  {\n    \"index\": 1,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": false,\n      \"mode\": \"synthetic-memory-only\",\n      \"reason\": \"MOCK: serviço raster indisponível.\"\n    }\n  },\n  {\n    \"index\": 2,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": true,\n      \"mode\": \"synthetic-memory-only\"\n    }\n  }\n]",
+    "toasts": [],
+    "mode": "raster",
+    "resources": [
+      "http://127.0.0.1:4181/@vite/client",
+      "http://127.0.0.1:4181/src/f1f2UploadHarness.tsx",
+      "http://127.0.0.1:4181/@react-refresh",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react_jsx-dev-runtime.js?v=daee5453",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react.js?v=daee5453",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react-dom_client.js?v=2f434f33",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@tanstack_react-query.js?v=7080b8ae",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_client.js?v=90ff1914",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_server_observable.js?v=bbdac92a",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/sonner.js?v=bf724e15",
+      "http://127.0.0.1:4181/src/lib/trpc.ts",
+      "http://127.0.0.1:4181/src/components/FileUpload.tsx",
+      "http://127.0.0.1:4181/src/components/RasterIngestionPanel.tsx",
+      "http://127.0.0.1:4181/src/index.css",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/portal_geoespacial_arqueo_isolated/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-MLUOSQZJ.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-PR4QN5HX.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-C47UA6BB.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-UZ7NARL7.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-SPXXKOZL.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-VQYIAXAC.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-4GD4LNPS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_react-query.js?v=390d0726",
+      "http://127.0.0.1:4181/src/components/ui/button.tsx",
+      "http://127.0.0.1:4181/src/components/ui/card.tsx",
+      "http://127.0.0.1:4181/src/components/ui/progress.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/lucide-react.js?v=fb4c3a8f",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/atena_geoportal_f1f2_isolado/shared/tiffUploadPolicy.ts",
+      "http://127.0.0.1:4181/src/components/ui/input.tsx",
+      "http://127.0.0.1:4181/src/components/ui/label.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-slot.js?v=2dec1c95",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/class-variance-authority.js?v=8427b099",
+      "http://127.0.0.1:4181/src/lib/utils.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-progress.js?v=0a1bc8ad",
+      "http://127.0.0.1:4181/src/components/ui/dialog.tsx",
+      "http://127.0.0.1:4181/src/hooks/useComposition.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-label.js?v=7b1f6512",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-K7ASV7EK.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-NRBEAGZG.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/clsx.js?v=f4be2088",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/tailwind-merge.js?v=959f3f86",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-TQWJLQWC.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-SCFHDNJK.js?v=b39bbc71",
+      "http://127.0.0.1:4181/src/hooks/usePersistFn.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-dialog.js?v=2f529686",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-A3A5SGLN.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-GE5E2XVS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-AP4ESKEA.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-TMRUKK4K.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-LEE56TNQ.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-2635LLGS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-KFBWJ6WS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-UENCTDEN.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-P4NQAIGT.js?v=b39bbc71"
+    ],
+    "inputs": [
+      {
+        "accept": "application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip,application/x-zip-compressed,application/geo+json,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/tiff,image/geotiff,application/geotiff",
+        "files": []
+      },
+      {
+        "accept": ".tif,.tiff,image/tiff,image/geotiff,application/geotiff",
+        "files": []
+      }
+    ],
+    "cookies": "",
+    "localStorageKeys": [],
+    "sessionStorageKeys": []
+  },
+  "immediate": {
+    "inspection": {
+      "caseId": "10-panel-short-empty-mime",
+      "flags": {
+        "available": true,
+        "rejectRaster": false
+      },
+      "calls": [
+        {
+          "index": 1,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": false,
+            "mode": "synthetic-memory-only",
+            "reason": "MOCK: serviço raster indisponível."
+          }
+        },
+        {
+          "index": 2,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": true,
+            "mode": "synthetic-memory-only"
+          }
+        },
+        {
+          "index": 3,
+          "path": "raster.ingestGeoTiff",
+          "type": "mutation",
+          "input": {
+            "projectId": 4242,
+            "filename": "a.tif",
+            "mimeType": "image/tiff",
+            "size": 13,
+            "fileData": "SUkqAFNZTlRIRVRJQw==",
+            "name": "a.tif",
+            "acquisitionAt": "2026-11-02T20:16:00.000Z",
+            "sourceLabel": "Upload local autorizado pelo usuário do projeto",
+            "minZoom": 12,
+            "maxZoom": 14,
+            "nodata": 0,
+            "resampling": "cubic"
+          },
+          "outcome": "mock-success",
+          "response": {
+            "id": 9002,
+            "tileCount": 0,
+            "synthetic": true,
+            "persisted": false
+          }
+        }
+      ],
+      "completionCallbacks": 0,
+      "appId": "synthetic",
+      "mockedApis": [
+        "raster.ingestionAvailability",
+        "files.upload",
+        "raster.ingestGeoTiff"
+      ],
+      "limits": "No real storage, database, scanner, raster processing, OAuth or application authentication."
+    },
+    "body": "F1/F2 • EVIDÊNCIA VISUAL SINTÉTICA • LOOPBACK ISOLADO\n\nUpload TIFF — componentes reais, APIs simuladas\n\nFileUpload.tsx e RasterIngestionPanel.tsx sem substituições. Fixtures File do navegador; React Query + tRPC Provider com link em memória.\n\nNão prova storage, DB, scanner, COG, OAuth nem autorização real. As mensagens dos componentes abaixo refletem respostas simuladas.\n\nCaso: 10-panel-short-empty-mime · VITE_APP_ID: synthetic\n\nAPI simulada disponível\nAPI simulada rejeita raster\nFileUpload real\nTratamento dos arquivos TIFF / GeoTIFF\nProcessar como raster / COG (requer serviço disponível)\nGuardar somente o TIFF original (sem camada raster / COG)\n\nServiço raster disponível. O servidor valida e processa o arquivo.\n\nArraste arquivos aqui\n\nou clique no botão abaixo para selecionar\n\nSelecionar Arquivos\n\nTipos aceitos: KML, KMZ, SHP (ZIP), GeoTIFF/COG, PDF, DOCX, XLSX, Imagens\nTamanho máximo: 100MB por arquivo\n\nRasterIngestionPanel real\nIngerir GeoTIFF / COG\nO arquivo é validado, convertido para COG EPSG:4674, recebe pirâmides e tiles PNG protegidos por projeto.\nFonte/licença\nAquisição (UTC)\nSelecionar GeoTIFF\n\nAdapter: synthetic-memory-only. Limite: 100 MB. O navegador não envia paths; o worker usa apenas volume configurado.\n\nContratos inteiramente simulados\n\nraster.ingestionAvailability: flag local.\n\nfiles.upload: registra payload e responde em memória.\n\nraster.ingestGeoTiff: rejeição controlada; sem worker.\n\nNenhum App ou fluxo de autenticação é montado. Não há link HTTP tRPC.\n\nChamadas capturadas (simuladas)\n[\n  {\n    \"index\": 1,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": false,\n      \"mode\": \"synthetic-memory-only\",\n      \"reason\": \"MOCK: serviço raster indisponível.\"\n    }\n  },\n  {\n    \"index\": 2,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": true,\n      \"mode\": \"synthetic-memory-only\"\n    }\n  },\n  {\n    \"index\": 3,\n    \"path\": \"raster.ingestGeoTiff\",\n    \"type\": \"mutation\",\n    \"input\": {\n      \"projectId\": 4242,\n      \"filename\": \"a.tif\",\n      \"mimeType\": \"image/tiff\",\n      \"size\": 13,\n      \"fileData\": \"SUkqAFNZTlRIRVRJQw==\",\n      \"name\": \"a.tif\",\n      \"acquisitionAt\": \"2026-11-02T20:16:00.000Z\",\n      \"sourceLabel\": \"Upload local autorizado pelo usuário do projeto\",\n      \"minZoom\": 12,\n      \"maxZoom\": 14,\n      \"nodata\": 0,\n      \"resampling\": \"cubic\"\n    },\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"id\": 9002,\n      \"tileCount\": 0,\n      \"synthetic\": true,\n      \"persisted\": false\n    }\n  }\n]\nCOG processado: 0 tiles e hash SHA-256 registrado.",
+    "toasts": [
+      {
+        "type": "success",
+        "text": "COG processado: 0 tiles e hash SHA-256 registrado."
+      }
+    ],
+    "mode": "raster",
+    "resources": [
+      "http://127.0.0.1:4181/@vite/client",
+      "http://127.0.0.1:4181/src/f1f2UploadHarness.tsx",
+      "http://127.0.0.1:4181/@react-refresh",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react_jsx-dev-runtime.js?v=daee5453",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react.js?v=daee5453",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react-dom_client.js?v=2f434f33",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@tanstack_react-query.js?v=7080b8ae",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_client.js?v=90ff1914",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_server_observable.js?v=bbdac92a",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/sonner.js?v=bf724e15",
+      "http://127.0.0.1:4181/src/lib/trpc.ts",
+      "http://127.0.0.1:4181/src/components/FileUpload.tsx",
+      "http://127.0.0.1:4181/src/components/RasterIngestionPanel.tsx",
+      "http://127.0.0.1:4181/src/index.css",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/portal_geoespacial_arqueo_isolated/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-MLUOSQZJ.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-PR4QN5HX.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-C47UA6BB.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-UZ7NARL7.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-SPXXKOZL.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-VQYIAXAC.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-4GD4LNPS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_react-query.js?v=390d0726",
+      "http://127.0.0.1:4181/src/components/ui/button.tsx",
+      "http://127.0.0.1:4181/src/components/ui/card.tsx",
+      "http://127.0.0.1:4181/src/components/ui/progress.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/lucide-react.js?v=fb4c3a8f",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/atena_geoportal_f1f2_isolado/shared/tiffUploadPolicy.ts",
+      "http://127.0.0.1:4181/src/components/ui/input.tsx",
+      "http://127.0.0.1:4181/src/components/ui/label.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-slot.js?v=2dec1c95",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/class-variance-authority.js?v=8427b099",
+      "http://127.0.0.1:4181/src/lib/utils.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-progress.js?v=0a1bc8ad",
+      "http://127.0.0.1:4181/src/components/ui/dialog.tsx",
+      "http://127.0.0.1:4181/src/hooks/useComposition.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-label.js?v=7b1f6512",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-K7ASV7EK.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-NRBEAGZG.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/clsx.js?v=f4be2088",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/tailwind-merge.js?v=959f3f86",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-TQWJLQWC.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-SCFHDNJK.js?v=b39bbc71",
+      "http://127.0.0.1:4181/src/hooks/usePersistFn.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-dialog.js?v=2f529686",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-A3A5SGLN.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-GE5E2XVS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-AP4ESKEA.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-TMRUKK4K.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-LEE56TNQ.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-2635LLGS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-KFBWJ6WS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-UENCTDEN.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-P4NQAIGT.js?v=b39bbc71"
+    ],
+    "inputs": [
+      {
+        "accept": "application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip,application/x-zip-compressed,application/geo+json,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/tiff,image/geotiff,application/geotiff",
+        "files": []
+      },
+      {
+        "accept": ".tif,.tiff,image/tiff,image/geotiff,application/geotiff",
+        "files": []
+      }
+    ],
+    "cookies": "",
+    "localStorageKeys": [],
+    "sessionStorageKeys": []
+  },
+  "afterObservationWindow": {
+    "inspection": {
+      "caseId": "10-panel-short-empty-mime",
+      "flags": {
+        "available": true,
+        "rejectRaster": false
+      },
+      "calls": [
+        {
+          "index": 1,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": false,
+            "mode": "synthetic-memory-only",
+            "reason": "MOCK: serviço raster indisponível."
+          }
+        },
+        {
+          "index": 2,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": true,
+            "mode": "synthetic-memory-only"
+          }
+        },
+        {
+          "index": 3,
+          "path": "raster.ingestGeoTiff",
+          "type": "mutation",
+          "input": {
+            "projectId": 4242,
+            "filename": "a.tif",
+            "mimeType": "image/tiff",
+            "size": 13,
+            "fileData": "SUkqAFNZTlRIRVRJQw==",
+            "name": "a.tif",
+            "acquisitionAt": "2026-11-02T20:16:00.000Z",
+            "sourceLabel": "Upload local autorizado pelo usuário do projeto",
+            "minZoom": 12,
+            "maxZoom": 14,
+            "nodata": 0,
+            "resampling": "cubic"
+          },
+          "outcome": "mock-success",
+          "response": {
+            "id": 9002,
+            "tileCount": 0,
+            "synthetic": true,
+            "persisted": false
+          }
+        }
+      ],
+      "completionCallbacks": 0,
+      "appId": "synthetic",
+      "mockedApis": [
+        "raster.ingestionAvailability",
+        "files.upload",
+        "raster.ingestGeoTiff"
+      ],
+      "limits": "No real storage, database, scanner, raster processing, OAuth or application authentication."
+    },
+    "body": "F1/F2 • EVIDÊNCIA VISUAL SINTÉTICA • LOOPBACK ISOLADO\n\nUpload TIFF — componentes reais, APIs simuladas\n\nFileUpload.tsx e RasterIngestionPanel.tsx sem substituições. Fixtures File do navegador; React Query + tRPC Provider com link em memória.\n\nNão prova storage, DB, scanner, COG, OAuth nem autorização real. As mensagens dos componentes abaixo refletem respostas simuladas.\n\nCaso: 10-panel-short-empty-mime · VITE_APP_ID: synthetic\n\nAPI simulada disponível\nAPI simulada rejeita raster\nFileUpload real\nTratamento dos arquivos TIFF / GeoTIFF\nProcessar como raster / COG (requer serviço disponível)\nGuardar somente o TIFF original (sem camada raster / COG)\n\nServiço raster disponível. O servidor valida e processa o arquivo.\n\nArraste arquivos aqui\n\nou clique no botão abaixo para selecionar\n\nSelecionar Arquivos\n\nTipos aceitos: KML, KMZ, SHP (ZIP), GeoTIFF/COG, PDF, DOCX, XLSX, Imagens\nTamanho máximo: 100MB por arquivo\n\nRasterIngestionPanel real\nIngerir GeoTIFF / COG\nO arquivo é validado, convertido para COG EPSG:4674, recebe pirâmides e tiles PNG protegidos por projeto.\nFonte/licença\nAquisição (UTC)\nSelecionar GeoTIFF\n\nAdapter: synthetic-memory-only. Limite: 100 MB. O navegador não envia paths; o worker usa apenas volume configurado.\n\nContratos inteiramente simulados\n\nraster.ingestionAvailability: flag local.\n\nfiles.upload: registra payload e responde em memória.\n\nraster.ingestGeoTiff: rejeição controlada; sem worker.\n\nNenhum App ou fluxo de autenticação é montado. Não há link HTTP tRPC.\n\nChamadas capturadas (simuladas)\n[\n  {\n    \"index\": 1,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": false,\n      \"mode\": \"synthetic-memory-only\",\n      \"reason\": \"MOCK: serviço raster indisponível.\"\n    }\n  },\n  {\n    \"index\": 2,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": true,\n      \"mode\": \"synthetic-memory-only\"\n    }\n  },\n  {\n    \"index\": 3,\n    \"path\": \"raster.ingestGeoTiff\",\n    \"type\": \"mutation\",\n    \"input\": {\n      \"projectId\": 4242,\n      \"filename\": \"a.tif\",\n      \"mimeType\": \"image/tiff\",\n      \"size\": 13,\n      \"fileData\": \"SUkqAFNZTlRIRVRJQw==\",\n      \"name\": \"a.tif\",\n      \"acquisitionAt\": \"2026-11-02T20:16:00.000Z\",\n      \"sourceLabel\": \"Upload local autorizado pelo usuário do projeto\",\n      \"minZoom\": 12,\n      \"maxZoom\": 14,\n      \"nodata\": 0,\n      \"resampling\": \"cubic\"\n    },\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"id\": 9002,\n      \"tileCount\": 0,\n      \"synthetic\": true,\n      \"persisted\": false\n    }\n  }\n]\nCOG processado: 0 tiles e hash SHA-256 registrado.",
+    "toasts": [
+      {
+        "type": "success",
+        "text": "COG processado: 0 tiles e hash SHA-256 registrado."
+      }
+    ],
+    "mode": "raster",
+    "resources": [
+      "http://127.0.0.1:4181/@vite/client",
+      "http://127.0.0.1:4181/src/f1f2UploadHarness.tsx",
+      "http://127.0.0.1:4181/@react-refresh",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react_jsx-dev-runtime.js?v=daee5453",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react.js?v=daee5453",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/react-dom_client.js?v=2f434f33",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@tanstack_react-query.js?v=7080b8ae",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_client.js?v=90ff1914",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_server_observable.js?v=bbdac92a",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/sonner.js?v=bf724e15",
+      "http://127.0.0.1:4181/src/lib/trpc.ts",
+      "http://127.0.0.1:4181/src/components/FileUpload.tsx",
+      "http://127.0.0.1:4181/src/components/RasterIngestionPanel.tsx",
+      "http://127.0.0.1:4181/src/index.css",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/portal_geoespacial_arqueo_isolated/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-MLUOSQZJ.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-PR4QN5HX.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-C47UA6BB.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-UZ7NARL7.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-SPXXKOZL.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-VQYIAXAC.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-4GD4LNPS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@trpc_react-query.js?v=390d0726",
+      "http://127.0.0.1:4181/src/components/ui/button.tsx",
+      "http://127.0.0.1:4181/src/components/ui/card.tsx",
+      "http://127.0.0.1:4181/src/components/ui/progress.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/lucide-react.js?v=fb4c3a8f",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/atena_geoportal_f1f2_isolado/shared/tiffUploadPolicy.ts",
+      "http://127.0.0.1:4181/src/components/ui/input.tsx",
+      "http://127.0.0.1:4181/src/components/ui/label.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-slot.js?v=2dec1c95",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/class-variance-authority.js?v=8427b099",
+      "http://127.0.0.1:4181/src/lib/utils.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-progress.js?v=0a1bc8ad",
+      "http://127.0.0.1:4181/src/components/ui/dialog.tsx",
+      "http://127.0.0.1:4181/src/hooks/useComposition.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-label.js?v=7b1f6512",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-K7ASV7EK.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-NRBEAGZG.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/clsx.js?v=f4be2088",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/tailwind-merge.js?v=959f3f86",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-TQWJLQWC.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-SCFHDNJK.js?v=b39bbc71",
+      "http://127.0.0.1:4181/src/hooks/usePersistFn.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/@radix-ui_react-dialog.js?v=2f529686",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-A3A5SGLN.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-GE5E2XVS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-AP4ESKEA.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-TMRUKK4K.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-LEE56TNQ.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-2635LLGS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-KFBWJ6WS.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-UENCTDEN.js?v=b39bbc71",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-9augaog6/vite-cache/deps/chunk-P4NQAIGT.js?v=b39bbc71"
+    ],
+    "inputs": [
+      {
+        "accept": "application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip,application/x-zip-compressed,application/geo+json,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/tiff,image/geotiff,application/geotiff",
+        "files": []
+      },
+      {
+        "accept": ".tif,.tiff,image/tiff,image/geotiff,application/geotiff",
+        "files": []
+      }
+    ],
+    "cookies": "",
+    "localStorageKeys": [],
+    "sessionStorageKeys": []
+  },
+  "assertions": [
+    {
+      "assertion": "real component DOM mounted",
+      "passed": true
+    },
+    {
+      "assertion": "browser File preserves name/type",
+      "passed": true
+    },
+    {
+      "assertion": "no cookies/localStorage/sessionStorage",
+      "passed": true
+    },
+    {
+      "assertion": "all resource entries loopback",
+      "passed": true
+    },
+    {
+      "assertion": "only raster mutation; never generic fallback",
+      "passed": true
+    },
+    {
+      "assertion": "short raster name a.tif valid >=2",
+      "passed": true
+    },
+    {
+      "assertion": "filename not renamed",
+      "passed": true
+    },
+    {
+      "assertion": "effective raster MIME image/tiff",
+      "passed": true
+    },
+    {
+      "assertion": "mock success captured (not real ingestion)",
+      "passed": true
+    },
+    {
+      "assertion": "success toast visible",
+      "passed": true
+    },
+    {
+      "assertion": "synthetic bytes passed as base64",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "screenshot": "10-panel-short-empty-mime.png",
+  "screenshotSha256": "7bc3c080d1a3023096ade5bd94182d5e01a1da5302853438e498ef8092e14d96"
+}

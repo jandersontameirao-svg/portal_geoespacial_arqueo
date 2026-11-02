@@ -1,0 +1,9 @@
+{
+  "exitCode": 0,
+  "temporaryRootRemoved": true,
+  "socketRemoved": true,
+  "temporaryOnly": true,
+  "productionStageTouched": false,
+  "sqlTransport": "Unix socket; skip-networking; mysqlx OFF",
+  "network": "private namespace, loopback only, no external route"
+}

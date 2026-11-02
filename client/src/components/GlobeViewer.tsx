@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Globe from "react-globe.gl";
 import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, FeatureGroup } from "react-leaflet";
-import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { Button } from "./ui/button";
 import { Globe as GlobeIcon, Map, Layers, ZoomIn, ZoomOut, Home, Maximize2, Save, Hand, Upload, Printer } from "lucide-react";
@@ -23,14 +22,8 @@ import { formatUTMCoordinates } from "@/lib/utmHelper";
 import GeometryImport from "./GeometryImport";
 import SavedMapsPanel from "./SavedMapsPanel";
 import MapPrintPreview from "./MapPrintPreview";
-
-// Fix Leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+import { DEFAULT_BASEMAP } from "@/lib/basemaps";
+import LeafletDrawControl from "./LeafletDrawControl";
 
 interface GlobeViewerProps {
   projectId?: number;
@@ -40,6 +33,12 @@ interface GlobeViewerProps {
     altitude: number;
   };
   onViewModeChange?: (mode: "2d" | "3d") => void;
+}
+
+function firstStoredPosition(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  if (typeof value[0] === "number" && typeof value[1] === "number") return [value[0], value[1]];
+  return firstStoredPosition(value[0]);
 }
 
 export default function GlobeViewer({ 
@@ -59,6 +58,7 @@ export default function GlobeViewer({
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
   const [isPanMode, setIsPanMode] = useState(false);
   const [mouseCoords, setMouseCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [drawFeatureGroup, setDrawFeatureGroup] = useState<L.FeatureGroup | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   
@@ -70,6 +70,9 @@ export default function GlobeViewer({
     { projectId: projectId! },
     { enabled: !!projectId }
   );
+  const drawOptions = useMemo<L.Control.DrawOptions>(() => ({
+    rectangle: false, circle: false, circlemarker: false, marker: {}, polyline: {}, polygon: {},
+  }), []);
   
   // Mutation para salvar geometria
   const createGeometryMutation = trpc.geometries.create.useMutation({
@@ -237,16 +240,17 @@ export default function GlobeViewer({
           {/* Capturar eventos do mouse */}
           <MapEventsHandler onMouseMove={(lat, lng) => setMouseCoords({ lat, lng })} />
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution={DEFAULT_BASEMAP.attribution}
+            url={DEFAULT_BASEMAP.url!}
           />
           {/* Ferramentas de Medição */}
           <MeasurementTools />
           
           {/* Ferramentas de Desenho */}
-          <FeatureGroup>
-            <EditControl
-              position="topleft"
+          <FeatureGroup ref={setDrawFeatureGroup}>
+            {drawFeatureGroup && <LeafletDrawControl
+              featureGroup={drawFeatureGroup}
+              draw={drawOptions}
               onCreated={(e: any) => {
                 const { layerType, layer } = e;
                 const shape = {
@@ -268,15 +272,7 @@ export default function GlobeViewer({
               onDeleted={(e: any) => {
                 console.log("Formas deletadas:", e);
               }}
-              draw={{
-                rectangle: false,
-                circle: false,
-                circlemarker: false,
-                marker: true,
-                polyline: true,
-                polygon: true
-              }}
-            />
+            />}
           </FeatureGroup>
 
           {/* Marcadores de Projetos */}
@@ -355,8 +351,9 @@ export default function GlobeViewer({
                   </Polyline>
                 );
               } else if (geometry.type === "polygon") {
-                const positions = coords.map((c: number[]) => [c[0], c[1]]);
-                const firstPoint = positions[0];
+                const positions = coords as L.LatLngExpression[][] | L.LatLngExpression[][][];
+                const firstPoint = firstStoredPosition(coords);
+                if (!firstPoint) return null;
                 const utmCoords = formatUTMCoordinates(firstPoint[0], firstPoint[1]);
                 return (
                   <Polygon

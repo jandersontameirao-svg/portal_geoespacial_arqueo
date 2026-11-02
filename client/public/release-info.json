@@ -1,0 +1,15 @@
+{
+  "releaseId": "geoportal-gis-f5-20261102-1916",
+  "application": "Portal Geoespacial Corporativo - Grupo Arqueo",
+  "targetDomain": "https://geoportal.manus.space",
+  "functionalSourceCommit": "97ff97bc0ba421cc851c1a9bac05b29e5ae12250",
+  "candidateEvidenceCommit": "deaaf16e23e077d6de2cce0dcb9f927a79381c52",
+  "expectedGisMigration": "0013_glamorous_betty_brant",
+  "preparedAt": "2026-11-02T19:16:00-03:00",
+  "acceptedLimitations": [
+    "Recovery of 11 legacy file/base-layer objects is deferred; their records are preserved.",
+    "End-to-end authenticated functional validation is deferred.",
+    "Raster/tiles/Atlas runtime and durable asset availability in deployment remain unverified and may be unavailable."
+  ],
+  "note": "This file identifies source content only. Its presence in source or sandbox is not proof of production publication."
+}

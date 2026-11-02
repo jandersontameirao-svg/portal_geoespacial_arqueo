@@ -1,0 +1,54 @@
+{
+  "releaseKind": "candidate-local-option-a",
+  "checkpointAtManifestGeneration": "5fa06ac2f2fd544c541fc3f02969b9fd551ee1b3",
+  "functionalValidationCommit": "5fa06ac2f2fd544c541fc3f02969b9fd551ee1b3",
+  "evidencePackageCommit": "fcbc5aa35805c8f1cb8f5a394a91bad0c5161a58",
+  "visualHarnessCommit": "544408a5e6c57a38960092e081ff5b3545459a93",
+  "baselineProductionCheckpoint": "04e64773d0c2a9b4cb25fa7f4d1015646fb11091",
+  "gisCoreCheckpoint": "9426d80c4e6b10e584b6c0d53fd6b0aeaba0c791",
+  "pr8Reference": "25f8936614e7148f67c8b14cb3c909c6d2b3fc99",
+  "scope": {
+    "productionChanged": false,
+    "homologationChanged": false,
+    "githubPushed": false,
+    "ddlAppliedOutsideSyntheticDatabase": false,
+    "realDataOrSecretsIncluded": false
+  },
+  "validation": {
+    "syntheticDatabase": "MySQL 8 local, isolated and destroyed after run",
+    "migrations": "0000-0013 passed on empty synthetic schema",
+    "tests": "31 files / 112 tests passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "offlineVisualHarness": "passed on localhost only; no OAuth/tRPC/database/storage/stage/production",
+    "tidb85Analysis": "static review completed; ENUM ALTER migrations 0008/0009 require disposable TiDB test"
+  },
+  "reconciledDecision": {
+    "ogcEndpoint": "Preserve VARCHAR(1000); unique SHA-256 endpointHash; no truncation",
+    "atenaPR8": "deferred to distinct reconciled phase; no module discarded",
+    "objects11": "none recovered, excluded, deleted, or formally dispensed"
+  },
+  "evidence": [
+    "docs/consolidation/PROGRESSO_OPCAO_A_SYNTHETIC_2026-11-02.md",
+    "docs/consolidation/OGC_ENDPOINT_UNIQUENESS_REVIEW.md",
+    "docs/consolidation/SQL_GIS_RECONCILIADO_0007_0013_OPCAO_A.md",
+    "docs/consolidation/evidence/synthetic-db-run-6/report.json",
+    "docs/consolidation/evidence/synthetic-db-run-6/vitest.log",
+    "docs/consolidation/evidence/synthetic-db-run-7-5fa/report.json",
+    "docs/consolidation/evidence/synthetic-db-run-7-5fa/vitest.log",
+    "docs/consolidation/PREFLIGHT_READONLY_SQL_REVIEW_2026-11-02.md",
+    "docs/consolidation/HARNESS_VISUAL_LOCAL_OFFLINE_2026-11-02.md",
+    "docs/consolidation/ANALISE_COMPATIBILIDADE_TIDB_8_5_3_GIS_0007_0013.md",
+    "docs/consolidation/PROPOSTA_HOMOLOGACAO_REAL_STAGE_EXISTENTE_2026-11-02.md",
+    "docs/consolidation/evidence/local-visual-harness/report.json",
+    "docs/consolidation/evidence/typecheck.log",
+    "docs/consolidation/evidence/build.log"
+  ],
+  "localOnlyPreservedButExcludedFromRelease": [
+    "synthetic-db-run-1",
+    "synthetic-db-run-2",
+    "synthetic-db-run-3",
+    "synthetic-db-run-4",
+    "synthetic-db-run-5"
+  ]
+}

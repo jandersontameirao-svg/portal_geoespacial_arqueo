@@ -6,17 +6,11 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Alert, AlertDescription } from "./ui/alert";
 import { MapContainer, TileLayer, Marker, Polyline, Polygon } from "react-leaflet";
-import L from "leaflet";
+import L, { type LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import JSZip from "jszip";
-
-// Fix Leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+import { collectCoordinatePositions, normalizeStoredPolygonCoordinates, swapCoordinateOrderTree, validateClosedPolygonCoordinates } from "../../../shared/geometry-coordinates";
+import { DEFAULT_BASEMAP } from "@/lib/basemaps";
 
 interface GeometryImportProps {
   projectId: number;
@@ -28,34 +22,18 @@ interface ParsedGeometry {
   type: "marker" | "polyline" | "polygon";
   name: string;
   description?: string;
-  coordinates: any;
+  coordinates: unknown;
   color?: string;
 }
 
 // Função auxiliar para calcular o centro das geometrias
 function calculateCenter(geometries: ParsedGeometry[]): [number, number] {
   if (geometries.length === 0) return [-15.7801, -47.9292]; // Brasília como padrão
-
-  let totalLat = 0;
-  let totalLng = 0;
-  let count = 0;
-
-  geometries.forEach((geom) => {
-    if (geom.type === "marker") {
-      totalLat += geom.coordinates[1];
-      totalLng += geom.coordinates[0];
-      count++;
-    } else if (geom.type === "polyline" || geom.type === "polygon") {
-      geom.coordinates.forEach((coord: any) => {
-        totalLat += coord[1];
-        totalLng += coord[0];
-        count++;
-      });
-    }
-  });
-
-  if (count === 0) return [-15.7801, -47.9292];
-  return [totalLat / count, totalLng / count];
+  const positions = geometries.flatMap(geometry => collectCoordinatePositions(geometry.coordinates));
+  if (positions.length === 0) return [-15.7801, -47.9292];
+  const totalLng = positions.reduce((sum, position) => sum + position[0], 0);
+  const totalLat = positions.reduce((sum, position) => sum + position[1], 0);
+  return [totalLat / positions.length, totalLng / positions.length];
 }
 
 export default function GeometryImport({ projectId, open, onOpenChange }: GeometryImportProps) {
@@ -150,51 +128,76 @@ export default function GeometryImport({ projectId, open, onOpenChange }: Geomet
       }
     } catch (err) {
       console.error("Erro ao processar arquivo:", err);
-      setError("Erro ao processar arquivo. Verifique o formato.");
+      const message = err instanceof Error ? err.message : "Erro ao processar arquivo. Verifique o formato.";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const parseGeoJSON = (text: string): ParsedGeometry[] => {
-    const geojson = JSON.parse(text);
+    const geojson = JSON.parse(text) as unknown;
     const geometries: ParsedGeometry[] = [];
 
-    const processFeature = (feature: any, index: number) => {
+    const processFeature = (value: unknown, index: number) => {
+      if (typeof value !== "object" || value === null) throw new Error(`Feature ${index + 1} inválida.`);
+      const feature = value as { geometry?: { type?: unknown; coordinates?: unknown }; properties?: Record<string, unknown> };
       const geometry = feature.geometry;
-      const properties = feature.properties || {};
+      if (!geometry || typeof geometry.type !== "string" || geometry.coordinates === undefined) {
+        throw new Error(`Geometria ausente na feature ${index + 1}.`);
+      }
+      const properties = feature.properties ?? {};
+      const name = typeof properties.name === "string" ? properties.name : `Geometria ${index + 1}`;
+      const description = typeof properties.description === "string" ? properties.description : "";
+      const color = typeof properties.stroke === "string" ? properties.stroke : "#3b82f6";
+      const positions = collectCoordinatePositions(geometry.coordinates);
 
       if (geometry.type === "Point") {
+        if (!Array.isArray(geometry.coordinates) || geometry.coordinates.length < 2 || positions.length !== 1) {
+          throw new Error(`Ponto inválido na feature ${index + 1}.`);
+        }
         geometries.push({
           type: "marker",
-          name: properties.name || `Ponto ${index + 1}`,
-          description: properties.description || "",
+          name,
+          description,
           coordinates: geometry.coordinates,
-          color: properties.stroke || "#3b82f6",
+          color,
         });
       } else if (geometry.type === "LineString") {
+        if (!Array.isArray(geometry.coordinates) || geometry.coordinates.length < 2 || positions.length < 2) {
+          throw new Error(`Linha inválida na feature ${index + 1}.`);
+        }
         geometries.push({
           type: "polyline",
-          name: properties.name || `Linha ${index + 1}`,
-          description: properties.description || "",
+          name,
+          description,
           coordinates: geometry.coordinates,
-          color: properties.stroke || "#3b82f6",
+          color,
         });
-      } else if (geometry.type === "Polygon") {
+      } else if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
+        const storedShape = validateClosedPolygonCoordinates(swapCoordinateOrderTree(geometry.coordinates));
+        if (storedShape.type !== geometry.type) throw new Error(`Estrutura ${geometry.type} incompatível na feature ${index + 1}.`);
         geometries.push({
           type: "polygon",
-          name: properties.name || `Polígono ${index + 1}`,
-          description: properties.description || "",
-          coordinates: geometry.coordinates[0], // Primeiro anel
-          color: properties.stroke || "#3b82f6",
+          name,
+          description,
+          coordinates: geometry.coordinates,
+          color,
         });
+      } else {
+        throw new Error(`Tipo GeoJSON não suportado na feature ${index + 1}: ${geometry.type}.`);
       }
     };
 
-    if (geojson.type === "FeatureCollection") {
-      geojson.features.forEach(processFeature);
-    } else if (geojson.type === "Feature") {
+    if (typeof geojson !== "object" || geojson === null) throw new Error("Documento GeoJSON inválido.");
+    const document = geojson as { type?: unknown; features?: unknown };
+    if (document.type === "FeatureCollection" && Array.isArray(document.features)) {
+      document.features.forEach(processFeature);
+    } else if (document.type === "Feature") {
       processFeature(geojson, 0);
+    } else {
+      throw new Error("O arquivo precisa conter uma Feature ou FeatureCollection GeoJSON.");
     }
 
     return geometries;
@@ -263,27 +266,36 @@ export default function GeometryImport({ projectId, open, onOpenChange }: Geomet
         }
       }
 
-      // Polygon
-      const polygon = placemark.getElementsByTagName("Polygon")[0];
-      if (polygon) {
-        const outerBoundary = polygon.getElementsByTagName("outerBoundaryIs")[0];
-        if (outerBoundary) {
-          const coords = outerBoundary.getElementsByTagName("coordinates")[0]?.textContent?.trim();
-          if (coords) {
-            const points = coords.split(/\s+/).map((coord) => {
-              const [lng, lat] = coord.split(",").map(parseFloat);
-              return [lng, lat];
-            });
-            geometries.push({
-              type: "polygon",
-              name,
-              description,
-              coordinates: points,
-              color,
-            });
-          }
-        }
-      }
+      // Polygon/MultiGeometry: cada parte conserva o anel exterior e todos os interiores.
+      const polygons = Array.from(placemark.getElementsByTagName("Polygon"));
+      const parseRing = (boundary: Element, label: string): number[][] => {
+        const coordinates = boundary.getElementsByTagName("coordinates")[0]?.textContent?.trim();
+        if (!coordinates) throw new Error(`${label}: anel sem coordenadas.`);
+        const points = coordinates.split(/\s+/).map((coordinate) => {
+          const [lngText, latText] = coordinate.split(",");
+          const lng = Number(lngText), lat = Number(latText);
+          if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw new Error(`${label}: coordenada inválida.`);
+          return [lng, lat];
+        });
+        if (points.length < 4) throw new Error(`${label}: anel com menos de quatro posições.`);
+        validateClosedPolygonCoordinates([points], "geojson-lng-lat");
+        return points;
+      };
+      polygons.forEach((polygonElement, polygonIndex) => {
+        const outerBoundary = polygonElement.getElementsByTagName("outerBoundaryIs")[0];
+        if (!outerBoundary) throw new Error(`${name}: polígono sem anel exterior.`);
+        const rings = [parseRing(outerBoundary, name)];
+        const innerBoundaries = Array.from(polygonElement.getElementsByTagName("innerBoundaryIs"));
+        innerBoundaries.forEach((boundary, holeIndex) => rings.push(parseRing(boundary, `${name}, furo ${holeIndex + 1}`)));
+        validateClosedPolygonCoordinates(rings, "geojson-lng-lat");
+        geometries.push({
+          type: "polygon",
+          name: polygons.length > 1 ? `${name} (parte ${polygonIndex + 1})` : name,
+          description,
+          coordinates: rings,
+          color,
+        });
+      });
     }
 
     return geometries;
@@ -294,17 +306,22 @@ export default function GeometryImport({ projectId, open, onOpenChange }: Geomet
       toast.error("Nenhuma geometria para importar");
       return;
     }
-
-    importBatchMutation.mutate({
-      projectId,
-      geometries: parsedGeometries.map((g) => ({
-        type: g.type,
-        name: g.name,
-        description: g.description || "",
-        coordinates: JSON.stringify(g.coordinates),
-        color: g.color || "#3b82f6",
-      })),
-    });
+    try {
+      importBatchMutation.mutate({
+        projectId,
+        geometries: parsedGeometries.map((g) => ({
+          type: g.type,
+          name: g.name,
+          description: g.description || "",
+          coordinates: JSON.stringify(swapCoordinateOrderTree(g.coordinates)),
+          color: g.color || "#3b82f6",
+        })),
+      });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Coordenadas inválidas.";
+      setError(message);
+      toast.error(message);
+    }
   };
 
   const handleClose = () => {
@@ -379,30 +396,37 @@ export default function GeometryImport({ projectId, open, onOpenChange }: Geomet
                   scrollWheelZoom={false}
                 >
                   <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution={DEFAULT_BASEMAP.attribution}
+                    url={DEFAULT_BASEMAP.url!}
                   />
                   {parsedGeometries.map((geom, index) => {
                     if (geom.type === "marker") {
+                      const coordinates = swapCoordinateOrderTree(geom.coordinates);
+                      if (!Array.isArray(coordinates) || typeof coordinates[0] !== "number" || typeof coordinates[1] !== "number") {
+                        throw new Error("Coordenada do marcador inválida para visualização.");
+                      }
+                      const position: LatLngExpression = [coordinates[0], coordinates[1]];
                       return (
                         <Marker
                           key={index}
-                          position={[geom.coordinates[1], geom.coordinates[0]]}
+                          position={position}
                         />
                       );
                     } else if (geom.type === "polyline") {
+                      const positions = swapCoordinateOrderTree(geom.coordinates) as LatLngExpression[];
                       return (
                         <Polyline
                           key={index}
-                          positions={geom.coordinates.map((c: any) => [c[1], c[0]])}
+                          positions={positions}
                           color={geom.color}
                         />
                       );
                     } else if (geom.type === "polygon") {
+                      const stored = normalizeStoredPolygonCoordinates(swapCoordinateOrderTree(geom.coordinates));
                       return (
                         <Polygon
                           key={index}
-                          positions={geom.coordinates.map((c: any) => [c[1], c[0]])}
+                          positions={stored.coordinates as LatLngExpression[][] | LatLngExpression[][][]}
                           color={geom.color}
                           fillColor={geom.color}
                           fillOpacity={0.2}

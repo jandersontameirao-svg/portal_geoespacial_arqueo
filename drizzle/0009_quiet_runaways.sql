@@ -1,0 +1,1 @@
+ALTER TABLE `files` MODIFY COLUMN `fileType` enum('kml','kmz','shp','geojson','geotiff','pdf','docx','xlsx','image','other') NOT NULL;

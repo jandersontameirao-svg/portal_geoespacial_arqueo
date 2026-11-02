@@ -9,7 +9,9 @@ import {
   Trash2, 
   Eye, 
   MapPin,
-  FileArchive 
+  FileArchive,
+  History,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -20,6 +22,26 @@ import MapViewer from "@/components/MapViewer";
 interface FileListProps {
   projectId: number;
   canEdit?: boolean;
+}
+
+function FileVersionHistory({ fileId, currentVersion }: { fileId: number; currentVersion: number }) {
+  const { data: versions, isLoading } = trpc.files.versions.useQuery({ fileId });
+  const downloadVersion = trpc.files.downloadVersion.useMutation({
+    onSuccess: (data) => {
+      window.open(data.url, "_blank");
+      toast.success(`Download da versão iniciado${data.sha256 ? " com hash registrado" : ""}`);
+    },
+    onError: (error) => toast.error(error.message || "Não foi possível baixar a versão"),
+  });
+
+  return (
+    <details className="mt-3 rounded border border-dashed p-2 text-xs">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300"><History className="h-3.5 w-3.5" />Histórico de versões · atual v{currentVersion}</summary>
+      <div className="mt-2 space-y-2">
+        {isLoading ? <span className="text-muted-foreground">Carregando versões...</span> : !versions?.length ? <span className="text-muted-foreground">Sem versão registrada. Arquivos antigos permanecem preservados, mas precisam de migração de inventário.</span> : versions.map((version) => <div key={version.id} className="flex items-center justify-between gap-2 rounded bg-muted/40 p-2"><span className="min-w-0"><span className="flex items-center gap-1 font-medium"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />v{version.version}</span><span className="block truncate text-[11px] text-muted-foreground" title={version.sha256 || undefined}>{version.sha256 ? `SHA-256 ${version.sha256.slice(0, 12)}…` : "Checksum histórico indisponível"}</span></span><Button size="sm" variant="ghost" className="h-7 px-2" disabled={downloadVersion.isPending} onClick={() => downloadVersion.mutate({ fileId, version: version.version })}>Baixar</Button></div>)}
+      </div>
+    </details>
+  );
 }
 
 export default function FileList({ projectId, canEdit = false }: FileListProps) {
@@ -147,6 +169,7 @@ export default function FileList({ projectId, canEdit = false }: FileListProps) 
                       Geoespacial
                     </span>
                   )}
+                  <span className="inline-block px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded">v{file.currentVersion}</span>
                 </div>
               </div>
             </div>
@@ -186,6 +209,7 @@ export default function FileList({ projectId, canEdit = false }: FileListProps) 
                 </Button>
               )}
             </div>
+            <FileVersionHistory fileId={file.id} currentVersion={file.currentVersion} />
           </CardContent>
         </Card>
       ))}

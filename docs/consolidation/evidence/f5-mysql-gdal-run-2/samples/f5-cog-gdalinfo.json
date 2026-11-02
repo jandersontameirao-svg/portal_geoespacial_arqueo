@@ -1,0 +1,304 @@
+{
+  "description": "/tmp/atena-f5.isHfqE/raster-volume/projects/101/rasters/1/source.cog.tif",
+  "driverShortName": "GTiff",
+  "driverLongName": "GeoTIFF",
+  "files": [
+    "/tmp/atena-f5.isHfqE/raster-volume/projects/101/rasters/1/source.cog.tif"
+  ],
+  "size": [
+    2048,
+    2048
+  ],
+  "coordinateSystem": {
+    "wkt": "GEOGCRS[\"SIRGAS 2000\",\n    DATUM[\"Sistema de Referencia Geocentrico para las AmericaS 2000\",\n        ELLIPSOID[\"GRS 1980\",6378137,298.257222101004,\n            LENGTHUNIT[\"metre\",1]]],\n    PRIMEM[\"Greenwich\",0,\n        ANGLEUNIT[\"degree\",0.0174532925199433]],\n    CS[ellipsoidal,2],\n        AXIS[\"geodetic latitude (Lat)\",north,\n            ORDER[1],\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n        AXIS[\"geodetic longitude (Lon)\",east,\n            ORDER[2],\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n    ID[\"EPSG\",4674]]",
+    "dataAxisToSRSAxisMapping": [
+      2,
+      1
+    ]
+  },
+  "geoTransform": [
+    -48.1,
+    0.00012,
+    0,
+    -15.6,
+    0,
+    -0.00012
+  ],
+  "metadata": {
+    "": {
+      "AREA_OR_POINT": "Area",
+      "TIFFTAG_IMAGEDESCRIPTION": "Cena sintética Grupo Arqueo: before"
+    },
+    "IMAGE_STRUCTURE": {
+      "COMPRESSION": "DEFLATE",
+      "INTERLEAVE": "PIXEL",
+      "LAYOUT": "COG",
+      "PREDICTOR": "2"
+    }
+  },
+  "cornerCoordinates": {
+    "upperLeft": [
+      -48.1,
+      -15.6
+    ],
+    "lowerLeft": [
+      -48.1,
+      -15.84576
+    ],
+    "lowerRight": [
+      -47.85424,
+      -15.84576
+    ],
+    "upperRight": [
+      -47.85424,
+      -15.6
+    ],
+    "center": [
+      -47.97712,
+      -15.72288
+    ]
+  },
+  "wgs84Extent": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          -48.1,
+          -15.6
+        ],
+        [
+          -48.1,
+          -15.84576
+        ],
+        [
+          -47.85424,
+          -15.84576
+        ],
+        [
+          -47.85424,
+          -15.6
+        ],
+        [
+          -48.1,
+          -15.6
+        ]
+      ]
+    ]
+  },
+  "bands": [
+    {
+      "band": 1,
+      "block": [
+        512,
+        512
+      ],
+      "type": "Byte",
+      "colorInterpretation": "Red",
+      "min": 35,
+      "max": 214,
+      "minimum": 35,
+      "maximum": 214,
+      "mean": 123.971,
+      "stdDev": 51.204,
+      "noDataValue": 0,
+      "overviews": [
+        {
+          "size": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "size": [
+            512,
+            512
+          ]
+        }
+      ],
+      "metadata": {
+        "": {
+          "STATISTICS_MAXIMUM": "214",
+          "STATISTICS_MEAN": "123.97072164",
+          "STATISTICS_MINIMUM": "35",
+          "STATISTICS_STDDEV": "51.20446393086",
+          "STATISTICS_VALID_PERCENT": "97.49"
+        }
+      }
+    },
+    {
+      "band": 2,
+      "block": [
+        512,
+        512
+      ],
+      "type": "Byte",
+      "colorInterpretation": "Green",
+      "min": 45,
+      "max": 194,
+      "minimum": 45,
+      "maximum": 194,
+      "mean": 121.106,
+      "stdDev": 42.6,
+      "noDataValue": 0,
+      "overviews": [
+        {
+          "size": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "size": [
+            512,
+            512
+          ]
+        }
+      ],
+      "metadata": {
+        "": {
+          "STATISTICS_MAXIMUM": "194",
+          "STATISTICS_MEAN": "121.10625177761",
+          "STATISTICS_MINIMUM": "45",
+          "STATISTICS_STDDEV": "42.599737339252",
+          "STATISTICS_VALID_PERCENT": "97.49"
+        }
+      }
+    },
+    {
+      "band": 3,
+      "block": [
+        512,
+        512
+      ],
+      "type": "Byte",
+      "colorInterpretation": "Blue",
+      "min": 55,
+      "max": 184,
+      "minimum": 55,
+      "maximum": 184,
+      "mean": 120.005,
+      "stdDev": 26.358,
+      "noDataValue": 0,
+      "overviews": [
+        {
+          "size": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "size": [
+            512,
+            512
+          ]
+        }
+      ],
+      "metadata": {
+        "": {
+          "STATISTICS_MAXIMUM": "184",
+          "STATISTICS_MEAN": "120.00462893559",
+          "STATISTICS_MINIMUM": "55",
+          "STATISTICS_STDDEV": "26.35814692179",
+          "STATISTICS_VALID_PERCENT": "97.49"
+        }
+      }
+    }
+  ],
+  "stac": {
+    "proj:shape": [
+      2048,
+      2048
+    ],
+    "proj:wkt2": "GEOGCRS[\"SIRGAS 2000\",\n    DATUM[\"Sistema de Referencia Geocentrico para las AmericaS 2000\",\n        ELLIPSOID[\"GRS 1980\",6378137,298.257222101004,\n            LENGTHUNIT[\"metre\",1]]],\n    PRIMEM[\"Greenwich\",0,\n        ANGLEUNIT[\"degree\",0.0174532925199433]],\n    CS[ellipsoidal,2],\n        AXIS[\"geodetic latitude (Lat)\",north,\n            ORDER[1],\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n        AXIS[\"geodetic longitude (Lon)\",east,\n            ORDER[2],\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n    ID[\"EPSG\",4674]]",
+    "proj:epsg": 4674,
+    "proj:projjson": {
+      "$schema": "https://proj.org/schemas/v0.7/projjson.schema.json",
+      "type": "GeographicCRS",
+      "name": "SIRGAS 2000",
+      "datum": {
+        "type": "GeodeticReferenceFrame",
+        "name": "Sistema de Referencia Geocentrico para las AmericaS 2000",
+        "ellipsoid": {
+          "name": "GRS 1980",
+          "semi_major_axis": 6378137,
+          "inverse_flattening": 298.257222101004
+        }
+      },
+      "coordinate_system": {
+        "subtype": "ellipsoidal",
+        "axis": [
+          {
+            "name": "Geodetic latitude",
+            "abbreviation": "Lat",
+            "direction": "north",
+            "unit": "degree"
+          },
+          {
+            "name": "Geodetic longitude",
+            "abbreviation": "Lon",
+            "direction": "east",
+            "unit": "degree"
+          }
+        ]
+      },
+      "id": {
+        "authority": "EPSG",
+        "code": 4674
+      }
+    },
+    "proj:transform": [
+      -48.1,
+      0.00012,
+      0,
+      -15.6,
+      0,
+      -0.00012
+    ],
+    "raster:bands": [
+      {
+        "data_type": "uint8",
+        "stats": {
+          "minimum": 35,
+          "maximum": 214,
+          "mean": 123.971,
+          "stddev": 51.204
+        },
+        "nodata": 0
+      },
+      {
+        "data_type": "uint8",
+        "stats": {
+          "minimum": 45,
+          "maximum": 194,
+          "mean": 121.106,
+          "stddev": 42.6
+        },
+        "nodata": 0
+      },
+      {
+        "data_type": "uint8",
+        "stats": {
+          "minimum": 55,
+          "maximum": 184,
+          "mean": 120.005,
+          "stddev": 26.358
+        },
+        "nodata": 0
+      }
+    ],
+    "eo:bands": [
+      {
+        "name": "b1",
+        "description": "Red"
+      },
+      {
+        "name": "b2",
+        "description": "Green"
+      },
+      {
+        "name": "b3",
+        "description": "Blue"
+      }
+    ]
+  }
+}

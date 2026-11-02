@@ -1,0 +1,15 @@
+{
+  "firstAttempt": "readiness-timeout-during-component-download",
+  "sqlOnFirstTimedAttempt": "not-run",
+  "reusedSameInstanceAfterDownload": true,
+  "initialStatusHost": "0.0.0.0",
+  "initialStatusPort": 10080,
+  "initialSqlHost": "127.0.0.1",
+  "statusBindCorrectedBeforeSqlValidation": true,
+  "finalSqlAndStatusHosts": "127.0.0.1",
+  "browserPreviewOpened": false,
+  "externalHttpTestPerformed": false,
+  "cleanup": "completed",
+  "temporaryDirectoriesRemoved": true,
+  "remainingTemporaryProcesses": []
+}

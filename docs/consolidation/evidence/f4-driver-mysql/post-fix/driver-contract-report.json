@@ -1,0 +1,171 @@
+{
+  "scope": "private-network-namespace-unix-socket-synthetic-only",
+  "mockedDriver": false,
+  "engine": "8.0.46-0ubuntu0.24.04.4",
+  "timestampRepresentation": "Drizzle raw typeCast SQL string -> JSON preserves string -> SQL restore -> same Drizzle string",
+  "blobs": "generic synthetic fixture bytes; no assertion of valid GeoTIFF/COG",
+  "driverTuple": {
+    "elements": 2,
+    "realRows": 3,
+    "fieldPackets": 18,
+    "legacyReportedRows": 2,
+    "legacyFirstEntryIsArray": true,
+    "timestampIsSqlString": true,
+    "enumIsLabel": true,
+    "jsonIsObject": true
+  },
+  "export": {
+    "tables": [
+      {
+        "name": "users",
+        "primaryKey": "id",
+        "rowCount": 3,
+        "sha256": "35fca2b4b3dd2e491577a5a4c0ec93b6bd6549bd4647bf11a0f02a1183d8a6d9"
+      },
+      {
+        "name": "invitations",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "projects",
+        "primaryKey": "id",
+        "rowCount": 2,
+        "sha256": "651f72b8a93b91b52c68ac7bc4969b8f1a75b5c8c8a5cb6e6861219d6bf52ba6"
+      },
+      {
+        "name": "project_members",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "styles",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "files",
+        "primaryKey": "id",
+        "rowCount": 3,
+        "sha256": "d75187486b9217714e2be06935e26873fbc18bfc3cd7019307d25b592648eab4"
+      },
+      {
+        "name": "file_versions",
+        "primaryKey": "id",
+        "rowCount": 1,
+        "sha256": "f5e30a65ac7b2ea187e27831a076cca7e57993fcec375720fc550dc678626045"
+      },
+      {
+        "name": "base_layers",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "ogc_services",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "ogc_catalog_variants",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "layers",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "geometries",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "saved_maps",
+        "primaryKey": "id",
+        "rowCount": 1,
+        "sha256": "252386e391773b949ff4366148c722941f3195f08d608053f4d1b5adca7c965d"
+      },
+      {
+        "name": "print_jobs",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "atlas_templates",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "atlas_jobs",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "backup_policies",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "backup_inventories",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "gis_uploads",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "notifications",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "name": "audit_logs",
+        "primaryKey": "id",
+        "rowCount": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    ],
+    "totalRecords": 10,
+    "payloadSha256": "0142582592ab09b6212ce78fb5a33214c252ae69fbcda6ec4f90145baee86aca",
+    "artifactSha256": "78d8ed0afb089b00347f8137d50d5069755a0334790fa86eeb4195686dd82b53",
+    "driverFieldsIncluded": false,
+    "emptyTablesCorrect": true,
+    "typesPreserved": [
+      "integer",
+      "enum-label",
+      "JSON-object",
+      "NULL",
+      "DECIMAL-string",
+      "timestamp-SQL-string-by-Drizzle"
+    ]
+  },
+  "restore": {
+    "memoryRoundtrip": true,
+    "sqlDestination": "geoportal_f4_restore (same private Unix socket, different schema)",
+    "perTableHashesMatch": true,
+    "payloadSha256": "0142582592ab09b6212ce78fb5a33214c252ae69fbcda6ec4f90145baee86aca",
+    "restoredObjects": 3,
+    "allObjectHashesMatch": true,
+    "timestampIsSameSqlStringAfterSQL": true,
+    "driverFieldsIncluded": false,
+    "routerVerifyRestore": true
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "scope": "local-disposable-synthetic-only",
+  "sourceCommit": "7974a5ed5da6395757970ff4a10aa802df2e72ee",
+  "migrationStatus": "passed",
+  "testStatus": "passed",
+  "database": "geoportal_synthetic",
+  "mysql": "MySQL local socket/TCP loopback temporary",
+  "fixtures": "infra/synthetic/seed_minimal.sql",
+  "productionTouched": false,
+  "homologationTouched": false,
+  "storageRemoteTouched": false,
+  "rawDataIncluded": false
+}

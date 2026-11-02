@@ -21,6 +21,7 @@ import BaseLayersViewer from "./pages/BaseLayersViewer";
 import GisUploads from "./pages/GisUploads";
 import WMSDemo from "./pages/WMSDemo";
 import GISDiagnostics from "./pages/GISDiagnostics";
+import OgcCatalog from "./pages/OgcCatalog";
 import { GuidedTour } from "./components/GuidedTour";
 
 function Router() {
@@ -39,6 +40,7 @@ function Router() {
         <Route path="/atlas" component={Atlas} />
         <Route path="/files" component={Files} />
         <Route path="/admin/backups" component={Backups} />
+        <Route path="/admin/ogc-catalog" component={OgcCatalog} />
         <Route path="/base-layers" component={BaseLayers} />
         <Route path="/base-layers/viewer" component={BaseLayersViewer} />
         <Route path="/gis-uploads" component={GisUploads} />

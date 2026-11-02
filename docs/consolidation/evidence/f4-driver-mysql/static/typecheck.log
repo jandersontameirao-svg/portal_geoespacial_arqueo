@@ -1,0 +1,4 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.patchedDependencies", "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> portal_geoespacial_arqueo@1.0.0 check /home/ubuntu/atena_geoportal_f4_isolado
+> tsc --noEmit

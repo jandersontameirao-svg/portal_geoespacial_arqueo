@@ -21,6 +21,10 @@ import {
   InsertPrintJob,
   atlasJobs,
   InsertAtlasJob,
+  backupPolicies,
+  InsertBackupPolicy,
+  backupInventories,
+  InsertBackupInventory,
   auditLogs,
   InsertAuditLog,
   geometries,
@@ -29,6 +33,8 @@ import {
   InsertGisUpload
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { getFileTypesForCategory } from "../shared/fileTypeCategories";
+import { buildInitialFileVersion } from "./fileVersioning";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -321,6 +327,59 @@ export async function createFile(file: InsertFile) {
   await db.insert(files).values(file);
 }
 
+export async function createFileAndGetId(file: InsertFile): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [result] = await db.insert(files).values(file).$returningId();
+  return result.id;
+}
+
+/**
+ * Raster v1 refers to the scanned original, not the derived COG. File and version
+ * must commit together before a layer/worker is started. The external storage
+ * write happens earlier and is NOT part of this SQL transaction.
+ */
+export async function createRasterFileWithInitialVersion(file: InsertFile, sha256: string) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database.transaction(async (tx) => {
+    const [inserted] = await tx.insert(files).values({ ...file, currentVersion: 1 }).$returningId();
+    if (!inserted?.id) throw new Error("Arquivo GeoTIFF não foi registrado");
+    const [created] = await tx.select().from(files).where(eq(files.id, inserted.id)).limit(1);
+    if (!created) throw new Error("Arquivo GeoTIFF não foi registrado");
+    const [version] = await tx.insert(fileVersions).values(buildInitialFileVersion({
+      fileId: created.id,
+      s3Key: created.s3Key,
+      s3Url: created.s3Url,
+      fileSize: created.fileSize,
+      mimeType: created.mimeType,
+      sha256,
+      uploadedBy: created.uploadedBy,
+      originalName: created.originalName,
+      fileType: created.fileType,
+      source: "raster-ingestion",
+    })).$returningId();
+    if (!version?.id) throw new Error("Versão inicial do GeoTIFF não foi registrada");
+    return { file: created, versionId: version.id };
+  });
+}
+
+export async function createFileVersion(version: InsertFileVersion): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(fileVersions).values(version).$returningId();
+  return result.id;
+}
+
+export async function getFileVersions(fileId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(fileVersions)
+    .where(eq(fileVersions.fileId, fileId))
+    .orderBy(desc(fileVersions.version));
+}
+
 export async function getFileById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -359,13 +418,7 @@ export async function getAllFilesForUser(
 
   // Filtro por categoria
   if (category) {
-    const categoryMap: Record<string, string[]> = {
-      geospatial: ["kml", "kmz", "shp"],
-      document: ["pdf", "docx", "xlsx"],
-      image: ["image"],
-      other: ["other"],
-    };
-    const types = categoryMap[category] || [];
+    const types = getFileTypesForCategory(category);
     if (types.length > 0) {
       conditions.push(sql`${files.fileType} IN (${sql.join(types.map(t => sql`${t}`), sql`, `)})`);
     }
@@ -422,14 +475,12 @@ export async function softDeleteFile(id: number) {
 // ============================================================================
 // CAMADAS
 // ============================================================================
-
 export async function createLayer(layer: InsertLayer) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-
-  await db.insert(layers).values(layer);
+  const [result] = await db.insert(layers).values(layer).$returningId();
+  return result.id;
 }
-
 export async function getLayersByProject(projectId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -438,6 +489,22 @@ export async function getLayersByProject(projectId: number) {
     .orderBy(desc(layers.createdAt));
 }
 
+export async function getLayerById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(layers).where(eq(layers.id, id)).limit(1);
+  return result[0];
+}
+export async function updateLayer(id: number, data: Partial<InsertLayer>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(layers).set(data).where(eq(layers.id, id));
+}
+export async function deleteLayer(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(layers).where(eq(layers.id, id));
+}
 export async function updateFile(id: number, data: Partial<InsertFile>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -559,6 +626,48 @@ export async function updateAtlasJobStatus(
 }
 
 // ============================================================================
+// INVENTÁRIO DE BACKUPS RECUPERÁVEIS
+// ============================================================================
+
+export async function getBackupPolicy() {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(backupPolicies).where(eq(backupPolicies.id, 1)).limit(1);
+  return rows[0];
+}
+
+export async function upsertBackupPolicy(policy: Omit<InsertBackupPolicy, "id">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(backupPolicies).values({ id: 1, ...policy }).onDuplicateKeyUpdate({ set: { ...policy, updatedAt: new Date() } });
+}
+
+export async function createBackupInventory(inventory: InsertBackupInventory): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(backupInventories).values(inventory).$returningId();
+  return result.id;
+}
+
+export async function listBackupInventories(limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(backupInventories).orderBy(desc(backupInventories.createdAt)).limit(limit);
+}
+
+export async function listExpiredBackupInventories(now = new Date()) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(backupInventories).where(and(eq(backupInventories.status, "complete"), sql`${backupInventories.expiresAt} <= ${now}`));
+}
+
+export async function updateBackupInventoryStatus(id: number, status: "complete" | "incomplete" | "expired" | "purged", restoreVerifiedAt?: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(backupInventories).set({ status, ...(restoreVerifiedAt ? { restoreVerifiedAt } : {}) }).where(eq(backupInventories.id, id));
+}
+
+// ============================================================================
 // LOGS DE AUDITORIA
 // ============================================================================
 
@@ -649,6 +758,16 @@ export async function updateGeometryOpacity(id: number, opacity: number) {
   if (!db) throw new Error("Database not available");
   
   await db.update(geometries).set({ opacity }).where(eq(geometries.id, id));
+}
+
+export async function updateGeometry(
+  id: number,
+  data: Partial<Pick<InsertGeometry, "type" | "name" | "description" | "coordinates" | "color">>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(geometries).set(data).where(eq(geometries.id, id));
 }
 
 export async function getGeometryById(id: number) {

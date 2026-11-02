@@ -13,6 +13,9 @@ import { infrastructureRouter } from "./infrastructureRouter";
 import { baseLayersRouter } from "./baseLayersRouter";
 import { gisUploadsRouter } from "./gisUploadsRouter";
 import { gisDiagnosticsRouter } from "./gisDiagnosticsRouter";
+import { gisAnalysisRouter } from "./gisAnalysisRouter";
+import { ogcCatalogRouter } from "./ogcCatalogRouter";
+import { rasterRouter } from "./rasterRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -21,6 +24,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import * as db from "./db";
 import { createAuditLog } from "./db";
+import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
 
 // ============================================================================
 // HELPER: Admin Procedure
@@ -450,6 +454,7 @@ const projectsRouter = router({
           message: "Projeto não encontrado",
         });
       }
+      await requireProjectEditor(input.projectId, ctx.user);
 
       await db.addProjectMember({
         projectId: input.projectId,
@@ -498,6 +503,7 @@ const projectsRouter = router({
       userId: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireProjectEditor(input.projectId, ctx.user);
       await db.removeProjectMember(input.projectId, input.userId);
 
       await logAudit(
@@ -519,6 +525,7 @@ const projectsRouter = router({
   listMembers: protectedProcedure
     .input(z.object({ projectId: z.number() }))
     .query(async ({ ctx, input }) => {
+      await requireProjectAccess(input.projectId, ctx.user);
       return await db.getProjectMembers(input.projectId);
     }),
 
@@ -526,6 +533,7 @@ const projectsRouter = router({
   getActivities: protectedProcedure
     .input(z.object({ projectId: z.number() }))
     .query(async ({ ctx, input }) => {
+      await requireProjectAccess(input.projectId, ctx.user);
       return await db.getProjectAuditLogs(input.projectId);
     }),
 });
@@ -632,6 +640,9 @@ export const appRouter = router({
   baseLayers: baseLayersRouter,
   gisUploads: gisUploadsRouter,
   gisDiagnostics: gisDiagnosticsRouter,
+  gisAnalysis: gisAnalysisRouter,
+  ogcCatalog: ogcCatalogRouter,
+  raster: rasterRouter,
 });
 
 export type AppRouter = typeof appRouter;

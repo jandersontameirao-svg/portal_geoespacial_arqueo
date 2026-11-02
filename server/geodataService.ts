@@ -10,6 +10,8 @@ import { storagePut } from "./storage";
 import fetch from "node-fetch";
 import AdmZip from "adm-zip";
 import { randomBytes } from "crypto";
+import shp from "shpjs";
+import bbox from "@turf/bbox";
 
 // ============================================================================
 // TIPOS
@@ -43,6 +45,34 @@ export interface GeoJSONFeatureCollection {
     };
   };
   bbox?: [number, number, number, number];
+}
+
+/**
+ * Um ZIP pode conter uma coleção única ou múltiplas camadas. O visualizador
+ * recebe sempre uma FeatureCollection GeoJSON única e nunca o ZIP binário.
+ */
+export function normalizeShapefileResult(result: unknown): GeoJSONFeatureCollection {
+  const collections = Array.isArray(result) ? result : [result];
+  const features = collections.flatMap((collection: any) => {
+    if (collection?.type !== "FeatureCollection" || !Array.isArray(collection.features)) {
+      return [];
+    }
+    return collection.features;
+  });
+
+  if (features.length === 0) {
+    throw new Error("O Shapefile não contém feições GeoJSON legíveis");
+  }
+
+  return { type: "FeatureCollection", features };
+}
+
+export async function convertShapefileZipToGeoJSON(zipBuffer: Buffer): Promise<GeoJSONFeatureCollection> {
+  const bytes = zipBuffer.buffer.slice(
+    zipBuffer.byteOffset,
+    zipBuffer.byteOffset + zipBuffer.byteLength,
+  ) as ArrayBuffer;
+  return normalizeShapefileResult(await shp(bytes));
 }
 
 // ============================================================================
@@ -190,14 +220,19 @@ export async function downloadTerrasQuilombolas(): Promise<DownloadResult> {
       }
     }
 
-    // Salvar ZIP completo no S3
+    // Converter antes de armazenar: o visualizador trabalha com GeoJSON e não
+    // pode interpretar um ZIP binário como JSON.
+    const geojson = await convertShapefileZipToGeoJSON(buffer);
+    const [west, south, east, north] = bbox(geojson as any);
+
+    // A proveniência continua sendo o URL oficial de download declarado acima.
     const suffix = randomBytes(4).toString("hex");
-    const s3Key = `base-layers/incra/quilombos_${suffix}.zip`;
+    const s3Key = `base-layers/incra/quilombos_${suffix}.geojson`;
     
     const { url: s3Url } = await storagePut(
       s3Key,
-      buffer,
-      "application/zip"
+      JSON.stringify(geojson),
+      "application/geo+json"
     );
 
     console.log(`[INCRA] ✓ Terras quilombolas baixadas (${featureCount || "?"} features)`);
@@ -207,12 +242,11 @@ export async function downloadTerrasQuilombolas(): Promise<DownloadResult> {
       featureCount,
       s3Key,
       s3Url,
-      // Bounds conhecidos do shapefile
       bounds: {
-        west: -44.018936,
-        south: -17.646125,
-        east: -35.495522,
-        north: -2.817687,
+        west,
+        south,
+        east,
+        north,
       },
     };
   } catch (error: any) {

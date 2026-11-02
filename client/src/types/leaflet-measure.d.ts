@@ -1,8 +1,8 @@
 declare module "leaflet-measure" {
-  import * as L from "leaflet";
-  
+  import type * as L from "leaflet";
+
   export interface MeasureOptions {
-    position?: string;
+    position?: L.ControlPosition;
     primaryLengthUnit?: string;
     secondaryLengthUnit?: string;
     primaryAreaUnit?: string;
@@ -11,11 +11,8 @@ declare module "leaflet-measure" {
     completedColor?: string;
     captureZIndex?: number;
     popupOptions?: L.PopupOptions;
+    decPoint?: string;
+    thousandsSep?: string;
   }
-  
-  export class Control extends L.Control {
-    constructor(options?: MeasureOptions);
-  }
-  
-  export default Control;
+  // Runtime side effect: registers L.Control.Measure on the Leaflet instance.
 }

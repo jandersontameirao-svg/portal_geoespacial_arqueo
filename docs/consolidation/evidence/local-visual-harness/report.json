@@ -1,0 +1,50 @@
+{
+  "scope": "strict-local-visual-harness",
+  "url": "http://127.0.0.1:4178/local-visual-harness.html",
+  "network": {
+    "externalNetworkBlocked": true,
+    "csp": "assets self/data/blob; connect-src self; unsafe-eval limitado ao plugin UMD neste harness localhost",
+    "chromiumHostResolver": "MAP * 0.0.0.0, EXCLUDE 127.0.0.1",
+    "externalResourcesObserved": []
+  },
+  "authentication": "not mounted; no auth mock, OAuth callback, cookie, token or user created",
+  "fixtures": "in-memory synthetic thematic layers and in-memory Leaflet marker",
+  "leafletMarkerAssets": [
+    {
+      "asset": "marker-shadow.png",
+      "loopback": true,
+      "complete": true,
+      "naturalWidth": 41,
+      "naturalHeight": 41,
+      "className": "leaflet-marker-shadow leaflet-zoom-animated"
+    },
+    {
+      "asset": "marker-icon.png",
+      "loopback": true,
+      "complete": true,
+      "naturalWidth": 25,
+      "naturalHeight": 41,
+      "className": "leaflet-marker-icon leaflet-zoom-animated leaflet-interactive"
+    }
+  ],
+  "flows": {
+    "thematicVisibility": "passed",
+    "thematicReorder": "passed",
+    "leafletDrawMarkerInMemory": "passed",
+    "measurementControlMounted": true
+  },
+  "measurementBootstrap": {
+    "windowLIsSameMapInstance": true,
+    "umdRegisteredBeforeReactMount": true
+  },
+  "screenshot": "local-visual-harness.png",
+  "screenshotSha256": "9d1156cf5f3bbdc7870a57770fbe0f8b344e99ea6257cf8cb68b7cfb07c43b50",
+  "limits": [
+    "not OAuth real",
+    "not tRPC/backend",
+    "not database persistence",
+    "not storage",
+    "not WMS/WFS/tiles",
+    "not production or stage"
+  ]
+}

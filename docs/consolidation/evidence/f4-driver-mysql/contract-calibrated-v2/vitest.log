@@ -1,0 +1,10 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.patchedDependencies", "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v2.1.9 /home/ubuntu/atena_geoportal_f4_isolado
+
+ ✓ server/backupDriver.synthetic.test.ts (3 tests | 2 skipped) 70ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 2 skipped (3)
+   Start at  15:38:27
+   Duration  1.55s (transform 290ms, setup 0ms, collect 1.14s, tests 70ms, environment 0ms, prepare 94ms)

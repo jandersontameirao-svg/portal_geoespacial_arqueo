@@ -47,6 +47,7 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import "leaflet-geometryutil";
 import MeasurementControl from "@/components/MeasurementControl";
+import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
 
 // Fix para ícones do Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -93,6 +94,7 @@ function FitBounds({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
 }
 
 export default function BaseLayersViewer() {
+  const [basemapId, setBasemapId] = useState(DEFAULT_BASEMAP.id);
   const [layers, setLayers] = useState<LayerControl[]>([
     {
       id: "funai",
@@ -135,6 +137,7 @@ export default function BaseLayersViewer() {
       loading: false,
     },
   ]);
+  const activeBasemap = SELECTABLE_BASEMAPS.find((basemap) => basemap.id === basemapId) || DEFAULT_BASEMAP;
 
   const [bounds, setBounds] = useState<L.LatLngBoundsExpression | null>(null);
   const [selectedState, setSelectedState] = useState<string>("all");
@@ -536,9 +539,21 @@ export default function BaseLayersViewer() {
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-[300px_1fr] gap-6">
+      <div className="grid lg:grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
         {/* Painel de controle */}
         <div className="space-y-4">
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex items-center gap-2"><Layers className="w-5 h-5" /><h3 className="font-semibold">Mapa-base</h3></div>
+              <Select value={basemapId} onValueChange={setBasemapId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{SELECTABLE_BASEMAPS.map((basemap) => <SelectItem key={basemap.id} value={basemap.id}>{basemap.name}{basemap.availability === "legacy-available" ? " — legado" : ""}</SelectItem>)}</SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{activeBasemap.description}</p>
+              {activeBasemap.availability === "legacy-available" && <Badge variant="outline" className="border-amber-300 text-amber-800">Legado: retirada prevista pela Esri em dez/2029</Badge>}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-center gap-2 mb-4">
@@ -857,12 +872,12 @@ export default function BaseLayersViewer() {
             <MapContainer
               center={[-15.7801, -47.9292]} // Brasília
               zoom={4}
-              style={{ height: "calc(100vh - 200px)", width: "100%" }}
+              style={{ height: "clamp(420px, 62vh, 680px)", width: "100%" }}
               className="rounded-lg"
             >
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution={activeBasemap.attribution}
+                url={activeBasemap.url!}
               />
 
               {/* Renderizar camadas visíveis */}

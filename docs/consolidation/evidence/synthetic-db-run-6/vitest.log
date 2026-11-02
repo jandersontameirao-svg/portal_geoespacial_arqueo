@@ -1,0 +1,42 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.patchedDependencies", "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v2.1.9 /home/ubuntu/atena_geoportal_opcao_a_isolado
+
+ ✓ server/ogcCatalogService.test.ts (3 tests) 105ms
+ ✓ server/backupArchive.test.ts (5 tests) 225ms
+ ✓ server/backupManifest.test.ts (3 tests) 29ms
+ ✓ server/wfsImportService.test.ts (4 tests) 24ms
+ ✓ server/gisAnalysis.test.ts (5 tests) 81ms
+ ✓ server/localFilesystemBackupStore.test.ts (4 tests) 58ms
+ ✓ server/atlas.test.ts (4 tests) 56ms
+ ✓ server/geometries.test.ts (6 tests) 232ms
+ ✓ server/projects.test.ts (17 tests) 270ms
+ ✓ server/vectorLayerPromotion.test.ts (3 tests) 23ms
+ ✓ server/localRasterService.test.ts (3 tests) 7ms
+ ✓ server/notifications.test.ts (5 tests) 100ms
+ ✓ server/ogcCatalogRouter.synthetic.test.ts (5 tests) 87ms
+ ✓ server/mfa.test.ts (4 tests) 149ms
+ ✓ server/backupRuntime.test.ts (3 tests) 7ms
+ ✓ server/ogcEndpointIdentity.test.ts (6 tests) 9ms
+ ✓ server/backupInventoryPolicy.test.ts (3 tests) 7ms
+ ✓ server/backup.test.ts (3 tests) 41ms
+ ✓ server/baseLayerCachePolicy.test.ts (3 tests) 10ms
+ ✓ server/projectAccess.test.ts (4 tests) 8ms
+ ✓ server/auth.logout.test.ts (1 test) 16ms
+ ✓ server/atlasVectorOverlay.test.ts (2 tests) 39ms
+ ✓ server/geodataService.test.ts (3 tests) 6ms
+ ✓ client/src/lib/basemaps.test.ts (2 tests) 5ms
+ ✓ server/historicalImageryCatalog.test.ts (1 test) 18ms
+ ✓ server/fileVersioning.test.ts (2 tests) 6ms
+ ✓ server/rasterLayerMetadata.test.ts (1 test) 4ms
+ ✓ server/rasterIngestionAdapter.test.ts (3 tests) 5ms
+ ✓ client/src/components/ThematicLayerTree.test.ts (2 tests) 5ms
+ ✓ server/rasterCogBackupRoundtrip.test.ts (1 test) 10252ms
+   ✓ backup físico de COG válido > restaura bytes de COG real e o GDAL reabre o arquivo com layout COG 10250ms
+ ✓ server/rasterIngestionLocal.test.ts (1 test) 9648ms
+   ✓ ingestão local GeoTIFF > transforma GeoTIFF válido em COG EPSG:4674, gera tiles e preserva hashes 9647ms
+
+ Test Files  31 passed (31)
+      Tests  112 passed (112)
+   Start at  14:04:46
+   Duration  14.33s (transform 1.64s, setup 0ms, collect 18.62s, tests 21.53s, environment 14ms, prepare 3.54s)

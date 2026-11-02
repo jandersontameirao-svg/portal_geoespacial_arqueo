@@ -5,6 +5,7 @@ import { getDb } from "./db";
 import { printJobs, savedMaps, projects, projectMembers, layers } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import * as db from "./db";
+import { summarizeRasterLayers } from "./rasterLayerMetadata";
 
 /**
  * Router para Jobs de Impressão de Mapas Técnicos
@@ -257,6 +258,7 @@ export const printJobsRouter = router({
         .select()
         .from(layers)
         .where(eq(layers.projectId, job.projectId));
+      const rasterLayers = summarizeRasterLayers(projectLayers);
 
       // Gerar configuração do template
       const pageSize = PAGE_SIZES[job.pageSize as keyof typeof PAGE_SIZES];
@@ -266,6 +268,7 @@ export const printJobsRouter = router({
         job,
         project,
         layers: projectLayers,
+        rasterLayers,
         dimensions: {
           width: isLandscape ? pageSize.height : pageSize.width,
           height: isLandscape ? pageSize.width : pageSize.height,

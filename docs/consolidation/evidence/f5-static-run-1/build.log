@@ -1,0 +1,38 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.patchedDependencies", "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> portal_geoespacial_arqueo@1.0.0 build /home/ubuntu/atena_geoportal_f5_isolado
+> vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+vite v7.1.9 building for production...
+(!) %VITE_ANALYTICS_ENDPOINT% is not defined in env variables found in /index.html. Is the variable mistyped?
+(!) %VITE_ANALYTICS_WEBSITE_ID% is not defined in env variables found in /index.html. Is the variable mistyped?
+<script src="%VITE_ANALYTICS_ENDPOINT%/umami"> in "/index.html" can't be bundled without type="module" attribute
+transforming...
+✓ 3897 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/public/assets/spritesheet-DpIxuf5L.svg               5.55 kB │ gzip:     1.67 kB
+../dist/public/draw-lab.html                               367.43 kB │ gzip:   105.43 kB
+../dist/public/construction-preview.html                   367.61 kB │ gzip:   105.46 kB
+../dist/public/index.html                                  368.18 kB │ gzip:   105.70 kB
+../dist/public/assets/main-Dnt2NJQz.css                     14.44 kB │ gzip:     6.30 kB
+../dist/public/assets/leafletDefaultMarker-BnFe-zhO.css     28.17 kB │ gzip:    12.76 kB
+../dist/public/assets/index-DU_3Oku-.css                   160.43 kB │ gzip:    25.05 kB
+../dist/public/assets/draw-lab-D82ZBA2u.js                   3.66 kB │ gzip:     1.67 kB
+../dist/public/assets/construction-preview-UdKQsR3i.js      15.10 kB │ gzip:     3.85 kB
+../dist/public/assets/purify.es-B6FQ9oRL.js                 22.57 kB │ gzip:     8.74 kB
+../dist/public/assets/leaflet-measure-Hho6HAqf.js           36.90 kB │ gzip:    11.31 kB
+../dist/public/assets/index-DGC_eN0h.js                     88.44 kB │ gzip:    28.26 kB
+../dist/public/assets/index.es-ufCz_Odt.js                 159.43 kB │ gzip:    53.45 kB
+../dist/public/assets/leafletDefaultMarker-laUjDYTc.js     424.16 kB │ gzip:   125.40 kB
+../dist/public/assets/main-CXU-v435.js                   3,844.24 kB │ gzip: 1,067.38 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 22.18s
+
+  dist/index.js  373.2kb
+
+⚡ Done in 17ms

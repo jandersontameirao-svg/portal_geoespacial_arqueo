@@ -1,0 +1,35 @@
+{
+  "scope": "F4-local-only-no-deploy",
+  "functionalCodeCommit": "ed1e6df5e539bb49561353607f41a12e00101abd",
+  "baseCommit": "f7bf75e8b25a1c6a55edea6281327dafcc310e5b",
+  "testedWorkingFilesExactlyMatchFunctionalCommit": true,
+  "sourceFilesSha256": {
+    "server/backupRouter.ts": "4d819357d500b577d25225f659a6eee333848d3e47026bd05458f4af4bbacc5c",
+    "server/backupTableSnapshot.ts": "c2c14c7814abf4a0e2a7a5fb4204da3442de0c3973af254f5284d43efa523e92",
+    "server/backupTableSnapshot.test.ts": "870466ab10b78bdfbdb16061a2a4cd71dd1dbafd100fd28f1075c15d8039251b",
+    "server/backupDriver.synthetic.test.ts": "b37a01f1d31c3348dcff2bd0b6e39cac9985c5e31039f7c0f6e9aaafbb75ccac",
+    "infra/scripts/run_backup_driver_f4_validation.sh": "b3be7122fd61716d9ecca12b9664bd1c7d4ce219cc54140f8067a3ca25d7a00d"
+  },
+  "driverVersions": {
+    "drizzle-orm": "0.44.6",
+    "mysql2": "3.15.1",
+    "mysql": "8.0.46"
+  },
+  "postFixRealDriverTests": 3,
+  "focusedRegressionTests": 29,
+  "newPureGuardsWithinRegression": 8,
+  "existingCasesWithinRegression": 21,
+  "historical112Repeated": false,
+  "driverFieldsIncluded": false,
+  "tabularPayloadSha256": "0142582592ab09b6212ce78fb5a33214c252ae69fbcda6ec4f90145baee86aca",
+  "realDriverNotMocks": true,
+  "sqlRestoreOnlyInTestSeparateSyntheticSchema": true,
+  "schemaMigrationsChanged": false,
+  "F1F2F5Changed": false,
+  "actualOAuthOrBrowserTest": false,
+  "TiDBServerlessRevalidated": false,
+  "productionOrStageBackupDDLConfigStorageDeploy": false,
+  "cleanupVerified": true,
+  "initialTestAssumptionFailure": "Date expected incorrectly; preserved; raw Drizzle returns SQL timestamp string",
+  "initialLauncherQuotingFailure": "preserved locally, no product test evidence"
+}

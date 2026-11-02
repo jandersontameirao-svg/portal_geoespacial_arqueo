@@ -26,7 +26,8 @@ import {
   Shield,
   ChevronDown,
   Layers,
-  Map as MapIcon
+  Map as MapIcon,
+  Server
 } from "lucide-react";
 import GlobalSearch from "./GlobalSearch";
 import { NotificationBell } from "./NotificationBell";
@@ -137,7 +138,7 @@ export default function Header() {
                       </div>
                     </DropdownMenuItem>
                   </Link>
-                  <Link href="/projects">
+                  <Link href="/files">
                     <DropdownMenuItem className="cursor-pointer">
                       <FileUp className="mr-2 h-4 w-4 text-purple-500" />
                       <div>
@@ -213,12 +214,21 @@ export default function Header() {
                         </div>
                       </DropdownMenuItem>
                     </Link>
-                    <Link href="/admin">
+                    <Link href="/admin/backups">
                       <DropdownMenuItem className="cursor-pointer">
                         <Database className="mr-2 h-4 w-4 text-purple-500" />
                         <div>
                           <span>Backups</span>
                           <p className="text-xs text-slate-500">Backup do sistema</p>
+                        </div>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/admin/ogc-catalog">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Server className="mr-2 h-4 w-4 text-cyan-600" />
+                        <div>
+                          <span>Catálogo OGC</span>
+                          <p className="text-xs text-slate-500">WMS/WFS, saúde e fallback</p>
                         </div>
                       </DropdownMenuItem>
                     </Link>
@@ -332,7 +342,7 @@ export default function Header() {
                     Atlas
                   </DropdownMenuItem>
                 </Link>
-                <Link href="/projects">
+                <Link href="/files">
                   <DropdownMenuItem className="cursor-pointer">
                     <FileUp className="mr-2 h-4 w-4" />
                     Arquivos
@@ -360,10 +370,16 @@ export default function Header() {
                         Convites
                       </DropdownMenuItem>
                     </Link>
-                    <Link href="/admin">
+                    <Link href="/admin/backups">
                       <DropdownMenuItem className="cursor-pointer">
                         <Database className="mr-2 h-4 w-4" />
                         Backups
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/admin/ogc-catalog">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Server className="mr-2 h-4 w-4" />
+                        Catálogo OGC
                       </DropdownMenuItem>
                     </Link>
                   </>

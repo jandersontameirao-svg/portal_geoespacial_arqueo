@@ -1,0 +1,5 @@
+target=MySQL local descartável (127.0.0.1:33127)
+database=geoportal_synthetic
+source_commit=7974a5ed5da6395757970ff4a10aa802df2e72ee
+source_branch=candidato/opcao-a-sintetico
+started_at=2026-11-02T14:04:40Z

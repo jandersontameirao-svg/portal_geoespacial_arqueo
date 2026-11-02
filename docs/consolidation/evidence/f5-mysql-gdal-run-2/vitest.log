@@ -1,0 +1,12 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.patchedDependencies", "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v2.1.9 /home/ubuntu/atena_geoportal_f5_isolado
+
+ ✓ server/fileVersioning.test.ts (2 tests) 7ms
+ ✓ server/rasterInitialVersion.synthetic.test.ts (7 tests) 8412ms
+   ✓ F5 local real-driver raster initial version > persists exactly v1 of the scanned ORIGINAL while real GDAL creates a distinct EPSG:4674 COG and zoom-12 tiles 8005ms
+
+ Test Files  2 passed (2)
+      Tests  9 passed (9)
+   Start at  20:28:45
+   Duration  10.15s (transform 471ms, setup 0ms, collect 1.55s, tests 8.42s, environment 0ms, prepare 225ms)

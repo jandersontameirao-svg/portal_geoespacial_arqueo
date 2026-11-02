@@ -64,12 +64,12 @@ export default function GlobalSearch({ className }: GlobalSearchProps) {
         break;
       case "file":
         if (item.projectId) {
-          setLocation(`/projects/${item.projectId}/files`);
+          setLocation(`/projects/${item.projectId}?tab=files`);
         }
         break;
       case "layer":
         if (item.projectId) {
-          setLocation(`/projects/${item.projectId}/map`);
+          setLocation(`/projects/${item.projectId}?tab=map`);
         }
         break;
     }

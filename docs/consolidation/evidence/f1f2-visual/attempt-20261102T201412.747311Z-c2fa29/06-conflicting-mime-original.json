@@ -1,0 +1,369 @@
+{
+  "id": "06-conflicting-mime-original",
+  "specification": {
+    "id": "06-conflicting-mime-original",
+    "mode": "original",
+    "filename": "conflict.tif",
+    "mime": "application/x-msdownload",
+    "expect": "blocked-mime"
+  },
+  "fixture": {
+    "name": "conflict.tif",
+    "type": "application/x-msdownload",
+    "size": 13,
+    "lastModified": 1700000000000,
+    "validGeoTiff": false
+  },
+  "before": {
+    "inspection": {
+      "caseId": "06-conflicting-mime-original",
+      "flags": {
+        "available": false,
+        "rejectRaster": true
+      },
+      "calls": [
+        {
+          "index": 1,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": false,
+            "mode": "synthetic-memory-only",
+            "reason": "MOCK: serviço raster indisponível."
+          }
+        }
+      ],
+      "completionCallbacks": 0,
+      "appId": "synthetic",
+      "mockedApis": [
+        "raster.ingestionAvailability",
+        "files.upload",
+        "raster.ingestGeoTiff"
+      ],
+      "limits": "No real storage, database, scanner, raster processing, OAuth or application authentication."
+    },
+    "body": "F1/F2 • EVIDÊNCIA VISUAL SINTÉTICA • LOOPBACK ISOLADO\n\nUpload TIFF — componentes reais, APIs simuladas\n\nFileUpload.tsx e RasterIngestionPanel.tsx sem substituições. Fixtures File do navegador; React Query + tRPC Provider com link em memória.\n\nNão prova storage, DB, scanner, COG, OAuth nem autorização real. As mensagens dos componentes abaixo refletem respostas simuladas.\n\nCaso: 06-conflicting-mime-original · VITE_APP_ID: synthetic\n\nAPI simulada disponível\nAPI simulada rejeita raster\nFileUpload real\nTratamento dos arquivos TIFF / GeoTIFF\nProcessar como raster / COG (requer serviço disponível)\nGuardar somente o TIFF original (sem camada raster / COG)\n\nO original é armazenado como imagem, com scanner e controle de acesso normais. Não cria camada, tiles nem georreferenciamento.\n\nArraste arquivos aqui\n\nou clique no botão abaixo para selecionar\n\nSelecionar Arquivos\n\nTipos aceitos: KML, KMZ, SHP (ZIP), GeoTIFF/COG, PDF, DOCX, XLSX, Imagens\nTamanho máximo: 100MB por arquivo\n\nRasterIngestionPanel real\nIngerir GeoTIFF / COG\nO arquivo é validado, convertido para COG EPSG:4674, recebe pirâmides e tiles PNG protegidos por projeto.\n\nMOCK: serviço raster indisponível.\n\nContratos inteiramente simulados\n\nraster.ingestionAvailability: flag local.\n\nfiles.upload: registra payload e responde em memória.\n\nraster.ingestGeoTiff: rejeição controlada; sem worker.\n\nNenhum App ou fluxo de autenticação é montado. Não há link HTTP tRPC.\n\nChamadas capturadas (simuladas)\n[\n  {\n    \"index\": 1,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": false,\n      \"mode\": \"synthetic-memory-only\",\n      \"reason\": \"MOCK: serviço raster indisponível.\"\n    }\n  }\n]",
+    "toasts": [],
+    "mode": "original",
+    "resources": [
+      "http://127.0.0.1:4181/@vite/client",
+      "http://127.0.0.1:4181/src/f1f2UploadHarness.tsx",
+      "http://127.0.0.1:4181/@react-refresh",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/portal_geoespacial_arqueo_isolated/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react_jsx-dev-runtime.js?v=7b6ec94b",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react.js?v=7b6ec94b",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react-dom_client.js?v=d1781988",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@tanstack_react-query.js?v=244c29b8",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_client.js?v=50f05547",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_server_observable.js?v=114482b4",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/sonner.js?v=4cd6867e",
+      "http://127.0.0.1:4181/src/lib/trpc.ts",
+      "http://127.0.0.1:4181/src/components/FileUpload.tsx",
+      "http://127.0.0.1:4181/src/components/RasterIngestionPanel.tsx",
+      "http://127.0.0.1:4181/src/index.css",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-MLUOSQZJ.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-PR4QN5HX.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-C47UA6BB.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UZ7NARL7.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UL5Z5H47.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-VQYIAXAC.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_react-query.js?v=43c6eb98",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-4GD4LNPS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/src/components/ui/button.tsx",
+      "http://127.0.0.1:4181/src/components/ui/card.tsx",
+      "http://127.0.0.1:4181/src/components/ui/progress.tsx",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/atena_geoportal_f1f2_isolado/shared/tiffUploadPolicy.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/lucide-react.js?v=dc552726",
+      "http://127.0.0.1:4181/src/components/ui/input.tsx",
+      "http://127.0.0.1:4181/src/components/ui/label.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-slot.js?v=96f6e8dd",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/class-variance-authority.js?v=959509aa",
+      "http://127.0.0.1:4181/src/lib/utils.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-progress.js?v=b1a84659",
+      "http://127.0.0.1:4181/src/components/ui/dialog.tsx",
+      "http://127.0.0.1:4181/src/hooks/useComposition.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-label.js?v=6a0046fa",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/clsx.js?v=90e7ac15",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/tailwind-merge.js?v=ea4349ad",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-K7ASV7EK.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-NRBEAGZG.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-TQWJLQWC.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-SCFHDNJK.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-dialog.js?v=d97d8341",
+      "http://127.0.0.1:4181/src/hooks/usePersistFn.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-FNBAGGGR.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-GE5E2XVS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-AP4ESKEA.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-TMRUKK4K.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-2635LLGS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-LEE56TNQ.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-KFBWJ6WS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UENCTDEN.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-P4NQAIGT.js?v=60e2c80e"
+    ],
+    "inputs": [
+      {
+        "accept": "application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip,application/x-zip-compressed,application/geo+json,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/tiff,image/geotiff,application/geotiff",
+        "files": []
+      }
+    ],
+    "cookies": "",
+    "localStorageKeys": [],
+    "sessionStorageKeys": []
+  },
+  "immediate": {
+    "inspection": {
+      "caseId": "06-conflicting-mime-original",
+      "flags": {
+        "available": false,
+        "rejectRaster": true
+      },
+      "calls": [
+        {
+          "index": 1,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": false,
+            "mode": "synthetic-memory-only",
+            "reason": "MOCK: serviço raster indisponível."
+          }
+        }
+      ],
+      "completionCallbacks": 0,
+      "appId": "synthetic",
+      "mockedApis": [
+        "raster.ingestionAvailability",
+        "files.upload",
+        "raster.ingestGeoTiff"
+      ],
+      "limits": "No real storage, database, scanner, raster processing, OAuth or application authentication."
+    },
+    "body": "F1/F2 • EVIDÊNCIA VISUAL SINTÉTICA • LOOPBACK ISOLADO\n\nUpload TIFF — componentes reais, APIs simuladas\n\nFileUpload.tsx e RasterIngestionPanel.tsx sem substituições. Fixtures File do navegador; React Query + tRPC Provider com link em memória.\n\nNão prova storage, DB, scanner, COG, OAuth nem autorização real. As mensagens dos componentes abaixo refletem respostas simuladas.\n\nCaso: 06-conflicting-mime-original · VITE_APP_ID: synthetic\n\nAPI simulada disponível\nAPI simulada rejeita raster\nFileUpload real\nTratamento dos arquivos TIFF / GeoTIFF\nProcessar como raster / COG (requer serviço disponível)\nGuardar somente o TIFF original (sem camada raster / COG)\n\nO original é armazenado como imagem, com scanner e controle de acesso normais. Não cria camada, tiles nem georreferenciamento.\n\nArraste arquivos aqui\n\nou clique no botão abaixo para selecionar\n\nSelecionar Arquivos\n\nTipos aceitos: KML, KMZ, SHP (ZIP), GeoTIFF/COG, PDF, DOCX, XLSX, Imagens\nTamanho máximo: 100MB por arquivo\n\nRasterIngestionPanel real\nIngerir GeoTIFF / COG\nO arquivo é validado, convertido para COG EPSG:4674, recebe pirâmides e tiles PNG protegidos por projeto.\n\nMOCK: serviço raster indisponível.\n\nContratos inteiramente simulados\n\nraster.ingestionAvailability: flag local.\n\nfiles.upload: registra payload e responde em memória.\n\nraster.ingestGeoTiff: rejeição controlada; sem worker.\n\nNenhum App ou fluxo de autenticação é montado. Não há link HTTP tRPC.\n\nChamadas capturadas (simuladas)\n[\n  {\n    \"index\": 1,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": false,\n      \"mode\": \"synthetic-memory-only\",\n      \"reason\": \"MOCK: serviço raster indisponível.\"\n    }\n  }\n]\nconflict.tif: Tipo de arquivo não permitido",
+    "toasts": [
+      {
+        "type": "error",
+        "text": "conflict.tif: Tipo de arquivo não permitido"
+      }
+    ],
+    "mode": "original",
+    "resources": [
+      "http://127.0.0.1:4181/@vite/client",
+      "http://127.0.0.1:4181/src/f1f2UploadHarness.tsx",
+      "http://127.0.0.1:4181/@react-refresh",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/portal_geoespacial_arqueo_isolated/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react_jsx-dev-runtime.js?v=7b6ec94b",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react.js?v=7b6ec94b",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react-dom_client.js?v=d1781988",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@tanstack_react-query.js?v=244c29b8",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_client.js?v=50f05547",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_server_observable.js?v=114482b4",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/sonner.js?v=4cd6867e",
+      "http://127.0.0.1:4181/src/lib/trpc.ts",
+      "http://127.0.0.1:4181/src/components/FileUpload.tsx",
+      "http://127.0.0.1:4181/src/components/RasterIngestionPanel.tsx",
+      "http://127.0.0.1:4181/src/index.css",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-MLUOSQZJ.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-PR4QN5HX.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-C47UA6BB.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UZ7NARL7.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UL5Z5H47.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-VQYIAXAC.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_react-query.js?v=43c6eb98",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-4GD4LNPS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/src/components/ui/button.tsx",
+      "http://127.0.0.1:4181/src/components/ui/card.tsx",
+      "http://127.0.0.1:4181/src/components/ui/progress.tsx",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/atena_geoportal_f1f2_isolado/shared/tiffUploadPolicy.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/lucide-react.js?v=dc552726",
+      "http://127.0.0.1:4181/src/components/ui/input.tsx",
+      "http://127.0.0.1:4181/src/components/ui/label.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-slot.js?v=96f6e8dd",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/class-variance-authority.js?v=959509aa",
+      "http://127.0.0.1:4181/src/lib/utils.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-progress.js?v=b1a84659",
+      "http://127.0.0.1:4181/src/components/ui/dialog.tsx",
+      "http://127.0.0.1:4181/src/hooks/useComposition.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-label.js?v=6a0046fa",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/clsx.js?v=90e7ac15",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/tailwind-merge.js?v=ea4349ad",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-K7ASV7EK.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-NRBEAGZG.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-TQWJLQWC.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-SCFHDNJK.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-dialog.js?v=d97d8341",
+      "http://127.0.0.1:4181/src/hooks/usePersistFn.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-FNBAGGGR.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-GE5E2XVS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-AP4ESKEA.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-TMRUKK4K.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-2635LLGS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-LEE56TNQ.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-KFBWJ6WS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UENCTDEN.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-P4NQAIGT.js?v=60e2c80e"
+    ],
+    "inputs": [
+      {
+        "accept": "application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip,application/x-zip-compressed,application/geo+json,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/tiff,image/geotiff,application/geotiff",
+        "files": [
+          {
+            "name": "conflict.tif",
+            "type": "application/x-msdownload",
+            "size": 13
+          }
+        ]
+      }
+    ],
+    "cookies": "",
+    "localStorageKeys": [],
+    "sessionStorageKeys": []
+  },
+  "afterObservationWindow": {
+    "inspection": {
+      "caseId": "06-conflicting-mime-original",
+      "flags": {
+        "available": false,
+        "rejectRaster": true
+      },
+      "calls": [
+        {
+          "index": 1,
+          "path": "raster.ingestionAvailability",
+          "type": "query",
+          "input": null,
+          "outcome": "mock-success",
+          "response": {
+            "available": false,
+            "mode": "synthetic-memory-only",
+            "reason": "MOCK: serviço raster indisponível."
+          }
+        }
+      ],
+      "completionCallbacks": 0,
+      "appId": "synthetic",
+      "mockedApis": [
+        "raster.ingestionAvailability",
+        "files.upload",
+        "raster.ingestGeoTiff"
+      ],
+      "limits": "No real storage, database, scanner, raster processing, OAuth or application authentication."
+    },
+    "body": "F1/F2 • EVIDÊNCIA VISUAL SINTÉTICA • LOOPBACK ISOLADO\n\nUpload TIFF — componentes reais, APIs simuladas\n\nFileUpload.tsx e RasterIngestionPanel.tsx sem substituições. Fixtures File do navegador; React Query + tRPC Provider com link em memória.\n\nNão prova storage, DB, scanner, COG, OAuth nem autorização real. As mensagens dos componentes abaixo refletem respostas simuladas.\n\nCaso: 06-conflicting-mime-original · VITE_APP_ID: synthetic\n\nAPI simulada disponível\nAPI simulada rejeita raster\nFileUpload real\nTratamento dos arquivos TIFF / GeoTIFF\nProcessar como raster / COG (requer serviço disponível)\nGuardar somente o TIFF original (sem camada raster / COG)\n\nO original é armazenado como imagem, com scanner e controle de acesso normais. Não cria camada, tiles nem georreferenciamento.\n\nArraste arquivos aqui\n\nou clique no botão abaixo para selecionar\n\nSelecionar Arquivos\n\nTipos aceitos: KML, KMZ, SHP (ZIP), GeoTIFF/COG, PDF, DOCX, XLSX, Imagens\nTamanho máximo: 100MB por arquivo\n\nRasterIngestionPanel real\nIngerir GeoTIFF / COG\nO arquivo é validado, convertido para COG EPSG:4674, recebe pirâmides e tiles PNG protegidos por projeto.\n\nMOCK: serviço raster indisponível.\n\nContratos inteiramente simulados\n\nraster.ingestionAvailability: flag local.\n\nfiles.upload: registra payload e responde em memória.\n\nraster.ingestGeoTiff: rejeição controlada; sem worker.\n\nNenhum App ou fluxo de autenticação é montado. Não há link HTTP tRPC.\n\nChamadas capturadas (simuladas)\n[\n  {\n    \"index\": 1,\n    \"path\": \"raster.ingestionAvailability\",\n    \"type\": \"query\",\n    \"input\": null,\n    \"outcome\": \"mock-success\",\n    \"response\": {\n      \"available\": false,\n      \"mode\": \"synthetic-memory-only\",\n      \"reason\": \"MOCK: serviço raster indisponível.\"\n    }\n  }\n]\nconflict.tif: Tipo de arquivo não permitido",
+    "toasts": [
+      {
+        "type": "error",
+        "text": "conflict.tif: Tipo de arquivo não permitido"
+      }
+    ],
+    "mode": "original",
+    "resources": [
+      "http://127.0.0.1:4181/@vite/client",
+      "http://127.0.0.1:4181/src/f1f2UploadHarness.tsx",
+      "http://127.0.0.1:4181/@react-refresh",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/portal_geoespacial_arqueo_isolated/node_modules/.pnpm/vite@7.1.9_@types+node@24.7.0_jiti@2.6.1_lightningcss@1.30.1_tsx@4.20.6/node_modules/vite/dist/client/env.mjs",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react_jsx-dev-runtime.js?v=7b6ec94b",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react.js?v=7b6ec94b",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/react-dom_client.js?v=d1781988",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@tanstack_react-query.js?v=244c29b8",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_client.js?v=50f05547",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_server_observable.js?v=114482b4",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/sonner.js?v=4cd6867e",
+      "http://127.0.0.1:4181/src/lib/trpc.ts",
+      "http://127.0.0.1:4181/src/components/FileUpload.tsx",
+      "http://127.0.0.1:4181/src/components/RasterIngestionPanel.tsx",
+      "http://127.0.0.1:4181/src/index.css",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-MLUOSQZJ.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-PR4QN5HX.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-C47UA6BB.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UZ7NARL7.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UL5Z5H47.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-VQYIAXAC.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@trpc_react-query.js?v=43c6eb98",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-4GD4LNPS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/src/components/ui/button.tsx",
+      "http://127.0.0.1:4181/src/components/ui/card.tsx",
+      "http://127.0.0.1:4181/src/components/ui/progress.tsx",
+      "http://127.0.0.1:4181/@fs/home/ubuntu/atena_geoportal_f1f2_isolado/shared/tiffUploadPolicy.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/lucide-react.js?v=dc552726",
+      "http://127.0.0.1:4181/src/components/ui/input.tsx",
+      "http://127.0.0.1:4181/src/components/ui/label.tsx",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-slot.js?v=96f6e8dd",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/class-variance-authority.js?v=959509aa",
+      "http://127.0.0.1:4181/src/lib/utils.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-progress.js?v=b1a84659",
+      "http://127.0.0.1:4181/src/components/ui/dialog.tsx",
+      "http://127.0.0.1:4181/src/hooks/useComposition.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-label.js?v=6a0046fa",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/clsx.js?v=90e7ac15",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/tailwind-merge.js?v=ea4349ad",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-K7ASV7EK.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-NRBEAGZG.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-TQWJLQWC.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-SCFHDNJK.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/@radix-ui_react-dialog.js?v=d97d8341",
+      "http://127.0.0.1:4181/src/hooks/usePersistFn.ts",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-FNBAGGGR.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-GE5E2XVS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-AP4ESKEA.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-TMRUKK4K.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-2635LLGS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-LEE56TNQ.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-KFBWJ6WS.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-UENCTDEN.js?v=60e2c80e",
+      "http://127.0.0.1:4181/@fs/tmp/atena-f1f2-visual-xs5o49mq/vite-cache/deps/chunk-P4NQAIGT.js?v=60e2c80e"
+    ],
+    "inputs": [
+      {
+        "accept": "application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip,application/x-zip-compressed,application/geo+json,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/tiff,image/geotiff,application/geotiff",
+        "files": [
+          {
+            "name": "conflict.tif",
+            "type": "application/x-msdownload",
+            "size": 13
+          }
+        ]
+      }
+    ],
+    "cookies": "",
+    "localStorageKeys": [],
+    "sessionStorageKeys": []
+  },
+  "assertions": [
+    {
+      "assertion": "real component DOM mounted",
+      "passed": true
+    },
+    {
+      "assertion": "browser File preserves name/type",
+      "passed": true
+    },
+    {
+      "assertion": "no cookies/localStorage/sessionStorage",
+      "passed": true
+    },
+    {
+      "assertion": "all resource entries loopback",
+      "passed": true
+    },
+    {
+      "assertion": "blocked before any mutation",
+      "passed": true
+    },
+    {
+      "assertion": "error toast visible",
+      "passed": true
+    },
+    {
+      "assertion": "no success toast",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "screenshot": "06-conflicting-mime-original.png",
+  "screenshotSha256": "25a58a06eddb8d5ce87a39f74403962b40fb8464ac3e6e8d6c922acc2edfb875"
+}

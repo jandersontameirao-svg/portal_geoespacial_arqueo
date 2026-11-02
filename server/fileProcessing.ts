@@ -4,6 +4,8 @@ import mime from "mime-types";
 import bbox from "@turf/bbox";
 import { featureCollection } from "@turf/helpers";
 import JSZip from "jszip";
+import toGeoJSON from "@mapbox/togeojson";
+import { DOMParser } from "@xmldom/xmldom";
 
 /**
  * Utilitários para processamento de arquivos geoespaciais
@@ -175,14 +177,23 @@ export async function processSHP(zipBuffer: Buffer): Promise<FileProcessingResul
  */
 export async function processKML(kmlText: string): Promise<FileProcessingResult> {
   try {
-    const bounds = extractBoundsFromKML(kmlText);
+    const document = new DOMParser().parseFromString(kmlText, "text/xml");
+    if (document.getElementsByTagName("parsererror").length > 0) {
+      throw new Error("XML KML inválido");
+    }
+    const layerData = toGeoJSON.kml(document) as { type: string; features?: unknown[] };
+    const featureCount = layerData.features?.length || 0;
+    const bounds = featureCount > 0 ? extractBoundsFromGeoJSON(layerData) : extractBoundsFromKML(kmlText);
 
     return {
       isGeospatial: true,
       crs: "EPSG:4326", // KML sempre usa WGS84
       bounds: bounds || undefined,
+      featureCount,
+      layerData: featureCount > 0 ? layerData : undefined,
       metadata: {
         originalFormat: 'kml',
+        convertedToGeoJSON: featureCount > 0,
       },
     };
   } catch (error: any) {

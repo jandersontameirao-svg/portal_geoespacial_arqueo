@@ -1,0 +1,12 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.patchedDependencies", "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v2.1.9 /home/ubuntu/atena_geoportal_f1f2_isolado
+
+ ✓ server/tiffUploadPolicy.test.ts (16 tests) 13ms
+ ✓ server/fileTypeCategories.test.ts (24 tests) 17ms
+ ✓ server/filesF1F2.synthetic.test.ts (5 tests) 327ms
+
+ Test Files  3 passed (3)
+      Tests  45 passed (45)
+   Start at  20:13:01
+   Duration  2.35s (transform 495ms, setup 0ms, collect 1.90s, tests 358ms, environment 1ms, prepare 301ms)

@@ -145,7 +145,11 @@ export default function BaseLayers() {
   };
 
   // Helper para badge de status
-  const StatusBadge = ({ status }: { status: string }) => {
+  const StatusBadge = ({ status, cacheState, retryAfter }: { status: string; cacheState?: string; retryAfter?: Date | string | null }) => {
+    if (cacheState === "fresh") return <Badge variant="default" className="bg-green-600"><CheckCircle2 className="w-3 h-3 mr-1" />Cache atual</Badge>;
+    if (cacheState === "stale") return <Badge className="bg-amber-600"><Clock className="w-3 h-3 mr-1" />Cache antigo disponível</Badge>;
+    if (cacheState === "refreshing") return <Badge className="bg-blue-500"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Atualizando cache</Badge>;
+    if (cacheState === "backoff") return <Badge variant="destructive" title={retryAfter ? `Nova tentativa: ${formatDate(retryAfter)}` : undefined}><Clock className="w-3 h-3 mr-1" />Backoff ativo</Badge>;
     switch (status) {
       case "completed":
         return (
@@ -223,7 +227,7 @@ export default function BaseLayers() {
                 </CardTitle>
                 <CardDescription>FUNAI</CardDescription>
               </div>
-              {funaiLayer && <StatusBadge status={funaiLayer.downloadStatus} />}
+              {funaiLayer && <StatusBadge status={funaiLayer.downloadStatus} cacheState={funaiLayer.cacheState} retryAfter={funaiLayer.retryAfter} />}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -308,7 +312,7 @@ export default function BaseLayers() {
                 </CardTitle>
                 <CardDescription>INCRA</CardDescription>
               </div>
-              {incraLayer && <StatusBadge status={incraLayer.downloadStatus} />}
+              {incraLayer && <StatusBadge status={incraLayer.downloadStatus} cacheState={incraLayer.cacheState} retryAfter={incraLayer.retryAfter} />}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -393,7 +397,7 @@ export default function BaseLayers() {
                 </CardTitle>
                 <CardDescription>IPHAN</CardDescription>
               </div>
-              {iphanLayer && <StatusBadge status={iphanLayer.downloadStatus} />}
+              {iphanLayer && <StatusBadge status={iphanLayer.downloadStatus} cacheState={iphanLayer.cacheState} retryAfter={iphanLayer.retryAfter} />}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -478,7 +482,7 @@ export default function BaseLayers() {
                 </CardTitle>
                 <CardDescription>OpenStreetMap</CardDescription>
               </div>
-              {osmLayer && <StatusBadge status={osmLayer.downloadStatus} />}
+              {osmLayer && <StatusBadge status={osmLayer.downloadStatus} cacheState={osmLayer.cacheState} retryAfter={osmLayer.retryAfter} />}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -1,4 +1,4 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, decodeOAuthState, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
@@ -39,8 +39,9 @@ class OAuthService {
   }
 
   private decodeState(state: string): string {
-    const redirectUri = atob(state);
-    return redirectUri;
+    const decoded = decodeOAuthState(state);
+    if (!decoded) throw new Error("Invalid OAuth state");
+    return decoded.redirectUri;
   }
 
   async getTokenByCode(
@@ -156,6 +157,9 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
+    if (!secret.trim()) {
+      throw new Error("Managed session signing secret is unavailable");
+    }
     return new TextEncoder().encode(secret);
   }
 
@@ -193,6 +197,8 @@ class SDKServer {
       name: payload.name,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuer("atena-geoportal")
+      .setAudience(ENV.appId)
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
   }
@@ -209,6 +215,8 @@ class SDKServer {
       const secretKey = this.getSessionSecret();
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
+        issuer: "atena-geoportal",
+        audience: ENV.appId,
       });
       const { openId, appId, name } = payload as Record<string, unknown>;
 
@@ -218,6 +226,12 @@ class SDKServer {
         !isNonEmptyString(name)
       ) {
         console.warn("[Auth] Session payload missing required fields");
+        return null;
+      }
+
+      // F3: a sessão só vale para este app; evita aceitar token de outro ambiente que compartilhe o segredo.
+      if (appId !== ENV.appId) {
+        console.warn("[Auth] Session issued for a different app");
         return null;
       }
 

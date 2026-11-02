@@ -10,6 +10,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getDb } from "../db";
+import { registerRasterAssetRoutes } from "../rasterAssetRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -141,6 +142,8 @@ async function startServer() {
   });
 
   // tRPC API (com rate limiting)
+  // Bytes raster nunca são servidos por express.static: cada tile/exportação valida sessão e projeto.
+  registerRasterAssetRoutes(app);
   app.use("/api/trpc", apiLimiter);
   app.use(
     "/api/trpc",

@@ -1,0 +1,82 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.patchedDependencies", "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v2.1.9 /home/ubuntu/atena_geoportal_f4_isolado
+
+ ❯ server/backupDriver.synthetic.test.ts (3 tests | 3 failed) 1374ms
+   × F4 real Drizzle/mysql2 backup contract > observes actual execute tuple, fields and row types, and reproduces the legacy extraction 19ms
+     → expected '2026-01-02 03:04:05' to be an instance of Date
+   × F4 real Drizzle/mysql2 backup contract > backs up real SQL rows through the actual router, with exact counts and no driver fields 1293ms
+     → Backup inválido: Hash divergente: users; Hash divergente: invitations; Hash divergente: projects; Hash divergente: project_members; Hash divergente: styles; Hash divergente: files; Hash divergente: file_versions; Hash divergente: base_layers; Hash divergente: ogc_services; Hash divergente: ogc_catalog_variants; Hash divergente: layers; Hash divergente: geometries; Hash divergente: saved_maps; Hash divergente: print_jobs; Hash divergente: atlas_templates; Hash divergente: atlas_jobs; Hash divergente: backup_policies; Hash divergente: backup_inventories; Hash divergente: gis_uploads; Hash divergente: notifications; Hash divergente: audit_logs; Hash global divergente
+   × F4 real Drizzle/mysql2 backup contract > restores archive bytes and all tabular hashes to memory and a different synthetic SQL schema 2ms
+     → requires the successful router backup case: expected undefined to be truthy
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  server/backupDriver.synthetic.test.ts > F4 real Drizzle/mysql2 backup contract > observes actual execute tuple, fields and row types, and reproduces the legacy extraction
+AssertionError: expected '2026-01-02 03:04:05' to be an instance of Date
+ ❯ server/backupDriver.synthetic.test.ts:148:30
+    146|     expect(first.mimeType).toBeNull();
+    147|     expect(first.metadata).toMatchObject({ nested: { fields: { legitim…
+    148|     expect(first.uploadedAt).toBeInstanceOf(Date);
+       |                              ^
+    149|     const legacy = Array.isArray(raw) ? raw : (raw as any)[0] || [];
+    150|     expect(legacy).toHaveLength(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  server/backupDriver.synthetic.test.ts > F4 real Drizzle/mysql2 backup contract > backs up real SQL rows through the actual router, with exact counts and no driver fields
+TRPCError: Backup inválido: Hash divergente: users; Hash divergente: invitations; Hash divergente: projects; Hash divergente: project_members; Hash divergente: styles; Hash divergente: files; Hash divergente: file_versions; Hash divergente: base_layers; Hash divergente: ogc_services; Hash divergente: ogc_catalog_variants; Hash divergente: layers; Hash divergente: geometries; Hash divergente: saved_maps; Hash divergente: print_jobs; Hash divergente: atlas_templates; Hash divergente: atlas_jobs; Hash divergente: backup_policies; Hash divergente: backup_inventories; Hash divergente: gis_uploads; Hash divergente: notifications; Hash divergente: audit_logs; Hash global divergente
+ ❯ Module.restoreToIsolatedMemory server/backupManifest.ts:144:34
+    142|   if (mode !== "local-rehearsal") throw new Error("Restauração permiti…
+    143|   const verification = verifyBackupArtifact(artifact);
+    144|   if (!verification.valid) throw new Error(`Backup inválido: ${verific…
+       |                                  ^
+    145|   return JSON.parse(JSON.stringify(artifact.tables)) as BackupRows;
+    146| }
+ ❯ Module.restoreLocalFilesystemArchive server/backupArchive.ts:141:18
+ ❯ server/backupRouter.ts:68:28
+ ❯ resolveMiddleware ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:571:22
+ ❯ callRecursive ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:633:20
+ ❯ callRecursive ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:633:20
+ ❯ callRecursive ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:633:20
+ ❯ procedure ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:673:20
+ ❯ ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/router.ts:474:20
+ ❯ server/backupDriver.synthetic.test.ts:158:14
+
+Caused by: Error: Backup inválido: Hash divergente: users; Hash divergente: invitations; Hash divergente: projects; Hash divergente: project_members; Hash divergente: styles; Hash divergente: files; Hash divergente: file_versions; Hash divergente: base_layers; Hash divergente: ogc_services; Hash divergente: ogc_catalog_variants; Hash divergente: layers; Hash divergente: geometries; Hash divergente: saved_maps; Hash divergente: print_jobs; Hash divergente: atlas_templates; Hash divergente: atlas_jobs; Hash divergente: backup_policies; Hash divergente: backup_inventories; Hash divergente: gis_uploads; Hash divergente: notifications; Hash divergente: audit_logs; Hash global divergente
+ ❯ Module.restoreToIsolatedMemory server/backupManifest.ts:144:34
+ ❯ Module.restoreLocalFilesystemArchive server/backupArchive.ts:141:18
+ ❯ server/backupRouter.ts:68:28
+ ❯ resolveMiddleware ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:571:22
+ ❯ callRecursive ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:633:20
+ ❯ callRecursive ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:633:20
+ ❯ callRecursive ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:633:20
+ ❯ procedure ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:673:20
+ ❯ ../portal_geoespacial_arqueo_isolated/node_modules/.pnpm/@trpc+server@11.6.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/router.ts:474:20
+ ❯ server/backupDriver.synthetic.test.ts:158:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  server/backupDriver.synthetic.test.ts > F4 real Drizzle/mysql2 backup contract > restores archive bytes and all tabular hashes to memory and a different synthetic SQL schema
+AssertionError: requires the successful router backup case: expected undefined to be truthy
+
+- Expected:
+true
+
++ Received:
+undefined
+
+ ❯ server/backupDriver.synthetic.test.ts:183:68
+    181|
+    182|   it("restores archive bytes and all tabular hashes to memory and a di…
+    183|     expect(artifact, "requires the successful router backup case").toB…
+       |                                                                    ^
+    184|     restored = await restoreLocalFilesystemArchive({ backupId: result.…
+    185|     expect(restored.tables).toEqual(artifact.tables);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  15:37:00
+   Duration  2.82s (transform 269ms, setup 0ms, collect 1.09s, tests 1.37s, environment 0ms, prepare 98ms)

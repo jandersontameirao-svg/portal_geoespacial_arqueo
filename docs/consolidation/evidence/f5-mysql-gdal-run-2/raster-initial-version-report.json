@@ -1,0 +1,778 @@
+{
+  "suite": "F5 raster initial-version local synthetic contracts",
+  "setupCompleted": true,
+  "boundaries": {
+    "database": "real MySQL + mysql2 + Drizzle; separate observation/seed connection",
+    "scanner": "real scanner, local mode required; VirusTotal configuration forbidden",
+    "raster": "real direct-local adapter/worker and GDAL; one successful processing request",
+    "storage": "test-only filesystem substitution, actual bytes, metadata-only captures",
+    "authentication": "synthetic TrpcContext callers; OAuth/session/HTTP delivery not exercised",
+    "cleanup": "runner owns the temporary root and database lifecycle"
+  },
+  "limits": {
+    "maxBytes": 104857600,
+    "requestedMinZoom": 12,
+    "requestedMaxZoom": 12,
+    "perTestTimeoutMs": 120000
+  },
+  "caveats": [
+    "SQL atomicity covers files + file_versions only, not the earlier external storage write.",
+    "A forced file_versions failure deliberately retains a synthetic storage orphan; no deletion is attempted.",
+    "Failed worker requests may leave files.metadata.rasterIngestion.status=processing; only the layer failure status is asserted.",
+    "Download procedures return local synthetic URL references; bytes are verified on disk, not via HTTP or real S3.",
+    "Completed cases below are recorded after their assertions; the runner's Vitest result remains authoritative for overall pass/fail."
+  ],
+  "engineVersion": "8.0.46-0ubuntu0.24.04.4",
+  "guard": {
+    "schema": "geoportal_f5",
+    "hostname": "127.0.0.1",
+    "socketOnly": true,
+    "nonSymlinkTemporaryRoot": true,
+    "externalCredentialsAbsent": true
+  },
+  "transactionTables": [
+    {
+      "name": "file_versions",
+      "engine": "InnoDB"
+    },
+    {
+      "name": "files",
+      "engine": "InnoDB"
+    },
+    {
+      "name": "layers",
+      "engine": "InnoDB"
+    }
+  ],
+  "fixture": {
+    "filename": "before_raw_epsg4326.tif",
+    "bytes": 587179,
+    "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92",
+    "sourceCrs": "EPSG:4326",
+    "sourceLayout": null,
+    "dimensions": [
+      2048,
+      2048
+    ]
+  },
+  "preservedSyntheticSamples": {
+    "original": {
+      "path": "/home/ubuntu/atena_geoportal_f5_isolado/docs/consolidation/evidence/f5-mysql-gdal-run-2/samples/f5-original-epsg4326.tif",
+      "bytes": 587179,
+      "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92"
+    },
+    "cog": {
+      "path": "/home/ubuntu/atena_geoportal_f5_isolado/docs/consolidation/evidence/f5-mysql-gdal-run-2/samples/f5-derived-epsg4674.cog.tif",
+      "bytes": 377166,
+      "sha256": "7de383d180b4ff57ff5ae3696a03302c8e3c7148406ec6a4a086343e361a7d8e"
+    },
+    "gdalInfo": [
+      "/home/ubuntu/atena_geoportal_f5_isolado/docs/consolidation/evidence/f5-mysql-gdal-run-2/samples/f5-original-gdalinfo.json",
+      "/home/ubuntu/atena_geoportal_f5_isolado/docs/consolidation/evidence/f5-mysql-gdal-run-2/samples/f5-cog-gdalinfo.json"
+    ]
+  },
+  "finalCounts": {
+    "files": 4,
+    "versions": 4,
+    "layers": 4,
+    "audits": 16
+  },
+  "rows": {
+    "files": [
+      {
+        "id": 1,
+        "projectId": 101,
+        "name": "before_raw_epsg4326.tif",
+        "originalName": "before_raw_epsg4326.tif",
+        "fileType": "geotiff",
+        "mimeType": "image/tiff",
+        "fileSize": 587179,
+        "s3Key": "projects/101/files/bo8Ol2dEhjfwFxM6r0G_r-before_raw_epsg4326.tif",
+        "currentVersion": 1,
+        "uploadedBy": 2
+      },
+      {
+        "id": 2,
+        "projectId": 101,
+        "name": "worker-invalid-signature.tif",
+        "originalName": "worker-invalid-signature.tif",
+        "fileType": "geotiff",
+        "mimeType": "image/tiff",
+        "fileSize": 68,
+        "s3Key": "projects/101/files/IKkHdIumZIOs_3wwT-TIx-worker-invalid-signature.tif",
+        "currentVersion": 1,
+        "uploadedBy": 2
+      },
+      {
+        "id": 3,
+        "projectId": 101,
+        "name": "same-filename.tif",
+        "originalName": "same-filename.tif",
+        "fileType": "geotiff",
+        "mimeType": "image/tiff",
+        "fileSize": 72,
+        "s3Key": "projects/101/files/5WmVC95zllvKKZlFsQIpn-same-filename.tif",
+        "currentVersion": 1,
+        "uploadedBy": 2
+      },
+      {
+        "id": 4,
+        "projectId": 101,
+        "name": "same-filename.tif",
+        "originalName": "same-filename.tif",
+        "fileType": "geotiff",
+        "mimeType": "image/tiff",
+        "fileSize": 75,
+        "s3Key": "projects/101/files/Nvr5XhcHSl4kD4PSVhjdn-same-filename.tif",
+        "currentVersion": 1,
+        "uploadedBy": 2
+      }
+    ],
+    "versions": [
+      {
+        "id": 1,
+        "fileId": 1,
+        "version": 1,
+        "s3Key": "projects/101/files/bo8Ol2dEhjfwFxM6r0G_r-before_raw_epsg4326.tif",
+        "fileSize": 587179,
+        "mimeType": "image/tiff",
+        "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92",
+        "uploadedBy": 2,
+        "metadata": {
+          "kind": "initial-upload",
+          "source": "raster-ingestion",
+          "fileType": "geotiff",
+          "originalName": "before_raw_epsg4326.tif",
+          "immutableReference": true
+        }
+      },
+      {
+        "id": 2,
+        "fileId": 2,
+        "version": 1,
+        "s3Key": "projects/101/files/IKkHdIumZIOs_3wwT-TIx-worker-invalid-signature.tif",
+        "fileSize": 68,
+        "mimeType": "image/tiff",
+        "sha256": "532e4706a1cd293da287ea6bbcff6a34d4c27622cb12b66a4221ce891f5a6996",
+        "uploadedBy": 2,
+        "metadata": {
+          "kind": "initial-upload",
+          "source": "raster-ingestion",
+          "fileType": "geotiff",
+          "originalName": "worker-invalid-signature.tif",
+          "immutableReference": true
+        }
+      },
+      {
+        "id": 3,
+        "fileId": 3,
+        "version": 1,
+        "s3Key": "projects/101/files/5WmVC95zllvKKZlFsQIpn-same-filename.tif",
+        "fileSize": 72,
+        "mimeType": "image/tiff",
+        "sha256": "2497cd4b9c927755af07c870f34f2e56f9249c1079962f51574eb59e11441288",
+        "uploadedBy": 2,
+        "metadata": {
+          "kind": "initial-upload",
+          "source": "raster-ingestion",
+          "fileType": "geotiff",
+          "originalName": "same-filename.tif",
+          "immutableReference": true
+        }
+      },
+      {
+        "id": 4,
+        "fileId": 4,
+        "version": 1,
+        "s3Key": "projects/101/files/Nvr5XhcHSl4kD4PSVhjdn-same-filename.tif",
+        "fileSize": 75,
+        "mimeType": "image/tiff",
+        "sha256": "2e2eda668e585fd081e558ab20c830444e4726e423a5a75ebc1315f42eb1302b",
+        "uploadedBy": 2,
+        "metadata": {
+          "kind": "initial-upload",
+          "source": "raster-ingestion",
+          "fileType": "geotiff",
+          "originalName": "same-filename.tif",
+          "immutableReference": true
+        }
+      }
+    ],
+    "layers": [
+      {
+        "id": 1,
+        "projectId": 101,
+        "fileId": 1,
+        "layerType": "raster",
+        "isVisible": 1,
+        "isPublic": 0,
+        "createdBy": 2,
+        "metadata": {
+          "localRaster": {
+            "cogKey": "projects/101/rasters/1/source.cog.tif",
+            "nodata": 0,
+            "maxZoom": 12,
+            "minZoom": 12,
+            "tilesKey": "projects/101/rasters/1/tiles",
+            "expectedCrs": "EPSG:4674"
+          },
+          "rasterIngestion": {
+            "cogKey": "projects/101/rasters/1/source.cog.tif",
+            "status": "completed",
+            "stacKey": "projects/101/rasters/1/source.stac-item.json",
+            "cogBytes": 377166,
+            "cogSha256": "7de383d180b4ff57ff5ae3696a03302c8e3c7148406ec6a4a086343e361a7d8e",
+            "sourceKey": "projects/101/rasters/1/source/original.tif",
+            "tileCount": 16,
+            "workerMode": "direct-local",
+            "completedAt": "2026-11-02T20:28:55.589Z",
+            "manifestKey": "projects/101/rasters/1/tile-manifest.json",
+            "requestedBy": 2,
+            "sourceBytes": 587179,
+            "sourceLabel": "Fixture sintética local autorizada F5",
+            "sourceSha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92",
+            "acquisitionAt": "2026-01-02T03:04:05.000Z"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "projectId": 101,
+        "fileId": 2,
+        "layerType": "raster",
+        "isVisible": 0,
+        "isPublic": 0,
+        "createdBy": 2,
+        "metadata": {
+          "rasterIngestion": {
+            "error": "Arquivo de origem não possui assinatura TIFF válida",
+            "status": "failed",
+            "failedAt": "2026-11-02T20:28:55.776Z"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "projectId": 101,
+        "fileId": 3,
+        "layerType": "raster",
+        "isVisible": 0,
+        "isPublic": 0,
+        "createdBy": 2,
+        "metadata": {
+          "rasterIngestion": {
+            "error": "Arquivo de origem não possui assinatura TIFF válida",
+            "status": "failed",
+            "failedAt": "2026-11-02T20:28:55.855Z"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "projectId": 101,
+        "fileId": 4,
+        "layerType": "raster",
+        "isVisible": 0,
+        "isPublic": 0,
+        "createdBy": 2,
+        "metadata": {
+          "rasterIngestion": {
+            "error": "Arquivo de origem não possui assinatura TIFF válida",
+            "status": "failed",
+            "failedAt": "2026-11-02T20:28:55.856Z"
+          }
+        }
+      }
+    ],
+    "audit": [
+      {
+        "action": "raster.ingest",
+        "entityType": "layer",
+        "entityId": 1,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.view",
+        "entityType": "file",
+        "entityId": 1,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.version.download",
+        "entityType": "file_version",
+        "entityId": 1,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.download",
+        "entityType": "file",
+        "entityId": 1,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "raster.ingest_failed",
+        "entityType": "layer",
+        "entityId": 2,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.view",
+        "entityType": "file",
+        "entityId": 2,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.version.download",
+        "entityType": "file_version",
+        "entityId": 2,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.download",
+        "entityType": "file",
+        "entityId": 2,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "raster.ingest_failed",
+        "entityType": "layer",
+        "entityId": 3,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "raster.ingest_failed",
+        "entityType": "layer",
+        "entityId": 4,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.view",
+        "entityType": "file",
+        "entityId": 3,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.version.download",
+        "entityType": "file_version",
+        "entityId": 3,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.download",
+        "entityType": "file",
+        "entityId": 3,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.view",
+        "entityType": "file",
+        "entityId": 4,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.version.download",
+        "entityType": "file_version",
+        "entityId": 4,
+        "projectId": 101,
+        "userId": 2
+      },
+      {
+        "action": "file.download",
+        "entityType": "file",
+        "entityId": 4,
+        "projectId": 101,
+        "userId": 2
+      }
+    ]
+  },
+  "rasterArtifacts": [
+    {
+      "key": "projects/101/rasters/1/source.cog.tif",
+      "size": 377166,
+      "sha256": "7de383d180b4ff57ff5ae3696a03302c8e3c7148406ec6a4a086343e361a7d8e"
+    },
+    {
+      "key": "projects/101/rasters/1/source.stac-item.json",
+      "size": 1653,
+      "sha256": "bf208ad7365d78e0b95913d3386b31077bbd97e1da5b6400f335426e05731943"
+    },
+    {
+      "key": "projects/101/rasters/1/source/original.tif",
+      "size": 587179,
+      "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92"
+    },
+    {
+      "key": "projects/101/rasters/1/tile-manifest.json",
+      "size": 384,
+      "sha256": "8ebfcb53deb53952439fbd676c07f8db06ef579171adaaf59f40abbdc095adcd"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2227.png",
+      "size": 1768,
+      "sha256": "1793cc063edd445f51b4fb590eb589823585f96fec4e68bd87ecdb774a1dd9f2"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2227.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2228.png",
+      "size": 3536,
+      "sha256": "d98757b3c9359be3173b43d050dbc1b7c69ebf775c4ff0710d8ef6080f0e645e"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2228.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2229.png",
+      "size": 2628,
+      "sha256": "9a5f0b582af28333526762f0a9884df7b48d188ed962096b964a30b5095692c1"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2229.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2230.png",
+      "size": 1928,
+      "sha256": "be969ec980ab7122a7a9ae8ffa7b5cb0ac9fdc9cffee9a06bd61249bfa624fce"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1500/2230.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2227.png",
+      "size": 2774,
+      "sha256": "f7ccc6ab60d9603b215852f2a90df694650349ae8ef5723f518e60056e444022"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2227.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2228.png",
+      "size": 4396,
+      "sha256": "98fc2ad09b3e2910024e3f0549c1d2bb1b4afced450b52e64875e1510b9c5951"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2228.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2229.png",
+      "size": 3607,
+      "sha256": "725689797ce9232d00cfe001eab8e2af994bbb02886ca6c4f300ae8427e1aee9"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2229.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2230.png",
+      "size": 2736,
+      "sha256": "71329c431f16ef8659bedd935c048e94fe157655cd378ddd905ca840122831ef"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1501/2230.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2227.png",
+      "size": 1607,
+      "sha256": "0ad1368f6dd74cbd16b7bdc20db9c08fa855fb54e98f64ec8370bea238e604ea"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2227.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2228.png",
+      "size": 3684,
+      "sha256": "cd03e9fed1730af31fd01ee1ce34b91860fd3fa5536892935b52fb83dfbe45c8"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2228.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2229.png",
+      "size": 3688,
+      "sha256": "170699cc8f284c6f374d5c66c982bc530bee6d88bcee0609a3bdd6488d96ae49"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2229.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2230.png",
+      "size": 2774,
+      "sha256": "35ce7a1aaf7b536d4a4b17cd5e05b2c1dab116d500b8443cd744ee99aa72ffc8"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1502/2230.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2227.png",
+      "size": 952,
+      "sha256": "c36ccf4dd331fadf9a97364788757c0e111c2674f2fecbc1e0a975c687ae9182"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2227.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2228.png",
+      "size": 3244,
+      "sha256": "2def87d2fe34c6e44ec3d74661d5d280f2c13fefa2f15d58f1f5454af2426ad4"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2228.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2229.png",
+      "size": 3046,
+      "sha256": "a1664e5a9d2607dfd5bc266497fcc76cd8397033b24e0a3e8e7d7819272960a0"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2229.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2230.png",
+      "size": 2245,
+      "sha256": "e42eef6542019d17172d36cc99a406c6ed065c1701aee8fe5469228c0272f6f2"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/12/1503/2230.png.aux.xml",
+      "size": 298,
+      "sha256": "595feef02a08d83be7ec77fab4cb60d82c66cb4bedbd5b8afcf54be2f8b4f20f"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/googlemaps.html",
+      "size": 27834,
+      "sha256": "8d8284d431f2b6fd1d5c625a4bf668a32a780b93dc65a63906a47a1b45693f39"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/leaflet.html",
+      "size": 4566,
+      "sha256": "26b0f072a2bf59648399ccd3fd8e88b7c2ca768613982b7d3122e595ba7a650e"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/mapml.mapml",
+      "size": 1853,
+      "sha256": "e3fc14b8ea9fc4cb572309afd91b3ca7200d04445c123bb6c85234b98c19362e"
+    },
+    {
+      "key": "projects/101/rasters/1/tiles/openlayers.html",
+      "size": 4702,
+      "sha256": "be951fcb70a7c0d476751cbfe72232c27f1137b127a5e0bc41d033a5cb5375a9"
+    }
+  ],
+  "storageObjects": [
+    {
+      "key": "projects/101/files/bo8Ol2dEhjfwFxM6r0G_r-before_raw_epsg4326.tif",
+      "url": "/synthetic-f5-only/projects/101/files/bo8Ol2dEhjfwFxM6r0G_r-before_raw_epsg4326.tif",
+      "size": 587179,
+      "mimeType": "image/tiff",
+      "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92"
+    },
+    {
+      "key": "projects/101/files/IKkHdIumZIOs_3wwT-TIx-worker-invalid-signature.tif",
+      "url": "/synthetic-f5-only/projects/101/files/IKkHdIumZIOs_3wwT-TIx-worker-invalid-signature.tif",
+      "size": 68,
+      "mimeType": "image/tiff",
+      "sha256": "532e4706a1cd293da287ea6bbcff6a34d4c27622cb12b66a4221ce891f5a6996"
+    },
+    {
+      "key": "projects/101/files/5WmVC95zllvKKZlFsQIpn-same-filename.tif",
+      "url": "/synthetic-f5-only/projects/101/files/5WmVC95zllvKKZlFsQIpn-same-filename.tif",
+      "size": 72,
+      "mimeType": "image/tiff",
+      "sha256": "2497cd4b9c927755af07c870f34f2e56f9249c1079962f51574eb59e11441288"
+    },
+    {
+      "key": "projects/101/files/Nvr5XhcHSl4kD4PSVhjdn-same-filename.tif",
+      "url": "/synthetic-f5-only/projects/101/files/Nvr5XhcHSl4kD4PSVhjdn-same-filename.tif",
+      "size": 75,
+      "mimeType": "image/tiff",
+      "sha256": "2e2eda668e585fd081e558ab20c830444e4726e423a5a75ebc1315f42eb1302b"
+    },
+    {
+      "key": "projects/101/files/t0MT22jQ7YBDbW4nP247c-rollback-original.tif",
+      "url": "/synthetic-f5-only/projects/101/files/t0MT22jQ7YBDbW4nP247c-rollback-original.tif",
+      "size": 587179,
+      "mimeType": "image/tiff",
+      "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92"
+    }
+  ],
+  "completedCases": [
+    {
+      "name": "success-original-v1-real-cog",
+      "evidence": {
+        "fileId": 1,
+        "versionId": 1,
+        "layerId": 1,
+        "originalKey": "projects/101/files/bo8Ol2dEhjfwFxM6r0G_r-before_raw_epsg4326.tif",
+        "cogKey": "projects/101/rasters/1/source.cog.tif",
+        "originalSha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92",
+        "cogSha256": "7de383d180b4ff57ff5ae3696a03302c8e3c7148406ec6a4a086343e361a7d8e",
+        "originalBytes": 587179,
+        "cogBytes": 377166,
+        "scanner": {
+          "method": "local",
+          "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92"
+        },
+        "gdal": {
+          "layout": "COG",
+          "crs": "EPSG:4674",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        "tiles": 16,
+        "crossProjectReadDownloadDenied": true
+      }
+    },
+    {
+      "name": "worker-failure-preserves-original-v1",
+      "evidence": {
+        "fileId": 2,
+        "versionId": 2,
+        "layerId": 2,
+        "sha256": "532e4706a1cd293da287ea6bbcff6a34d4c27622cb12b66a4221ce891f5a6996",
+        "scanner": {
+          "method": "local",
+          "sha256": "532e4706a1cd293da287ea6bbcff6a34d4c27622cb12b66a4221ce891f5a6996"
+        },
+        "layerStatus": "failed",
+        "layerVisible": false,
+        "fileMetadataStatusObservedOnly": "processing"
+      }
+    },
+    {
+      "name": "concurrent-same-filename-independent-originals",
+      "evidence": {
+        "originals": [
+          {
+            "fileId": 3,
+            "versionId": 3,
+            "key": "projects/101/files/5WmVC95zllvKKZlFsQIpn-same-filename.tif",
+            "sha256": "2497cd4b9c927755af07c870f34f2e56f9249c1079962f51574eb59e11441288"
+          },
+          {
+            "fileId": 4,
+            "versionId": 4,
+            "key": "projects/101/files/Nvr5XhcHSl4kD4PSVhjdn-same-filename.tif",
+            "sha256": "2e2eda668e585fd081e558ab20c830444e4726e423a5a75ebc1315f42eb1302b"
+          }
+        ],
+        "noSecondCogProcessing": true,
+        "eachVersionCount": 1
+      }
+    },
+    {
+      "name": "real-driver-version-insert-rollback",
+      "evidence": {
+        "sqlCountsBefore": {
+          "files": 4,
+          "versions": 4,
+          "layers": 4,
+          "audits": 16
+        },
+        "sqlCountsAfter": {
+          "files": 4,
+          "versions": 4,
+          "layers": 4,
+          "audits": 16
+        },
+        "driverCodes": [
+          "INTERNAL_SERVER_ERROR",
+          "ER_SIGNAL_EXCEPTION"
+        ],
+        "sqlStates": [
+          "45000"
+        ],
+        "triggerMarkerObserved": true,
+        "orphan": {
+          "key": "projects/101/files/t0MT22jQ7YBDbW4nP247c-rollback-original.tif",
+          "url": "/synthetic-f5-only/projects/101/files/t0MT22jQ7YBDbW4nP247c-rollback-original.tif",
+          "size": 587179,
+          "mimeType": "image/tiff",
+          "sha256": "db63d16649f634da5fb4bce1984b14dc431b033c4a7761a33e2ae948e8bf0f92",
+          "deliberatelyRetained": true,
+          "sqlReferences": 0
+        },
+        "workerEvidence": "No layer/audit insertion and no new/changed raster artefacts with a known-valid fixture; no mocked invocation counter.",
+        "crossStorageAtomicity": false
+      }
+    },
+    {
+      "name": "access-guards-before-writes",
+      "evidence": {
+        "denied": [
+          "client",
+          "nonmember",
+          "unauthenticated",
+          "missing project",
+          "other project"
+        ],
+        "sqlStorageRasterUnchanged": true
+      }
+    },
+    {
+      "name": "real-scanner-malware-before-writes",
+      "evidence": {
+        "signature": "MZ",
+        "method": "local",
+        "rejectedSha256": "cee8d097bd646f77e2dd679557cd69d7a2a8113ad5970077c37dcd64e89cc5a9",
+        "sqlStorageRasterUnchanged": true
+      }
+    },
+    {
+      "name": "size-mime-zoom-before-writes",
+      "evidence": {
+        "rejected": [
+          "decoded size mismatch",
+          "over 100 MiB declared size",
+          "unsupported MIME",
+          "minZoom greater than maxZoom"
+        ],
+        "sqlStorageRasterUnchanged": true
+      }
+    }
+  ]
+}

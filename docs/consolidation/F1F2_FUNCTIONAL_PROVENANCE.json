@@ -1,0 +1,21 @@
+{
+  "baseCommit": "98e7a894ddc543906031ebadadb7c92665a90bc8",
+  "functionalCommit": "3b5e0f03160c84279671f7e764ff0dc7ce9d25a1",
+  "changedFiles": {
+    "client/src/components/FileUpload.tsx": "0d2e6b72d9f8d22059b14740067e75d103e5443217b765a8979cf2a18a3bc81a",
+    "client/src/components/RasterIngestionPanel.tsx": "9f8964784fab0f88b5f257ca266dad15d72bb9d9d9806e81d40a5810dc921b17",
+    "client/src/pages/Files.tsx": "4e118ce4e655222e9c0981af0561a2a06a73f93b81f61bb5682f63926443a40e",
+    "infra/scripts/run_files_f1f2_validation.sh": "955091e75ab9f70f3ec5fb38906ca959913787152a9286a2641a19f1337f6cb0",
+    "server/db.ts": "42dbe46596c3ccc08c9128b816f345496f0c554216a0a3191f2530d18d27c5c3",
+    "server/fileTypeCategories.test.ts": "07878d49d652bdeeb0085f8d483ae364e1b308faa895245af9ec1d60cc814ef5",
+    "server/filesF1F2.synthetic.test.ts": "0d47c900d9917bea3156bda6f2d3a0b880af08338120b1c7b91dd15c95302ed5",
+    "server/filesRouter.ts": "efb7e28fa40b50283e7c3a997cdff3ddcca960c26b80d1705a36d2dd204023d5",
+    "server/tiffUploadPolicy.test.ts": "d4a6be6a64a84c12b2760e5d479c6c692c9cb62b324c006b648fad00faaa4ada",
+    "shared/fileTypeCategories.ts": "1e89266f7f3b29f51331601ce9f72d775ddc56bbb9d43a026a3d6cb9e59b63c4",
+    "shared/tiffUploadPolicy.ts": "fa21a9bbba14284c41453d36bcb9c549c8b8e43ee288c79bbac0971e2d5b2859"
+  },
+  "productionConfigSchemaAuthBackupStorageChanged": false,
+  "workingFilesEqualFunctionalCommit": true,
+  "directedTests": "45 pass; 40 pure + 5 real local MySQL/Drizzle integration; test-only filesystem storage substitution",
+  "historical112Rerun": false
+}

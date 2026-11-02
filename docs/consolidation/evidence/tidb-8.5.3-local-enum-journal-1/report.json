@@ -1,0 +1,17 @@
+{
+  "scope": "local-synthetic-only",
+  "version": "8.0.11-TiDB-v8.5.3",
+  "enumPreservation": "passed",
+  "drizzleMigration": "passed",
+  "productionTouched": false,
+  "homologationTouched": false,
+  "storageRemoteTouched": false,
+  "originalRowsPreserved": 8,
+  "newTypesPersisted": [
+    "geotiff",
+    "geojson"
+  ],
+  "ordinalValuesChanged": true,
+  "journalEntries": 14,
+  "journalMatchesExactSqlHashes": true
+}

@@ -1,0 +1,24 @@
+{
+  "baseF1F2Commit": "7886350d9fec7e7eaebeb4f82cca0a428516f1ab",
+  "functionalCommit": "97ff97bc0ba421cc851c1a9bac05b29e5ae12250",
+  "changedFunctionalFiles": {
+    "infra/scripts/run_raster_f5_validation.sh": "225bc91c4c166637c9f9e82247e060edc208f702e6a2e26b284973f018699960",
+    "server/db.ts": "4c26027fe270ac97a40abd88f5f5c9a02d7b3af680b40c7886718a86aa664cca",
+    "server/rasterInitialVersion.synthetic.test.ts": "0964783132c770bc2824ef14da55b724205ef773620734cb56f068ff7586cf3f",
+    "server/rasterRouter.ts": "6d7fe079932a3070a208322294943b366adc66c42934f0c9b323286da5f9ddd4"
+  },
+  "testedWorkingBytesEqualFunctionalCommit": true,
+  "directedVitest": {
+    "newRealIntegrationCases": 7,
+    "existingPureRegressionCases": 2,
+    "passed": 9,
+    "files": 2
+  },
+  "noDatabaseDriverScannerRasterMocks": true,
+  "onlySubstitutedBoundary": "test-only storage filesystem",
+  "sourceAndCogSyntheticSamplesHashesVerified": true,
+  "historical112Rerun": false,
+  "productionStageOperation": false,
+  "noSchemaMigrationsClientAuthStorageManagedDependencyChanged": true,
+  "failedInitialPreparationPreserved": true
+}

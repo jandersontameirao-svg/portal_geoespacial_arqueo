@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-02T03:47:30Z",
+  "status": "candidate_not_deployable_without_schema_review",
+  "candidate": {
+    "baseCommit": "9426d80c4e6b10e584b6c0d53fd6b0aeaba0c791",
+    "branch": "candidato/consolidacao-gis-pr8",
+    "pr8Reference": "25f8936614e7148f67c8b14cb3c909c6d2b3fc99",
+    "oauthJwtPatchSha256": "f9febbf140be820321968e50417d8d5729795d2ef4fd1944c1a1fc4ba8c2360f"
+  },
+  "activePorts": [
+    "Polygon/MultiPolygon topology including holes",
+    "KML/KMZ bounded parser and viewer",
+    "Geometry import/export preservation and validation",
+    "Measurement control lifecycle",
+    "Bundled Leaflet default marker asset usage",
+    "OAuth state nonce binding and single-use callback consumption",
+    "JWT issuer/audience/app binding"
+  ],
+  "preservedGISCapabilities": [
+    "workspace thematic tree",
+    "2D/3D globe and navigation",
+    "projects, maps, atlas, files and administration routes",
+    "raster COG ingestion/tiles/comparison/export",
+    "WMS visualization and WFS import",
+    "Atlas and cartographic worker architecture",
+    "backup inventory and recoverable local adapters"
+  ],
+  "deferredNotDiscarded": [
+    {
+      "component": "PR8 Atena analysis/router/panel",
+      "archive": "docs/consolidation/deferred-pr8-atena",
+      "reason": "requires incompatible geometry layer tree fields and batch helpers; must be reconciled by a new approved migration"
+    },
+    {
+      "component": "PR8 migrations 0007-0012",
+      "reason": "not copied or executed; production approval remains pending"
+    }
+  ],
+  "dataSafety": {
+    "migrationsExecuted": false,
+    "ddlExecuted": false,
+    "seedsExecuted": false,
+    "productionDataReadOrCopiedByThisConsolidation": false,
+    "storageObjectsModified": false,
+    "objectsDispensed": 0,
+    "objectComparison": "11 items inaccessible in locally mounted artifacts; no absence claimed"
+  },
+  "validation": {
+    "typecheck": "passed",
+    "build": "passed",
+    "targetedUnitTests": {
+      "passed": 36,
+      "suites": 6,
+      "scope": "topology, Leaflet coordinate conversion, KML/KMZ limits, OAuth state callback, JWT issuer/audience/app binding"
+    },
+    "fullExistingSuite": {
+      "result": "partially blocked by unavailable database",
+      "reason": "15 pre-existing DB-dependent assertions failed with 'Database not available'; pure GIS/raster/backup/OGC tests passed"
+    }
+  },
+  "notAuthorized": [
+    "production migration execution",
+    "production deployment",
+    "data deletion or object dispensation",
+    "merge or push to GitHub"
+  ]
+}

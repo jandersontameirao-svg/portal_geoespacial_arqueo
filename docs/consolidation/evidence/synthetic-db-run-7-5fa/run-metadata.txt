@@ -1,0 +1,5 @@
+target=MySQL local descartável (127.0.0.1:33128)
+database=geoportal_synthetic
+source_commit=5fa06ac2f2fd544c541fc3f02969b9fd551ee1b3
+source_branch=
+started_at=2026-11-02T14:20:57Z

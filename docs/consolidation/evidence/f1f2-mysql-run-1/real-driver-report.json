@@ -1,0 +1,55 @@
+{
+  "realMySQLDrizzle": true,
+  "realScanner": true,
+  "storage": "test-only filesystem boundary substitution",
+  "oauth": "not tested; synthetic caller contexts, no app bypass",
+  "productionStageTouched": false,
+  "engine": "8.0.46-0ubuntu0.24.04.4",
+  "fixture": {
+    "validGeoTiffVerifiedByGDALInExecutor": true,
+    "size": 447,
+    "sha256": "9bbcbd7a6c27c6d9067e5eb89736a62b9b98b7768ad660d1765acacc35c93b2a"
+  },
+  "categories": {
+    "geospatial": [
+      "kml",
+      "kmz",
+      "shp",
+      "geojson",
+      "geotiff"
+    ],
+    "document": [
+      "pdf",
+      "docx",
+      "xlsx"
+    ],
+    "image": [
+      "image"
+    ],
+    "other": [
+      "other"
+    ]
+  },
+  "originalUpload": {
+    "fileId": 303,
+    "fileType": "image",
+    "versionCount": 1,
+    "sha256": "9bbcbd7a6c27c6d9067e5eb89736a62b9b98b7768ad660d1765acacc35c93b2a",
+    "layers": 0,
+    "scanner": "real local signature scanner; no API key",
+    "sourceMime": "application/geotiff",
+    "sentMime": "image/tiff"
+  },
+  "shortName": {
+    "filename": "a.tif",
+    "rasterName": "a.tif",
+    "validation": "passed name schema; real PRECONDITION_FAILED availability guard",
+    "noWrite": true
+  },
+  "securityNegatives": [
+    "client role denied",
+    "nonmember denied",
+    "unauthenticated denied",
+    "MZ signature rejected by actual scanner"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "scope": "private-network-namespace-unix-socket-synthetic-only",
+  "mockedDriver": false,
+  "engine": "8.0.46-0ubuntu0.24.04.4",
+  "timestampRepresentation": "Drizzle raw typeCast SQL string -> JSON preserves string -> SQL restore -> same Drizzle string",
+  "blobs": "generic synthetic fixture bytes; no assertion of valid GeoTIFF/COG",
+  "driverTuple": {
+    "elements": 2,
+    "realRows": 3,
+    "fieldPackets": 18,
+    "legacyReportedRows": 2,
+    "legacyFirstEntryIsArray": true,
+    "timestampIsSqlString": true,
+    "enumIsLabel": true,
+    "jsonIsObject": true
+  }
+}

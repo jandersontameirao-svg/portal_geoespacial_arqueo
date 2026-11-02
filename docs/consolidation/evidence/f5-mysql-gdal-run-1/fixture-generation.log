@@ -1,0 +1,76 @@
+
+A module that was compiled using NumPy 1.x cannot be run in
+NumPy 2.5.4 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+Traceback (most recent call last):  File "/home/ubuntu/atena_geoportal_f5_isolado/infra/raster/generate_synthetic_rasters.py", line 17, in <module>
+    gdal.UseExceptions()
+  File "/usr/lib/python3/dist-packages/osgeo/gdal.py", line 246, in UseExceptions
+    from . import gdal_array
+  File "/usr/lib/python3/dist-packages/osgeo/gdal_array.py", line 10, in <module>
+    from . import _gdal_array
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/numpy/core/_multiarray_umath.py", line 46, in __getattr__
+    raise ImportError(msg)
+ImportError:
+A module that was compiled using NumPy 1.x cannot be run in
+NumPy 2.5.4 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+
+
+A module that was compiled using NumPy 1.x cannot be run in
+NumPy 2.5.4 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+Traceback (most recent call last):  File "/home/ubuntu/atena_geoportal_f5_isolado/infra/raster/generate_synthetic_rasters.py", line 76, in <module>
+    main()
+  File "/home/ubuntu/atena_geoportal_f5_isolado/infra/raster/generate_synthetic_rasters.py", line 70, in main
+    create_scene(args.output_dir / "before_raw_epsg4326.tif", "before")
+  File "/home/ubuntu/atena_geoportal_f5_isolado/infra/raster/generate_synthetic_rasters.py", line 57, in create_scene
+    band.WriteArray(data)
+  File "/usr/lib/python3/dist-packages/osgeo/gdal.py", line 5296, in WriteArray
+    from osgeo import gdal_array
+  File "/usr/lib/python3/dist-packages/osgeo/gdal_array.py", line 10, in <module>
+    from . import _gdal_array
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/numpy/core/_multiarray_umath.py", line 46, in __getattr__
+    raise ImportError(msg)
+ImportError:
+A module that was compiled using NumPy 1.x cannot be run in
+NumPy 2.5.4 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+
+Traceback (most recent call last):
+  File "/home/ubuntu/atena_geoportal_f5_isolado/infra/raster/generate_synthetic_rasters.py", line 76, in <module>
+    main()
+  File "/home/ubuntu/atena_geoportal_f5_isolado/infra/raster/generate_synthetic_rasters.py", line 70, in main
+    create_scene(args.output_dir / "before_raw_epsg4326.tif", "before")
+  File "/home/ubuntu/atena_geoportal_f5_isolado/infra/raster/generate_synthetic_rasters.py", line 57, in create_scene
+    band.WriteArray(data)
+  File "/usr/lib/python3/dist-packages/osgeo/gdal.py", line 5296, in WriteArray
+    from osgeo import gdal_array
+  File "/usr/lib/python3/dist-packages/osgeo/gdal_array.py", line 10, in <module>
+    from . import _gdal_array
+ImportError: numpy.core.multiarray failed to import

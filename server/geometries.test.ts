@@ -108,7 +108,7 @@ describe("Geometries Router", () => {
     it("should validate required fields", async () => {
       const caller = appRouter.createCaller(adminContext);
 
-      // O backend aceita nome vazio, então vamos testar com projectId inválido
+      // Um projeto inexistente não pode receber geometria, inclusive por admin.
       await expect(
         caller.geometries.importBatch({
           projectId: 99999, // ID inexistente
@@ -122,19 +122,16 @@ describe("Geometries Router", () => {
             },
           ],
         })
-      ).resolves.toBeDefined(); // Backend não valida se projeto existe antes de inserir
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
 
-    it("should handle empty array", async () => {
+    it("should reject an empty import batch", async () => {
       const caller = appRouter.createCaller(adminContext);
 
-      const result = await caller.geometries.importBatch({
+      await expect(caller.geometries.importBatch({
         projectId: testProjectId,
         geometries: [],
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.count).toBe(0);
+      })).rejects.toThrow(/Too small: expected array to have >=1 items/);
     });
   });
 

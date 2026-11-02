@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLoginUrl } from "@/const";
+import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { 
   Globe, 
@@ -126,12 +126,10 @@ export default function Home() {
                 <Button 
                   size="lg" 
                   className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-6 text-lg shadow-lg shadow-orange-500/25"
-                  asChild
+                  onClick={startLogin}
                 >
-                  <a href={getLoginUrl()}>
-                    Acessar Sistema
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </a>
+                  Acessar Sistema
+                  <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </div>
             </div>

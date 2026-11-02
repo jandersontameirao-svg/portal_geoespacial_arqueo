@@ -1,0 +1,12 @@
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./SHA256SUMS.txt
+65decdf7c397b2c50ba2e0dc3353bc55013a3fdc155d80c7bf0eaad935d81be7  ./client/AtenaPanel.tsx
+fc587d534262e11ce2ed23653e22028dfc73dbdf36409f95dcee0d540aa64fc5  ./server-atena/ai.ts
+5df6b36115a20767824cebee727fe4ce4f444dbdab79dda917f7c01949a6db7c  ./server-atena/areas.ts
+14cfe8b4f36d9a657a663f737e343e2f9fc6c39d114bd302a06e8b66ac887880  ./server-atena/composition.ts
+83a8564ab2f93364cae400ca5d4477c5c96f93cde3cfd721ff038709ebef6e0a  ./server-atena/executor.ts
+f8cd3cb70f1558460a632702336ffc64b4e894f465c83a46b58cc4449a4affe2  ./server-atena/geo.ts
+ec801f2e13cb1d23c3e50ddeff63022234011d6951764183c66d295306c5c855  ./server-atena/plan.ts
+42dc62e4ecbdd01651e78e9aad65bfa84bc88d0cdf1a2f947b8005d90e9fb5bc  ./server-atena/proj.ts
+4266756af39a4e4f87e34537a06d495ee84cf7c10df68097702395f329366337  ./server-atena/skills.ts
+f9cba52f5753559bc7c16014615ea7c6f79a78c411ebae9cb77b930e7d95af65  ./server-atena/templates.ts
+5f301d01a882f213eeb0fa83d74fe63ad63c9dc622933657acb14595c71d057d  ./server-atenaRouter.ts

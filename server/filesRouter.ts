@@ -9,6 +9,9 @@ import { invokeLLM } from "./_core/llm";
 import AdmZip from "adm-zip";
 import { ensureFileSafe } from "./virusScanner";
 import { notifyUploadComplete, notifyUploadError } from "./notificationHelper";
+import { createImportedVectorLayer } from "./vectorLayerPromotion";
+import { buildInitialFileVersion } from "./fileVersioning";
+import { getFileTypesForCategory } from "../shared/fileTypeCategories";
 
 // ============================================================================
 // HELPER: Verificar acesso ao projeto
@@ -81,6 +84,8 @@ export const filesRouter = router({
         "application/vnd.google-earth.kmz",
         "application/zip", // Para shapefiles
         "application/x-zip-compressed",
+        "application/geo+json",
+        "application/json",
         // Documentos
         "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -152,10 +157,11 @@ export const filesRouter = router({
       }
 
       // Determinar fileType baseado no mimeType
-      let fileType: "kml" | "kmz" | "shp" | "pdf" | "docx" | "xlsx" | "image" | "other" = "other";
+      let fileType: "kml" | "kmz" | "shp" | "geojson" | "pdf" | "docx" | "xlsx" | "image" | "other" = "other";
       if (input.mimeType === "application/vnd.google-earth.kml+xml") fileType = "kml";
       else if (input.mimeType === "application/vnd.google-earth.kmz") fileType = "kmz";
       else if (input.mimeType === "application/zip" || input.mimeType === "application/x-zip-compressed") fileType = "shp";
+      else if (input.mimeType === "application/geo+json" || input.mimeType === "application/json") fileType = "geojson";
       else if (input.mimeType === "application/pdf") fileType = "pdf";
       else if (input.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") fileType = "docx";
       else if (input.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") fileType = "xlsx";
@@ -206,7 +212,7 @@ export const filesRouter = router({
       const { url } = await storagePut(fileKey, fileBuffer, input.mimeType);
 
       // Salvar metadados no banco (incluindo dados geoespaciais se existirem)
-      await db.createFile({
+      const fileId = await db.createFileAndGetId({
         projectId: input.projectId,
         name: input.filename,
         originalName: input.filename,
@@ -227,9 +233,8 @@ export const filesRouter = router({
         uploadedBy: ctx.user.id,
       });
 
-      // Buscar o arquivo criado
-      const files = await db.getFilesByProject(input.projectId);
-      const file = files.find(f => f.s3Key === fileKey);
+      // Recuperar o arquivo criado pelo ID retornado na mesma persistência.
+      const file = await db.getFileById(fileId);
 
       if (!file) {
         throw new TRPCError({
@@ -237,6 +242,26 @@ export const filesRouter = router({
           message: "Erro ao criar arquivo",
         });
       }
+
+      const versionId = await db.createFileVersion(buildInitialFileVersion({
+        fileId: file.id,
+        s3Key: file.s3Key,
+        s3Url: file.s3Url,
+        fileSize: file.fileSize,
+        mimeType: file.mimeType,
+        sha256: scanResult.result.fileHash,
+        uploadedBy: ctx.user.id,
+        originalName: file.originalName,
+        fileType: file.fileType,
+        source: "upload",
+      }));
+
+      // Vetores processáveis viram camada do projeto, mas começam desativados.
+      // O arquivo original continua preservado e a ativação é escolhida na interface.
+      const promotedLayer = processingResult
+        ? createImportedVectorLayer({ file, processing: processingResult, createdBy: ctx.user.id })
+        : null;
+      const layerId = promotedLayer ? await db.createLayer(promotedLayer) : null;
 
       // Log de auditoria
       await db.createAuditLog({
@@ -251,10 +276,28 @@ export const filesRouter = router({
           filename: input.filename,
           size: input.size,
           fileType,
+          layerId,
+          versionId,
+          sha256: scanResult.result.fileHash,
         },
         ipAddress: ctx.req.ip || null,
         userAgent: ctx.req.headers?.["user-agent"] || null,
       });
+
+      if (layerId) {
+        await db.createAuditLog({
+          userId: ctx.user.id,
+          userEmail: ctx.user.email || null,
+          userName: ctx.user.name || null,
+          action: "file.vector_layer.created",
+          entityType: "layer",
+          entityId: layerId,
+          projectId: input.projectId,
+          details: { fileId: file.id, filename: file.name, initialVisibility: false },
+          ipAddress: ctx.req.ip || null,
+          userAgent: ctx.req.headers?.["user-agent"] || null,
+        });
+      }
 
       // Notificar usuário sobre upload concluído
       await notifyUploadComplete(ctx.user.id, input.filename, input.projectId);
@@ -262,6 +305,8 @@ export const filesRouter = router({
       return {
         success: true,
         file,
+        layerId,
+        version: 1,
       };
     }),
 
@@ -304,13 +349,7 @@ export const filesRouter = router({
 
       // Filtrar por categoria se especificado
       if (input.category && input.category !== "all") {
-        const categoryMap: Record<string, string[]> = {
-          geospatial: ["kml", "kmz", "shp"],
-          document: ["pdf", "docx", "xlsx"],
-          image: ["image"],
-          other: ["other"],
-        };
-        const types = categoryMap[input.category] || [];
+        const types = getFileTypesForCategory(input.category);
         files = files.filter(f => types.includes(f.fileType));
       }
 
@@ -348,6 +387,38 @@ export const filesRouter = router({
       });
 
       return file;
+    }),
+
+  versions: protectedProcedure
+    .input(z.object({ fileId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const file = await db.getFileById(input.fileId);
+      if (!file) throw new TRPCError({ code: "NOT_FOUND", message: "Arquivo não encontrado" });
+      await checkProjectAccess(file.projectId, ctx.user.id, ctx.user.role);
+      return db.getFileVersions(file.id);
+    }),
+
+  downloadVersion: protectedProcedure
+    .input(z.object({ fileId: z.number(), version: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const file = await db.getFileById(input.fileId);
+      if (!file) throw new TRPCError({ code: "NOT_FOUND", message: "Arquivo não encontrado" });
+      await checkProjectAccess(file.projectId, ctx.user.id, ctx.user.role);
+      const version = (await db.getFileVersions(file.id)).find((item) => item.version === input.version);
+      if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Versão não encontrada" });
+      await db.createAuditLog({
+        userId: ctx.user.id,
+        userEmail: ctx.user.email || null,
+        userName: ctx.user.name || null,
+        action: "file.version.download",
+        entityType: "file_version",
+        entityId: version.id,
+        projectId: file.projectId,
+        details: { fileId: file.id, version: version.version, sha256: version.sha256 || null },
+        ipAddress: ctx.req.ip || null,
+        userAgent: ctx.req.headers?.["user-agent"] || null,
+      });
+      return { url: version.s3Url, filename: `${file.name}.v${version.version}`, mimeType: version.mimeType || file.mimeType, sha256: version.sha256 || null };
     }),
 
   // Download de arquivo (retorna URL pré-assinada)

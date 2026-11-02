@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { trpc } from "@/lib/trpc";
-import { Upload, FileIcon, CheckCircle, XCircle, AlertTriangle, Loader2 } from "lucide-react";
-import { storagePut } from "../../../server/storage";
+import { Upload, FileIcon, CheckCircle, XCircle, AlertTriangle, Loader2, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 
 interface UploadedFile {
   file: File;
@@ -44,112 +43,19 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 export default function GisUploader() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
-  const initiateMutation = trpc.gisUploads.initiate.useMutation();
-  const confirmMutation = trpc.gisUploads.confirm.useMutation();
-
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    // Este componente histórico não possui contexto obrigatório de projeto e
+    // anteriormente criava URL simulada. Para não registrar upload fictício,
+    // mantém o feedback local e encaminha o usuário ao fluxo integrado.
     const newFiles: UploadedFile[] = acceptedFiles.map((file) => ({
       file,
-      status: "pending",
-      progress: 0,
+      status: "failed",
+      progress: 100,
+      error: "Envie este arquivo dentro de um Projeto, na aba Arquivos. O upload legado não grava bytes nem cria camadas.",
     }));
 
     setUploadedFiles((prev) => [...prev, ...newFiles]);
-
-    // Processar cada arquivo
-    for (let i = 0; i < newFiles.length; i++) {
-      const fileIndex = uploadedFiles.length + i;
-      await processFile(newFiles[i], fileIndex);
-    }
-  }, [uploadedFiles.length]);
-
-  const processFile = async (uploadedFile: UploadedFile, index: number) => {
-    const { file } = uploadedFile;
-
-    try {
-      // Determinar tipo de arquivo
-      const extension = file.name.split(".").pop()?.toLowerCase();
-      let fileType: "shp" | "kml" | "kmz" | "geojson" | "gpx" | "gml" | "dxf";
-
-      if (extension === "zip") {
-        fileType = "shp";
-      } else if (["kml", "kmz", "geojson", "json", "gpx", "gml", "dxf"].includes(extension || "")) {
-        fileType = extension === "json" ? "geojson" : (extension as any);
-      } else {
-        throw new Error(`Formato não suportado: ${extension}`);
-      }
-
-      // Atualizar status: uploading
-      updateFileStatus(index, { status: "uploading", progress: 10 });
-
-      // Iniciar upload
-      const { uploadId, s3Key } = await initiateMutation.mutateAsync({
-        filename: file.name,
-        fileType,
-        fileSize: file.size,
-        mimeType: file.type || "application/octet-stream",
-      });
-
-      updateFileStatus(index, { uploadId, progress: 30 });
-
-      // Ler conteúdo do arquivo
-      const fileContent = await readFileContent(file, fileType);
-
-      updateFileStatus(index, { progress: 50 });
-
-      // Fazer upload para S3 (simulado - na prática usar storagePut)
-      // const { url } = await storagePut(s3Key, fileContent, file.type);
-      const url = `https://storage.example.com/${s3Key}`; // Simulado
-
-      updateFileStatus(index, { status: "validating", progress: 70 });
-
-      // Confirmar upload e validar com IA
-      const { validationResult } = await confirmMutation.mutateAsync({
-        uploadId,
-        s3Url: url,
-        fileContent: fileContent.substring(0, 50000), // Truncar para análise
-      });
-
-      updateFileStatus(index, {
-        status: validationResult.isValid ? "completed" : "failed",
-        progress: 100,
-        validationResult,
-        error: validationResult.isValid ? undefined : validationResult.errors?.join(", "),
-      });
-    } catch (error: any) {
-      updateFileStatus(index, {
-        status: "failed",
-        progress: 100,
-        error: error.message,
-      });
-    }
-  };
-
-  const updateFileStatus = (index: number, updates: Partial<UploadedFile>) => {
-    setUploadedFiles((prev) =>
-      prev.map((f, i) => (i === index ? { ...f, ...updates } : f))
-    );
-  };
-
-  const readFileContent = (file: File, fileType: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = reject;
-      
-      // Arquivos binários (KMZ, ZIP) devem ser lidos como base64
-      if (fileType === 'kmz' || fileType === 'shp') {
-        reader.onload = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // Arquivos de texto (KML, GeoJSON, etc)
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsText(file);
-      }
-    });
-  };
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -195,31 +101,31 @@ export default function GisUploader() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Upload de Arquivos GIS</CardTitle>
+          <CardTitle>Upload GIS legado</CardTitle>
           <CardDescription>
-            Arraste e solte arquivos ou clique para selecionar. Formatos aceitos: SHP (ZIP), KML, KMZ, GeoJSON, GPX, GML, DXF (máx. 100MB)
+            Esta tela preserva o histórico de uploads GIS anterior, mas não aceita novos envios: ela não possui contexto obrigatório de projeto e não pode criar uma URL fictícia.
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <Alert className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertDescription>Para upload, validação, camada e análise vinculados, abra um projeto e use a aba <strong>Arquivos</strong>.</AlertDescription></Alert>
+          <Button asChild className="mb-4"><Link href="/projects">Abrir Projetos<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
               isDragActive
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/50"
+                ? "border-amber-500 bg-amber-50"
+                : "border-border bg-muted/30"
             }`}
           >
-            <input {...getInputProps()} />
+            <input {...getInputProps({ "aria-label": "Upload legado desativado" })} />
             <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             {isDragActive ? (
-              <p className="text-lg font-medium">Solte os arquivos aqui...</p>
+              <p className="text-lg font-medium">O arquivo não será enviado nesta tela.</p>
             ) : (
               <>
-                <p className="text-lg font-medium mb-2">
-                  Arraste arquivos GIS aqui
-                </p>
+                <p className="text-lg font-medium mb-2">Fluxo legado desativado para novos envios</p>
                 <p className="text-sm text-muted-foreground">
-                  ou clique para selecionar
+                  Use Projeto → Arquivos para persistir e criar camadas vetoriais ou raster.
                 </p>
               </>
             )}

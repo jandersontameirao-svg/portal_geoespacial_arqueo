@@ -1,0 +1,9 @@
+{
+  "temporaryRoot": "/tmp/atena-f4-driver.JCcW7s",
+  "sqlTransport": "Unix socket only",
+  "tcpEnabled": false,
+  "mysqlXEnabled": false,
+  "privateNetworkNamespace": true,
+  "syntheticSourceSchema": "geoportal_f4_driver",
+  "syntheticRestoreSchema": "geoportal_f4_restore"
+}

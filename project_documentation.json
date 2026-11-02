@@ -24,8 +24,17 @@
       "geospatial": {
         "coordinate_system": "EPSG:4326 (WGS84) padrão, EPSG:4674 (SIRGAS 2000) para dados brasileiros",
         "data_formats": "KML, KMZ, SHP (zipado), GeoJSON",
-        "visualization": "Google Maps (2D), CesiumJS (3D - planejado)"
+        "visualization": "Google Maps (2D), CesiumJS (3D - planejado)",
+        "analysis_engine": "Turf.js 7: buffer métrico, interseção, união, recorte/sobreposição, área e malha arqueológica recortada",
+        "shapefile_pipeline": "shpjs converte ZIP Shapefile para GeoJSON antes de o visualizador consumir a camada",
+        "basemap_policy": "Catálogo centralizado; ESRI World Imagery validado como base disponível; OSM/OpenTopo requerem provedor aprovado ou infraestrutura própria"
       }
+    },
+    "isolated_candidate": {
+      "branch": "desenvolvimento/auditoria-20261029",
+      "base_checkpoint": "04e64773",
+      "status": "candidato isolado — não aplicado ao projeto principal e não publicado",
+      "scope": "motor de análise espacial, autorização por projeto, correção de GeoJSON INCRA e base cartográfica centralizada"
     }
   },
   "architecture": {
@@ -34,48 +43,172 @@
     "data_isolation": "Por projeto - usuários veem apenas projetos aos quais foram vinculados",
     "file_processing": "Upload → Validação (antivírus, tamanho, formato) → Processamento geoespacial → Validação IA → Storage S3 → Metadados no banco",
     "authorization": "RBAC com roles: admin (acesso total), user (acesso a projetos vinculados)",
-    "audit": "Logs imutáveis de todas as ações (audit_logs table)"
+    "audit": "Logs imutáveis de todas as ações (audit_logs table)",
+    "gis_analysis": "Resultados de análise são persistidos como layers vetoriais por projeto, com parâmetros, CRS, área e proveniência no metadata.",
+    "project_authorization": "Leitura de geometrias e resultados exige vínculo ao projeto; escrita exige membro do projeto e role global editor/admin; administradores têm acesso total."
   },
   "database_schema": {
     "users": {
       "description": "Usuários do sistema",
-      "key_fields": ["id", "openId", "email", "name", "role (admin|user)", "createdAt", "updatedAt"]
+      "key_fields": [
+        "id",
+        "openId",
+        "email",
+        "name",
+        "role (admin|user)",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "projects": {
       "description": "Projetos arqueológicos com AOI (Área de Interesse)",
-      "key_fields": ["id", "name", "description", "code", "aoi (geometria)", "status", "createdBy", "createdAt", "updatedAt"]
+      "key_fields": [
+        "id",
+        "name",
+        "description",
+        "code",
+        "aoi (geometria)",
+        "status",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "project_members": {
       "description": "Vinculação de usuários a projetos",
-      "key_fields": ["id", "projectId", "userId", "role", "joinedAt"]
+      "key_fields": [
+        "id",
+        "projectId",
+        "userId",
+        "role",
+        "joinedAt"
+      ]
     },
     "files": {
       "description": "Repositório de arquivos (geoespaciais e documentos)",
-      "key_fields": ["id", "projectId", "name", "s3Key", "s3Url", "fileType", "size", "mimeType", "isGeospatial", "crs", "bounds", "metadata (JSON)", "uploadedBy", "createdAt", "updatedAt"]
+      "key_fields": [
+        "id",
+        "projectId",
+        "name",
+        "s3Key",
+        "s3Url",
+        "fileType",
+        "size",
+        "mimeType",
+        "isGeospatial",
+        "crs",
+        "bounds",
+        "metadata (JSON)",
+        "uploadedBy",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "file_versions": {
       "description": "Versionamento de arquivos",
-      "key_fields": ["id", "fileId", "versionNumber", "s3Key", "s3Url", "size", "uploadedBy", "createdAt"]
+      "key_fields": [
+        "id",
+        "fileId",
+        "versionNumber",
+        "s3Key",
+        "s3Url",
+        "size",
+        "uploadedBy",
+        "createdAt"
+      ]
     },
     "base_layers": {
       "description": "Camadas base oficiais brasileiras (FUNAI, INCRA, IPHAN, OSM)",
-      "key_fields": ["id", "name", "description", "source", "dataType", "url", "status", "featureCount", "lastDownload", "cacheExpiry", "metadata (JSON)", "createdAt", "updatedAt"]
+      "key_fields": [
+        "id",
+        "name",
+        "description",
+        "source",
+        "dataType",
+        "url",
+        "status",
+        "featureCount",
+        "lastDownload",
+        "cacheExpiry",
+        "metadata (JSON)",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "saved_maps": {
       "description": "Configurações salvas de mapas (layers, zoom, center)",
-      "key_fields": ["id", "projectId", "name", "description", "config (JSON)", "thumbnail", "createdBy", "createdAt", "updatedAt"]
+      "key_fields": [
+        "id",
+        "projectId",
+        "name",
+        "description",
+        "config (JSON)",
+        "thumbnail",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "notifications": {
       "description": "Notificações do sistema",
-      "key_fields": ["id", "userId", "type", "title", "message", "isRead", "relatedEntityType", "relatedEntityId", "createdAt"]
+      "key_fields": [
+        "id",
+        "userId",
+        "type",
+        "title",
+        "message",
+        "isRead",
+        "relatedEntityType",
+        "relatedEntityId",
+        "createdAt"
+      ]
     },
     "audit_logs": {
       "description": "Logs de auditoria imutáveis",
-      "key_fields": ["id", "userId", "userEmail", "userName", "action", "entityType", "entityId", "projectId", "details (JSON)", "ipAddress", "userAgent", "createdAt"]
+      "key_fields": [
+        "id",
+        "userId",
+        "userEmail",
+        "userName",
+        "action",
+        "entityType",
+        "entityId",
+        "projectId",
+        "details (JSON)",
+        "ipAddress",
+        "userAgent",
+        "createdAt"
+      ]
     },
     "invitations": {
       "description": "Convites para novos usuários (sem auto-cadastro)",
-      "key_fields": ["id", "email", "role", "projectIds (JSON)", "invitedBy", "token", "expiresAt", "acceptedAt", "createdAt"]
+      "key_fields": [
+        "id",
+        "email",
+        "role",
+        "projectIds (JSON)",
+        "invitedBy",
+        "token",
+        "expiresAt",
+        "acceptedAt",
+        "createdAt"
+      ]
+    },
+    "layers": {
+      "description": "Camadas vetoriais, raster, tile, WMS/WMTS por projeto; recebe resultados persistidos do motor de análise",
+      "key_fields": [
+        "id",
+        "projectId",
+        "name",
+        "layerType",
+        "layerData",
+        "crs",
+        "bounds",
+        "defaultStyle",
+        "metadata",
+        "createdBy",
+        "createdAt"
+      ]
     }
   },
   "features_implemented": {
@@ -177,6 +310,116 @@
         "Apresentação das principais funcionalidades",
         "Pode ser pulado ou reiniciado"
       ]
+    },
+    "spatial_analysis_isolated": {
+      "status": "🟡 Validado na cópia isolada; aguardando decisão de aplicação no projeto principal",
+      "details": [
+        "Aba Mapa & Análise em cada projeto com desenho, edição e exclusão de geometrias.",
+        "Buffer métrico, interseção, união, recorte, sobreposição, cálculo de área e malha arqueológica rotacionável.",
+        "Resultados salvos como camada vetorial e metadados de proveniência/auditoria.",
+        "Leitura e escrita de geometrias reforçadas com autorização por projeto e perfil.",
+        "INCRA: ZIP Shapefile é convertido em GeoJSON antes de ser disponibilizado ao visualizador.",
+        "Tiles públicos padrão OSM removidos dos visualizadores; base ESRI Image configurada por catálogo centralizado."
+      ]
+    },
+    "raster_pipeline_isolated": {
+      "status": "🟡 Validado em fixture local isolada",
+      "details": [
+        "GeoTIFF sintético para COG em EPSG:4674 com NoData, overviews e SHA-256",
+        "Manifesto STAC-like",
+        "Comparação temporal RGB que gera máscara COG e métricas",
+        "Metadados raster incluídos em templates de mapa técnico e Atlas"
+      ]
+    },
+    "ogc_catalog_isolated": {
+      "status": "🟡 Código e migração isolados; não aplicados ao banco",
+      "details": [
+        "Cadastro admin de rascunho WMS/WFS",
+        "Allowlist HTTPS, sem redirect, sem IP literal e TLS estrito",
+        "GetCapabilities com limite de 2 MiB e estado de saúde",
+        "Fallback explícito por camada lógica"
+      ]
+    },
+    "recoverable_backup_rehearsal": {
+      "status": "🟡 Ensaio local sintético aprovado",
+      "details": [
+        "Registro de 18 tabelas físicas",
+        "Manifesto e hashes SHA-256",
+        "Inventário de referências de objetos",
+        "Restauração exclusivamente em memória local, sem adaptador remoto"
+      ]
+    },
+    "local_raster_rendering_isolated": {
+      "status": "validated_local_only",
+      "files": [
+        "infra/raster/build_local_raster_assets.py",
+        "infra/raster/export_raster_map.py",
+        "server/localRasterService.ts",
+        "server/rasterAssetRoutes.ts",
+        "server/rasterRouter.ts",
+        "client/src/components/RasterRealPixelExport.tsx"
+      ],
+      "controls": [
+        "relative keys only",
+        "no URL/path/client GDAL arguments",
+        "same-origin authenticated tile/export routes",
+        "EPSG:4674 + NoData validation",
+        "XYZ limits and export pixel cap"
+      ],
+      "evidence": {
+        "beforeTiles": 234,
+        "afterTiles": 234,
+        "changedTileChecksums": 29,
+        "pngSize": [
+          1024,
+          1024
+        ],
+        "pdfPages": 1,
+        "productionConnections": 0
+      },
+      "operationPrerequisites": [
+        "persistent absolute ARQUEO_LOCAL_RASTER_ROOT",
+        "approved layer.metadata.localRaster descriptor",
+        "GDAL runtime available on the serving/worker host"
+      ]
+    },
+    "local_filesystem_recoverable_backup_isolated": {
+      "status": "validated_local_only",
+      "files": [
+        "server/backupStore.ts",
+        "server/localFilesystemBackupStore.ts",
+        "server/backupArchive.ts",
+        "infra/scripts/backup_local_filesystem_rehearsal.ts"
+      ],
+      "evidence": {
+        "tables": 18,
+        "objectReferences": 7,
+        "distinctObjects": 7,
+        "copiedObjects": 7,
+        "restoredObjects": 7,
+        "productionConnections": 0
+      },
+      "remoteIntegration": "blocked explicitly because platform storage lacks get/head/list by stable private key",
+      "runtimeSelection": {
+        "rehearsal": "ARQUEO_EXECUTION_MODE=isolated-rehearsal reports unavailable and blocks create/scheduling without calling storage",
+        "onPremise": "ARQUEO_BACKUP_STORE=filesystem plus absolute ARQUEO_BACKUP_SOURCE_FILESYSTEM_ROOT and ARQUEO_BACKUP_FILESYSTEM_ROOT enables the recoverable adapter",
+        "template": "infra/backup/.env.backup.recoverable.example"
+      },
+      "testsPassed": 17
+    },
+    "leaflet_draw_lab_isolated": {
+      "status": "visual_smoke_passed_anonymous",
+      "entry": "/draw-lab.html",
+      "files": [
+        "client/draw-lab.html",
+        "client/src/draw-lab.tsx",
+        "client/src/pages/LeafletDrawLab.tsx"
+      ],
+      "guarantees": [
+        "does not mount App/Header/tRPC/GuidedTour",
+        "in-memory only",
+        "marker creation and local cleanup verified"
+      ]
     }
   },
   "features_planned": {
@@ -270,7 +513,10 @@
   },
   "file_validation_ai": {
     "description": "Sistema de validação automática com IA para arquivos geoespaciais",
-    "supported_formats": ["KML", "KMZ"],
+    "supported_formats": [
+      "KML",
+      "KMZ"
+    ],
     "validations": {
       "structure": [
         "Formato XML válido",
@@ -319,10 +565,21 @@
       ],
       "metadata": {
         "crs": "EPSG:4326",
-        "bounds": [-47.9292, -15.7801, 2.3522, 48.8566],
+        "bounds": [
+          -47.9292,
+          -15.7801,
+          2.3522,
+          48.8566
+        ],
         "featureCount": 3,
-        "geometryTypes": ["Point", "LineString"],
-        "attributes": ["name", "description"]
+        "geometryTypes": [
+          "Point",
+          "LineString"
+        ],
+        "attributes": [
+          "name",
+          "description"
+        ]
       }
     }
   },
@@ -339,7 +596,8 @@
       "CoordinateSearch": "Busca de coordenadas",
       "CoordinatesDisplay": "Exibição de coordenadas do cursor",
       "GeometryImport": "Importação de geometrias de arquivos",
-      "MapPrintPreview": "Preview de impressão de mapas"
+      "MapPrintPreview": "Preview de impressão de mapas",
+      "ProjectGeoWorkspace": "Workspace por projeto com seleção de feições, desenho/edição Leaflet, análise espacial e lista de resultados persistidos"
     },
     "files": {
       "FileUpload": "Componente de upload com drag-and-drop",
@@ -419,6 +677,18 @@
       "query": "way[\"highway\"~\"motorway|trunk\"][\"ref\"~\"BR-\"]({bbox});",
       "description": "Rodovias Federais Brasileiras",
       "cache_duration": "30 dias"
+    },
+    "icmbio": {
+      "name": "ICMBio Geosserviços INDE",
+      "wms_capabilities": "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows?service=WMS&version=1.3.0&request=GetCapabilities",
+      "wfs_capabilities": "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows?service=WFS&version=2.0.0&request=GetCapabilities",
+      "verification": "GetCapabilities WMS respondeu HTTP 200 em 29/10/2026"
+    },
+    "esri_imagery": {
+      "name": "Esri World Imagery",
+      "url_template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      "verification": "Tile de validação respondeu HTTP 200 image/jpeg em 29/10/2026",
+      "note": "Base de referência visual; não declarar como ortofoto certificada sem metadados do fornecedor."
     }
   },
   "deployment": {
@@ -446,7 +716,36 @@
   "testing": {
     "framework": "Vitest",
     "example_test": "server/auth.logout.test.ts",
-    "coverage": "Testes de procedures críticas (auth, files, projects)"
+    "coverage": "Testes de procedures críticas (auth, files, projects)",
+    "isolated_candidate_20261029": {
+      "tests": 12,
+      "suites": [
+        "gisAnalysis.test.ts (5)",
+        "projectAccess.test.ts (4)",
+        "geodataService.test.ts (3)"
+      ],
+      "checks": [
+        "pnpm exec tsc --noEmit: sem diagnóstico",
+        "pnpm run build: concluído",
+        "busca de tile público OSM no client/src: nenhum resultado"
+      ],
+      "visual_check": "Build estático carregado anonimamente no navegador sandbox; landing page e assets renderizados.",
+      "rasterBackupDrawExtension": {
+        "testsPassed": 36,
+        "typecheck": "passed",
+        "build": "passed",
+        "rasterRehearsal": "passed",
+        "backupFilesystemRehearsal": "passed",
+        "newTargetedTests": 12,
+        "newSuites": [
+          "rasterIngestionLocal.test.ts",
+          "rasterCogBackupRoundtrip.test.ts",
+          "rasterIngestionAdapter.test.ts"
+        ],
+        "workerHttpRehearsal": "passed",
+        "validCogBackupRehearsal": "passed"
+      }
+    }
   },
   "documentation": {
     "readme": "README.md no diretório raiz",
@@ -463,19 +762,160 @@
     "Adicionar PostgreSQL + PostGIS para geometrias complexas",
     "Implementar MFA obrigatório para usuários internos",
     "Implementar sistema de comentários e anotações em mapas",
-    "Implementar compartilhamento externo de mapas"
+    "Implementar compartilhamento externo de mapas",
+    "Decidir se o commit isolado será aplicado ao projeto principal após revisão funcional autenticada.",
+    "Executar teste integrado controlado com projeto de homologação: desenho, análise, persistência, reabertura e exportação.",
+    "Implementar adaptador de armazenamento on-premise antes de depender de manus-upload-file fora do ambiente Manus.",
+    "Implementar catálogo WMS/WFS aprovado por administrador, health-check e fallback explícito por fonte.",
+    "Definir pipeline raster/ortofoto com metadados, pirâmides/COG e licença antes de chamar imagens de ortofoto operacional.",
+    "Aplicar somente em banco descartável a migration drizzle/0008_early_pyro.sql e executar smoke admin/editor/client da ingestão GeoTIFF.",
+    "No Docker Desktop/on-premise, subir o worker com volume raster persistente e ARQUEO_RASTER_WORKER_TOKEN; validar compose completo sem expor a porta do worker publicamente.",
+    "Implementar quota/retention e split slider antes/depois no ambiente isolado antes de qualquer promoção.",
+    "Usar a prévia /construction-preview.html para testes visuais sem login; reservar homologação autenticada para persistência, papéis e permissões."
   ],
   "known_issues": [
     "Query OSM para rodovias federais retorna 0 features (bbox ou query pode estar incorreta)",
     "Validação IA só funciona para KML/KMZ (não para SHP ou GeoJSON ainda)",
     "Não há exibição visual dos resultados da validação IA na interface",
     "Globo 3D (CesiumJS) ainda não implementado",
-    "QGIS Server para geração de mapas ainda não configurado"
+    "QGIS Server para geração de mapas ainda não configurado",
+    "Candidato GIS está em branch isolada e não foi aplicado/publicado no projeto principal.",
+    "Endpoint FUNAI apresentou falha de cadeia TLS no ambiente de validação em 29/10/2026; não foi ignorado certificado. Cache anterior deve permanecer até a fonte ser regularizada ou substituída por endpoint oficial aprovado.",
+    "Build alerta sobre interop ESM de react-leaflet-draw/leaflet-draw e bundle principal acima de 500 kB; build conclui, mas recomenda-se code splitting e teste autenticado do editor de desenho antes de produção.",
+    "Não houve teste integrado com banco, S3/manus-upload-file, OAuth ou dados reais na cópia isolada; não houve qualquer mutação desses recursos.",
+    "Docker/QGIS/PostGIS não estão instalados no sandbox; compose/WMS real permanece sem homologação.",
+    "COG local foi validado internamente; entrega HTTP Range/CORS e visualização web dependem de storage/proxy/tile service.",
+    "Catálogo OGC exige aplicação futura da migração 0007 e configuração de OGC_ALLOWED_HOSTS; não foi aplicado ao banco.",
+    "Backup remoto ainda não é recuperável enquanto o adaptador manus-upload-file não fornecer get/head/list privado por chave estável.",
+    "Smoke autenticado do editor Leaflet e persistência contra banco continuam pendentes por não acesso a OAuth/banco de plataforma.",
+    "No persistent raster root or authenticated homologation session was configured in the isolated raster rendering execution.",
+    "Remote blob backup is unavailable by default; it is intentionally blocked in isolated rehearsal and enabled only after a private get/head/list adapter is explicitly configured.",
+    "No database migration was applied and no production layer was assigned a local raster descriptor.",
+    "Atualização 2026-10-29: o marcador Leaflet quebrado no draw-lab foi corrigido por imports Vite hashados; o alerta histórico de react-leaflet-draw foi superado pelo controle Leaflet Draw nativo. Persistência autenticada ainda depende de banco/OAuth de homologação."
   ],
   "contact": {
     "organization": "Grupo Arqueo",
     "project_owner": "Janderson Rubens",
     "platform": "Manus",
     "support": "https://help.manus.im"
+  },
+  "isolated_candidate_20261029": {
+    "branch": "desenvolvimento/auditoria-20261029",
+    "baseCheckpoint": "04e64773",
+    "latestScope": "Raster local renderizado (tiles/PNG/PDF), backup físico local verificável e laboratório Leaflet Draw sem OAuth; tudo isolado.",
+    "deploymentState": "não aplicado ao projeto principal; não publicado; sem acesso a banco, storage, OAuth ou dados de produção",
+    "validated": {
+      "rasterRehearsal": {
+        "crs": "EPSG:4674",
+        "overviewsPerBand": 2,
+        "nodata": 0,
+        "changedPixels": 253074,
+        "changedPercent": 6.189049,
+        "meanAbsoluteDelta": 5.030621
+      },
+      "backupRehearsal": {
+        "tables": 18,
+        "rows": 14,
+        "objectReferences": 7,
+        "mode": "local-rehearsal in-memory",
+        "productionConnections": 0
+      },
+      "testSuites": 6,
+      "tests": 19,
+      "typescript": "clean",
+      "productionBuild": "passed",
+      "leafletMarkerAssets": {
+        "status": "passed",
+        "implementation": "client/src/lib/leafletDefaultMarker.ts imported by Portal and draw-lab entry",
+        "visualEvidence": "draw-lab marker counter 0->1; icon and shadow visible in isolated browser screenshot",
+        "scope": "memory-only lab; does not prove authenticated Portal persistence"
+      },
+      "rasterIngestionWorker": {
+        "status": "passed-local-discardable-volume",
+        "flow": "GeoTIFF valid -> COG EPSG:4674 -> overviews/NoData -> XYZ PNG tiles -> protected same-origin descriptor",
+        "workerEvidence": {
+          "unauthorizedRequest": "HTTP 401",
+          "authorizedTiles": 16,
+          "gdalLayout": "COG",
+          "redisPostgisUnavailable": "raster worker remained active"
+        },
+        "productionConnections": 0
+      },
+      "validCogBackupRoundTrip": {
+        "status": "passed",
+        "input": "valid synthetic GeoTIFF 587179 bytes (not 49-byte fixture)",
+        "cogBytes": 377166,
+        "sha256": "7de383d180b4ff57ff5ae3696a03302c8e3c7148406ec6a4a086343e361a7d8e",
+        "restoredBytesEqual": true,
+        "gdalAfterRestore": {
+          "layout": "COG",
+          "bands": 3,
+          "nodata": [
+            0,
+            0,
+            0
+          ]
+        },
+        "productionConnections": 0
+      },
+      "geotiffMigration": {
+        "file": "drizzle/0008_early_pyro.sql",
+        "reviewed": "ALTER enum adds geotiff only; no DROP",
+        "applied": false
+      },
+      "constructionPreviewWithoutLogin": {
+        "status": "passed",
+        "entry": "client/construction-preview.html",
+        "urlPath": "/construction-preview.html",
+        "isolation": [
+          "does not import App",
+          "does not import OAuth/useAuth",
+          "does not import tRPC",
+          "does not send files or drawings"
+        ],
+        "browserEvidence": "direct navigation without OAuth redirect; Esri map loaded; Leaflet marker created and local count changed to 1",
+        "productionAuthentication": "preserved"
+      }
+    },
+    "blockedInfrastructure": [
+      "Docker/QGIS/PostGIS indisponível no sandbox",
+      "homologação autenticada de UI bloqueada por não uso de OAuth/plataforma",
+      "storage atual não expõe get/head/list para recuperação de blobs"
+    ]
+  },
+  "incremental_update_2026_10_29_tree_versions_atlas": {
+    "scope": "isolated branch only; no production/publication/database mutation",
+    "implemented": [
+      "thematic layer tree with independent analysis selection and ordered Leaflet panes",
+      "file version v1 with antivirus SHA-256 and protected history/download API",
+      "base layer cache freshness/stale/refresh/backoff policy retaining prior cache",
+      "Atlas template CRUD with snapshot renderConfig",
+      "controlled COG-to-multipage-PDF worker render contract",
+      "historical imagery catalog based on completed COG metadata",
+      "backup registry expanded to 19 tables including atlas_templates"
+    ],
+    "validation": {
+      "targetedTests": 40,
+      "testFiles": 15,
+      "typescript": "passed",
+      "build": "passed",
+      "atlasWorkerRealPdf": {
+        "pages": 2,
+        "bytes": 492820,
+        "outputSha256": "a655464b116a3027fbfb93f2f9fabefee283aa801b9addbc0e628d42d1046b4c"
+      }
+    },
+    "migrationsNotApplied": [
+      "0010_lethal_expediter.sql",
+      "0011_abandoned_wraith.sql",
+      "0012_curved_justice.sql"
+    ],
+    "remainingExternalDependencies": [
+      "disposable MySQL/TiDB",
+      "isolated OAuth test session",
+      "worker endpoint and shared raster volume",
+      "homologation storage adapter",
+      "Docker Compose QGIS/PostGIS/Redis runtime"
+    ]
   }
 }

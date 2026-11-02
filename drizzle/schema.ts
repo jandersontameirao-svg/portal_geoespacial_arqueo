@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, decimal, json, index, unique } from "drizzle-orm/mysql-core";
+import { bigint, int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, decimal, json, index, unique } from "drizzle-orm/mysql-core";
 
 /**
  * PORTAL GEOESPACIAL CORPORATIVO - GRUPO ARQUEO
@@ -95,7 +95,7 @@ export const files = mysqlTable("files", {
   name: varchar("name", { length: 255 }).notNull(),
   originalName: varchar("originalName", { length: 255 }).notNull(),
   fileType: mysqlEnum("fileType", [
-    "kml", "kmz", "shp", "pdf", "docx", "xlsx", "image", "other"
+    "kml", "kmz", "shp", "geojson", "geotiff", "pdf", "docx", "xlsx", "image", "other"
   ]).notNull(),
   mimeType: varchar("mimeType", { length: 100 }),
   fileSize: int("fileSize").notNull(), // bytes
@@ -131,6 +131,9 @@ export const fileVersions = mysqlTable("file_versions", {
   s3Key: varchar("s3Key", { length: 500 }).notNull(),
   s3Url: text("s3Url").notNull(),
   fileSize: int("fileSize").notNull(),
+  sha256: varchar("sha256", { length: 64 }),
+  mimeType: varchar("mimeType", { length: 100 }),
+  metadata: json("metadata").$type<Record<string, any>>(),
   uploadedBy: int("uploadedBy").notNull(),
   uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
   changeDescription: text("changeDescription"),
@@ -168,6 +171,9 @@ export const baseLayers = mysqlTable("base_layers", {
   cacheExpiresAt: timestamp("cacheExpiresAt"),
   downloadStatus: mysqlEnum("downloadStatus", ["pending", "downloading", "completed", "failed"]).default("pending").notNull(),
   errorMessage: text("errorMessage"),
+  refreshFailureCount: int("refreshFailureCount").default(0).notNull(),
+  lastRefreshAttemptAt: timestamp("lastRefreshAttemptAt"),
+  retryAfter: timestamp("retryAfter"),
   // Controle
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy").notNull(),
@@ -177,6 +183,54 @@ export const baseLayers = mysqlTable("base_layers", {
   sourceIdx: index("source_idx").on(table.source),
   layerTypeIdx: index("layer_type_idx").on(table.layerType),
   statusIdx: index("status_idx").on(table.downloadStatus),
+}));
+
+// ============================================================================
+// CATÁLOGO OGC ADMINISTRADO (WMS/WFS)
+// ============================================================================
+
+export const ogcServices = mysqlTable("ogc_services", {
+  id: int("id").autoincrement().primaryKey(),
+  revision: int("revision").default(1).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  publisher: varchar("publisher", { length: 255 }).notNull(),
+  serviceType: mysqlEnum("serviceType", ["wms", "wfs"]).notNull(),
+  sourceClass: mysqlEnum("sourceClass", ["official", "approved_custom"]).default("official").notNull(),
+  // URL integral preservada pelo contrato do catálogo; não deve ser truncada.
+  endpoint: varchar("endpoint", { length: 1000 }).notNull(),
+  // Unicidade indexável em utf8mb4, derivada do endpoint normalizado no servidor.
+  endpointHash: varchar("endpointHash", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["draft", "validated", "published", "degraded", "unhealthy", "disabled"]).default("draft").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  health: mysqlEnum("health", ["healthy", "timeout", "tls_error", "http_error", "invalid_capabilities", "blocked"]).default("blocked").notNull(),
+  lastValidatedAt: timestamp("lastValidatedAt"),
+  lastHealthyAt: timestamp("lastHealthyAt"),
+  lastError: varchar("lastError", { length: 500 }),
+  capabilities: json("capabilities").$type<Record<string, any>>(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  endpointHashIdx: unique("ogc_endpoint_hash_unique").on(table.endpointHash),
+  statusIdx: index("ogc_status_idx").on(table.status, table.enabled),
+}));
+
+export const ogcCatalogVariants = mysqlTable("ogc_catalog_variants", {
+  id: int("id").autoincrement().primaryKey(),
+  logicalLayer: varchar("logicalLayer", { length: 255 }).notNull(),
+  serviceId: int("serviceId").notNull(),
+  remoteLayer: varchar("remoteLayer", { length: 500 }).notNull(),
+  role: mysqlEnum("role", ["primary", "fallback"]).notNull(),
+  priority: int("priority").default(1).notNull(),
+  displayCrs: varchar("displayCrs", { length: 50 }).default("EPSG:4674").notNull(),
+  attribution: text("attribution"),
+  enabled: boolean("enabled").default(false).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  layerPriorityIdx: unique("ogc_layer_priority_unique").on(table.logicalLayer, table.priority),
+  serviceIdx: index("ogc_variant_service_idx").on(table.serviceId),
 }));
 
 // ============================================================================
@@ -317,10 +371,26 @@ export const printJobs = mysqlTable("print_jobs", {
 // ATLAS AUTOMÁTICO
 // ============================================================================
 
+export const atlasTemplates = mysqlTable("atlas_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  templateType: mysqlEnum("templateType", ["abnt_tecnico", "cliente"]).notNull(),
+  config: json("config").$type<Record<string, any>>().notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  projectIdx: index("project_idx").on(table.projectId),
+  projectNameIdx: unique("atlas_template_project_name_unique").on(table.projectId, table.name),
+}));
+
 export const atlasJobs = mysqlTable("atlas_jobs", {
   id: int("id").autoincrement().primaryKey(),
   projectId: int("projectId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  templateId: int("templateId"),
   // Configurações do atlas
   templateType: mysqlEnum("templateType", ["abnt_tecnico", "cliente"]).notNull(),
   pageSize: mysqlEnum("pageSize", ["A4", "A3", "A1", "A0"]).notNull(),
@@ -348,6 +418,7 @@ export const atlasJobs = mysqlTable("atlas_jobs", {
     opacity: number;
     includeInLegend: boolean;
   }>>(),
+  renderConfig: json("renderConfig").$type<Record<string, any>>(),
   // Status do job
   status: mysqlEnum("status", ["pending", "processing", "completed", "failed"]).default("pending").notNull(),
   progress: int("progress").default(0).notNull(),
@@ -369,6 +440,44 @@ export const atlasJobs = mysqlTable("atlas_jobs", {
   projectIdx: index("project_idx").on(table.projectId),
   statusIdx: index("status_idx").on(table.status),
   requestedByIdx: index("requested_by_idx").on(table.requestedBy),
+}));
+
+// ============================================================================
+// INVENTÁRIO E RETENÇÃO DE BACKUPS RECUPERÁVEIS
+// ============================================================================
+
+export const backupPolicies = mysqlTable("backup_policies", {
+  id: int("id").primaryKey(), // singleton operacional: id=1
+  enabled: boolean("enabled").default(false).notNull(),
+  intervalHours: int("intervalHours").default(24).notNull(),
+  retentionDays: int("retentionDays").default(30).notNull(),
+  updatedBy: int("updatedBy"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const backupInventories = mysqlTable("backup_inventories", {
+  id: int("id").autoincrement().primaryKey(),
+  backupId: varchar("backupId", { length: 64 }).notNull().unique(),
+  storageMode: mysqlEnum("storageMode", ["filesystem"]).notNull(),
+  status: mysqlEnum("status", ["complete", "incomplete", "expired", "purged"]).default("complete").notNull(),
+  manifestKey: varchar("manifestKey", { length: 1024 }).notNull(),
+  manifestChecksumKey: varchar("manifestChecksumKey", { length: 1024 }).notNull(),
+  manifestSha256: varchar("manifestSha256", { length: 64 }).notNull(),
+  artifactSha256: varchar("artifactSha256", { length: 64 }).notNull(),
+  archiveBytes: bigint("archiveBytes", { mode: "number" }).notNull(),
+  objectBytes: bigint("objectBytes", { mode: "number" }).notNull(),
+  totalRecords: int("totalRecords").notNull(),
+  requiredObjects: int("requiredObjects").notNull(),
+  copiedObjects: int("copiedObjects").notNull(),
+  missingObjects: int("missingObjects").notNull(),
+  retentionDays: int("retentionDays").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  restoreVerifiedAt: timestamp("restoreVerifiedAt"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  expiryIdx: index("backup_inventory_expiry_idx").on(table.status, table.expiresAt),
+  createdAtIdx: index("backup_inventory_created_idx").on(table.createdAt),
 }));
 
 // ============================================================================
@@ -427,14 +536,27 @@ export type InsertLayer = typeof layers.$inferInsert;
 export type Style = typeof styles.$inferSelect;
 export type InsertStyle = typeof styles.$inferInsert;
 
+export type OgcService = typeof ogcServices.$inferSelect;
+export type InsertOgcService = typeof ogcServices.$inferInsert;
+export type OgcCatalogVariant = typeof ogcCatalogVariants.$inferSelect;
+export type InsertOgcCatalogVariant = typeof ogcCatalogVariants.$inferInsert;
+
 export type SavedMap = typeof savedMaps.$inferSelect;
 export type InsertSavedMap = typeof savedMaps.$inferInsert;
 
 export type PrintJob = typeof printJobs.$inferSelect;
 export type InsertPrintJob = typeof printJobs.$inferInsert;
 
+export type AtlasTemplate = typeof atlasTemplates.$inferSelect;
+export type InsertAtlasTemplate = typeof atlasTemplates.$inferInsert;
+
 export type AtlasJob = typeof atlasJobs.$inferSelect;
 export type InsertAtlasJob = typeof atlasJobs.$inferInsert;
+
+export type BackupPolicy = typeof backupPolicies.$inferSelect;
+export type InsertBackupPolicy = typeof backupPolicies.$inferInsert;
+export type BackupInventory = typeof backupInventories.$inferSelect;
+export type InsertBackupInventory = typeof backupInventories.$inferInsert;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;

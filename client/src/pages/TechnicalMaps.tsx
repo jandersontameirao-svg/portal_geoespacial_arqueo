@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import RasterRealPixelExport from "@/components/RasterRealPixelExport";
 
 export default function TechnicalMaps() {
   const { user } = useAuth();
@@ -52,6 +53,7 @@ export default function TechnicalMaps() {
   };
 
   const isFormValid = selectedProject && mapConfig.name && mapConfig.title;
+  const rasterExportBounds = { north: -15.60, south: -15.85, east: -47.85, west: -48.10 };
 
   // Queries
   const { data: projects } = trpc.projects.list.useQuery();
@@ -338,6 +340,9 @@ export default function TechnicalMaps() {
                     </div>
                   </div>
                 </div>
+                <Separator />
+
+                {selectedProject && <RasterRealPixelExport projectId={parseInt(selectedProject)} bounds={rasterExportBounds} title="Base raster da composição técnica" compact />}
 
                 {/* Botão de Gerar */}
                 <Button 

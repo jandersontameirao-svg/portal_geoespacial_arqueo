@@ -1,12 +1,28 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import {
+  COOKIE_NAME,
+  decodeOAuthState,
+  ONE_YEAR_MS,
+  OAUTH_STATE_COOKIE,
+} from "@shared/const";
+import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
+import { consumeOAuthNonce, safeNonceEqual } from "./oauthState";
 import { sdk } from "./sdk";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function clearOAuthStateCookie(res: Response): void {
+  res.clearCookie(OAUTH_STATE_COOKIE, {
+    httpOnly: true,
+    path: "/",
+    sameSite: "none",
+    secure: true,
+  });
 }
 
 export function registerOAuthRoutes(app: Express) {
@@ -18,6 +34,23 @@ export function registerOAuthRoutes(app: Express) {
       res.status(400).json({ error: "code and state are required" });
       return;
     }
+
+    const decodedState = decodeOAuthState(state);
+    const expectedNonce = parseCookieHeader(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
+
+    // Fail closed before code exchange. Clearing the cookie consumes a valid
+    // nonce once and prevents state/code replay on any callback outcome.
+    if (
+      !decodedState?.nonce ||
+      !expectedNonce ||
+      !safeNonceEqual(decodedState.nonce, expectedNonce) ||
+      !consumeOAuthNonce(decodedState.nonce)
+    ) {
+      clearOAuthStateCookie(res);
+      res.status(403).json({ error: "invalid oauth state" });
+      return;
+    }
+    clearOAuthStateCookie(res);
 
     try {
       const tokenResponse = await sdk.exchangeCodeForToken(code, state);
@@ -43,7 +76,6 @@ export function registerOAuthRoutes(app: Express) {
 
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);

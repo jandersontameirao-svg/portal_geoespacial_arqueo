@@ -40,16 +40,18 @@ export default function Backups() {
   );
 
   // Query para lista de backups
-  const { data: backupList } = trpc.backup.list.useQuery(
+  const { data: backupList, refetch: refetchList } = trpc.backup.list.useQuery(
     undefined,
     { enabled: isAuthenticated && user?.role === "admin" }
   );
+  const backupRecoverable = backupStatus?.recoverable === true;
 
   // Mutation para criar backup manual
   const createBackupMutation = trpc.backup.create.useMutation({
     onSuccess: (data) => {
-      toast.success("Backup iniciado com sucesso!");
+      toast.success("Backup recuperável criado e restauração em memória verificada.");
       refetch();
+      refetchList();
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao criar backup");
@@ -66,6 +68,14 @@ export default function Backups() {
     onError: (error) => {
       toast.error(error.message || "Erro ao configurar backup");
     },
+  });
+  const verifyRestoreMutation = trpc.backup.verifyRestore.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Restauração verificada: ${data.objects} objeto(s) e ${data.tables} tabela(s).`);
+      refetch();
+      refetchList();
+    },
+    onError: (error) => toast.error(error.message || "Falha ao verificar restauração"),
   });
 
   const handleCreateBackup = () => {
@@ -109,6 +119,7 @@ export default function Backups() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
+      case "complete":
         return (
           <Badge className="bg-green-100 text-green-700 border-green-200">
             <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -123,10 +134,20 @@ export default function Backups() {
           </Badge>
         );
       case "failed":
+      case "incomplete":
         return (
           <Badge className="bg-red-100 text-red-700 border-red-200">
             <XCircle className="w-3 h-3 mr-1" />
             Falhou
+          </Badge>
+        );
+      case "unavailable":
+      case "expired":
+      case "purged":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Indisponível
           </Badge>
         );
       default:
@@ -202,7 +223,7 @@ export default function Backups() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-500">Status:</span>
-                    {getStatusBadge("completed")}
+                    {getStatusBadge(backupStatus.lastBackup.status)}
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-500">Data:</span>
@@ -212,10 +233,10 @@ export default function Backups() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-500">Por:</span>
-                    <span className="text-sm font-medium">
-                      {backupStatus.lastBackup.createdBy || "Sistema"}
-                    </span>
+                    <span className="text-sm font-medium">ID #{backupStatus.lastBackup.backupId}</span>
                   </div>
+                  <div className="flex items-center justify-between"><span className="text-sm text-slate-500">Tamanho:</span><span className="text-sm font-medium">{formatSize(backupStatus.lastBackup.archiveBytes)}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-sm text-slate-500">Expira:</span><span className="text-sm font-medium">{formatDate(backupStatus.lastBackup.expiresAt)}</span></div>
                 </div>
               ) : (
                 <p className="text-sm text-slate-500">Nenhum backup realizado ainda.</p>
@@ -236,13 +257,14 @@ export default function Backups() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-500">Total de Backups:</span>
                   <span className="text-sm font-medium">
-                    {backupList?.length || 0}
+                    {backupStatus?.inventory?.total || 0}
                   </span>
                 </div>
+                <div className="flex items-center justify-between"><span className="text-sm text-slate-500">Completos / removidos:</span><span className="text-sm font-medium">{backupStatus?.inventory?.complete || 0} / {backupStatus?.inventory?.purged || 0}</span></div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-500">Status:</span>
                   <span className="text-sm font-medium">
-                    {backupStatus?.healthy ? "Saudável" : "Atenção"}
+                    {backupRecoverable ? "Recuperável" : "Indisponível"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -270,7 +292,7 @@ export default function Backups() {
               <div className="flex gap-2">
                 <Button 
                   onClick={handleCreateBackup}
-                  disabled={createBackupMutation.isPending}
+                  disabled={createBackupMutation.isPending || !backupRecoverable}
                   className="flex-1"
                 >
                   {createBackupMutation.isPending ? (
@@ -290,6 +312,19 @@ export default function Backups() {
             </CardContent>
           </Card>
         </div>
+
+        {!isLoading && !backupRecoverable && (
+          <Card className="mt-6 border-amber-300 bg-amber-50/70 dark:bg-amber-950/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-200"><AlertTriangle className="w-5 h-5" />Backup recuperável indisponível neste ambiente</CardTitle>
+              <CardDescription>{backupStatus?.availability?.reason || backupStatus?.recommendation || "O adaptador de recuperação não está configurado."}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-amber-900 dark:text-amber-100">
+              <p>O contrato de backup permanece disponível, mas a criação é bloqueada para não registrar um manifesto sem bytes recuperáveis.</p>
+              {backupStatus?.availability?.requiredCapabilities?.length ? <p className="mt-2">Para habilitar: {backupStatus.availability.requiredCapabilities.join(", ")}.</p> : null}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Configuração de Agendamento */}
         {isConfiguring && (
@@ -379,14 +414,12 @@ export default function Backups() {
                 <Clock className="w-5 h-5" />
                 Histórico de Backups
               </span>
-              <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <Button variant="outline" size="sm" onClick={() => { refetch(); refetchList(); }}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Atualizar
               </Button>
             </CardTitle>
-            <CardDescription>
-              Lista dos últimos backups realizados
-            </CardDescription>
+            <CardDescription>Inventário físico: ID, tamanho, hashes, expiração e estado de restauração. Integração remota continua bloqueada sem get/head/list privado.</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -406,18 +439,18 @@ export default function Backups() {
                       <Database className="w-8 h-8 text-slate-400" />
                       <div>
                         <p className="font-medium text-slate-900 dark:text-white">
-                          Backup #{backup.id}
+                          Backup #{backup.id} · {backup.backupId}
                         </p>
                         <p className="text-sm text-slate-500">
-                          {formatDate(backup.createdAt)}
+                          {formatDate(backup.createdAt)} · {formatSize(backup.archiveBytes)} · expira {formatDate(backup.expiresAt)}
                         </p>
+                        <p className="max-w-xl truncate text-xs text-slate-500">SHA-256 manifesto: {backup.manifestSha256} · artifact: {backup.artifactSha256}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-sm text-slate-500">
-                        Por: {backup.createdBy || "Sistema"}
-                      </span>
-                      {getStatusBadge("completed")}
+                      <span className="text-xs text-slate-500">{backup.recoveryReadiness}</span>
+                      {getStatusBadge(backup.status)}
+                      {backup.status === "complete" && <Button size="sm" variant="outline" disabled={verifyRestoreMutation.isPending} onClick={() => verifyRestoreMutation.mutate({ backupId: backup.backupId })}>Verificar restore</Button>}
                     </div>
                   </div>
                 ))}
@@ -431,7 +464,7 @@ export default function Backups() {
                 <p className="text-slate-500 dark:text-slate-400 mb-4">
                   Execute seu primeiro backup para começar
                 </p>
-                <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending}>
+                <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending || !backupRecoverable}>
                   <Download className="w-4 h-4 mr-2" />
                   Criar Primeiro Backup
                 </Button>
