@@ -4,6 +4,7 @@ import { BASEMAPS, DEFAULT_BASEMAP } from "@/lib/basemaps";
 import { Button } from "./ui/button";
 import MyProjectsPanel from "./MyProjectsPanel";
 import BaseLayersPanel from "./BaseLayersPanel";
+import InstitutionalLayersPanel from "./InstitutionalLayersPanel";
 
 type MapPanel = "projects" | "basemap" | "layers";
 interface GlobalMapPanelsProps {
@@ -24,8 +25,8 @@ const panelOptions: Array<{
   icon: typeof FolderKanban;
 }> = [
   { id: "projects", label: "Projetos", icon: FolderKanban },
-  { id: "basemap", label: "Mapa-base", icon: MapIcon },
-  { id: "layers", label: "Camadas", icon: Layers },
+  { id: "basemap", label: "Mapa de fundo", icon: MapIcon },
+  { id: "layers", label: "GeoServer", icon: Layers },
 ];
 
 // Reaproveita a navegação compacta do stage, conservando seções visitadas
@@ -107,7 +108,8 @@ export default function GlobalMapPanels({
             aria-expanded={activePanel === id}
             aria-controls="global-map-panel-drawer"
             data-testid={`map-panel-toggle-${id}`}
-            className={`h-10 min-w-0 flex-1 gap-1 px-1 text-[11px] sm:gap-2 sm:px-2 sm:text-xs ${activePanel === id ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+            title={label}
+            className={`h-10 min-w-0 flex-1 gap-1 px-1 text-[10px] sm:gap-2 sm:px-2 sm:text-xs ${activePanel === id ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
           >
             <Icon className="hidden h-4 w-4 shrink-0 sm:block" />
             <span className="truncate">{label}</span>
@@ -134,8 +136,7 @@ export default function GlobalMapPanels({
               tabIndex={-1}
               className="rounded text-sm font-semibold focus-visible:outline-2"
             >
-              {panelOptions.find(panel => panel.id === activePanel)?.label ??
-                "Painel do mapa"}
+              {activePanel === "layers" ? "Camadas institucionais" : panelOptions.find(panel => panel.id === activePanel)?.label ?? "Painel do mapa"}
             </h2>
             <Button
               type="button"
@@ -169,7 +170,7 @@ export default function GlobalMapPanels({
                     htmlFor="global-basemap-select"
                     className="text-sm font-medium"
                   >
-                    Mapa-base cartográfico
+                    Mapa de fundo cartográfico
                   </label>
                   <select
                     id="global-basemap-select"
@@ -225,7 +226,9 @@ export default function GlobalMapPanels({
               </div>
             )}
             {visitedPanels.has("layers") && (
-              <div hidden={activePanel !== "layers"}>
+              <div hidden={activePanel !== "layers"} className="min-w-0 space-y-3">
+                <InstitutionalLayersPanel />
+                <h3 className="border-t border-border px-2 pt-3 text-sm font-semibold">Bases existentes (cache)</h3>
                 <BaseLayersPanel viewMode={viewMode} />
               </div>
             )}

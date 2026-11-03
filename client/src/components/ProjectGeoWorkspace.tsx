@@ -25,6 +25,7 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { storedPolygonToGeoJSON } from "../../../shared/geometry-coordinates";
 import { closeLeafletPolygonRings } from "@/lib/leaflet-geometry-coordinates";
 import { isWorkspaceFeatureCollection, standaloneWorkspaceGeometry, workspaceLayerVisible } from "../../../shared/workspaceHierarchy";
+import { escapeAttribution, ibgeAttribution, isIbgeVariant, type InstitutionalPublishedLayer } from "@/lib/institutionalLayers";
 
 type CoordinateGeometry = Exclude<Geometry, { type: "GeometryCollection" }>;
 
@@ -49,12 +50,7 @@ type ProjectVectorLayer = {
   metadata?: { kind?: string; sourceFileName?: string; logicalLayer?: string; featureCount?: number; presentation?: { renderOrder?: number } } | null;
 };
 
-type PublishedOgcLayer = {
-  logicalLayer: string;
-  selected: { id: number; endpoint: string; remoteLayer: string; serviceType: "wms" | "wfs"; health: string } | null;
-  isFallback: boolean;
-  reason: string | null;
-};
+type PublishedOgcLayer = InstitutionalPublishedLayer;
 
 type Operation = "buffer" | "intersection" | "union" | "clip" | "overlay" | "grid" | "area";
 
@@ -221,7 +217,8 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
   const center = useMemo(() => calculateCenter(geometries), [geometries]);
   const analysisLayers = presentedLayers.filter((layer: any) => !layer.isGroup && layer.metadata?.kind === "gis-analysis-result" && layer.layerData);
   const publishedOgcLayers = rawOgcLayers as PublishedOgcLayer[];
-  const publishedWfsLayers = useMemo(() => publishedOgcLayers.filter((layer) => layer.selected?.serviceType === "wfs"), [publishedOgcLayers]);
+  const publishedWfsLayers = useMemo(() => publishedOgcLayers.filter((layer) => layer.selected?.serviceType === "wfs" && !isIbgeVariant(layer.selected)), [publishedOgcLayers]);
+  const hasIbgeWfs = publishedOgcLayers.some(layer => layer.selected?.serviceType === "wfs" && isIbgeVariant(layer.selected));
   const thematicItems = useMemo<ThematicLayerItem[]>(() => {
     const drawings = geometries.map((geometry) => ({
       id: `drawing-${geometry.id}`,
@@ -439,6 +436,11 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
       return;
     }
     if (kind === "ogc") {
+      const selected = publishedOgcLayers.find(layer => layer.logicalLayer === rawId)?.selected;
+      if (selected?.serviceType === "wfs") {
+        toast.info(isIbgeVariant(selected) ? "Consulte o recorte IBGE no painel GeoServer do globo 2D; a consulta é somente em memória." : "WFS não é uma imagem WMS. Use a importação autorizada antes de visualizar.");
+        return;
+      }
       setVisibleOgcLayerIds((current) => visible ? Array.from(new Set([...current, rawId])) : current.filter((id) => id !== rawId));
     }
   };
@@ -488,7 +490,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
             {rasterLayers.filter((layer) => layer.isVisible && visibleRasterIds.includes(layer.id)).map((layer) => (
               <TileLayer key={`raster-${layer.id}`} pane={thematicPaneName(`raster-${layer.id}`)} url={layer.tileTemplate} minZoom={layer.minZoom} maxZoom={layer.maxZoom} opacity={rasterOpacity / 100} />
             ))}
-            {visibleOgcLayers.map((layer) => layer.selected && <WMSTileLayer key={`ogc-${layer.logicalLayer}`} pane={thematicPaneName(`ogc-${layer.logicalLayer}`)} url={layer.selected.endpoint} layers={layer.selected.remoteLayer} format="image/png" transparent version="1.1.1" />)}
+            {visibleOgcLayers.map((layer) => layer.selected?.serviceType === "wms" && <WMSTileLayer key={`ogc-${layer.logicalLayer}`} pane={thematicPaneName(`ogc-${layer.logicalLayer}`)} url={layer.selected.endpoint} layers={layer.selected.remoteLayer} format="image/png" transparent version="1.1.1" crs={L.CRS.EPSG3857} attribution={isIbgeVariant(layer.selected) ? ibgeAttribution(layer.selected) : escapeAttribution(layer.selected.attribution || layer.selected.publisher || "Fonte OGC publicada")} />)}
             {projectVectorLayers.filter((layer) => layer.isVisible).map((layer) => (
               <GeoJSON
                 key={`file-vector-${layer.id}`}
@@ -547,6 +549,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
           <CardContent className="space-y-3">{geometriesLoading || layersLoading || rastersLoading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : <ThematicLayerTree items={thematicItems} order={thematicOrder} disabled={!canEdit} onVisibilityChange={toggleThematicVisibility} onAnalysisSelectionChange={toggleThematicAnalysis} onMove={moveThematicLayer} />}{selectedVectorLayerIds.length > 0 && <Button variant="outline" className="w-full" disabled={exportVectorLayer.isPending} onClick={() => exportVectorLayer.mutate({ projectId, layerId: selectedVectorLayerIds[0] })}><Download className="mr-2 h-4 w-4" />Exportar primeiro vetor selecionado</Button>}<p className="text-xs text-muted-foreground">A ordem é visual nesta sessão; visibilidade de camadas próprias é persistida e auditada. WFS exige importação controlada antes de análise.</p></CardContent>
         </Card>
 
+        {hasIbgeWfs && <Card><CardHeader className="pb-3"><CardTitle className="text-base">IBGE WFS · consulta temporária</CardTitle></CardHeader><CardContent><p className="text-xs text-muted-foreground">Use o painel GeoServer do globo em 2D e clique em Consultar recorte. As feições ficam apenas em memória; importação persistente e análise de IBGE não estão disponíveis neste workspace.</p></CardContent></Card>}
         {publishedWfsLayers.length > 0 && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Importar base WFS</CardTitle><CardDescription>Importa GeoJSON paginado, recortado pela AOI e inicialmente oculto. WMS continua exclusivamente visual.</CardDescription></CardHeader><CardContent className="space-y-2">{publishedWfsLayers.map((layer) => <div key={layer.logicalLayer} className="flex items-center justify-between gap-2 rounded border p-2"><div className="min-w-0"><p className="truncate text-sm font-medium">{layer.logicalLayer}</p><p className="truncate text-xs text-muted-foreground">{layer.selected?.remoteLayer}</p></div><Button size="sm" variant="outline" disabled={!canEdit || importWfsLayer.isPending || !layer.selected} onClick={() => layer.selected && importWfsLayer.mutate({ projectId, variantId: layer.selected.id })}>{importWfsLayer.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Importar"}</Button></div>)}<p className="text-xs text-muted-foreground">Limites fixos: até 5.000 feições, 10 páginas e 15 MB por importação.</p></CardContent></Card>}
 
         <Card>

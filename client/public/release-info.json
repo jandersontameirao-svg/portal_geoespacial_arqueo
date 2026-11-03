@@ -1,23 +1,41 @@
 {
-  "releaseId": "geoportal-paineis-hierarquia-atena-20261102",
+  "releaseId": "geoportal-ibge-remoto-menus-20261102-2106",
   "application": "Portal Geoespacial Corporativo - Grupo Arqueo",
   "targetDomain": "https://geoportal.manus.space",
-  "functionalSourceCommit": "09539ac8158df86d07eb1fc8f20046eb1d4919c5",
-  "candidatePackageCommit": "e55240856905a8e26883e8838032e53ef5a9e1e3",
-  "baselineCheckpoint": "13bd34ef34e91bba0b813249dda2469d78fd8761",
-  "expectedMigration": "0014_hierarchy_atena",
-  "migrationSha256": "aefe1d867073dd95e6ef66b91e0f771ef7037594aedbcbc028812e4291136de5",
-  "migrationState": "applied and verified in target database on 2026-11-02",
-  "preparationState": "release source integrated; deployment must be confirmed by platform and served version",
+  "functionalSourceCommit": "0cebcf445df18186d4982934a1b67db6f11589d0",
+  "baselineCheckpoint": "7d07233042b5231752f1086dff669a5919814d68",
+  "schemaJournalCount": 15,
+  "schemaChangedByThisRelease": false,
+  "ibgeRegistration": {
+    "completedAt": "2026-11-03T00:06:40.775Z",
+    "publisher": "IBGE",
+    "edition": 2010,
+    "remoteLayer": "CGEO:C02_recortes_territoriais_municipio_2010",
+    "wmsServiceId": 1,
+    "wfsServiceId": 2,
+    "wmsVariantId": 1,
+    "wfsVariantId": 2,
+    "attribution": "Fonte: IBGE",
+    "mode": "remote services only; no geographic file download or persistent WFS import"
+  },
   "acceptedLimitations": [
-    "Recovery of 11 legacy file/base-layer objects is deferred; their records are preserved.",
-    "End-to-end authenticated functional validation is deferred.",
-    "Raster/tiles/Atlas runtime and durable asset availability in deployment remain unverified and may be unavailable."
+    "Recovery of 11 legacy file/base-layer objects remains deferred; their records are preserved.",
+    "End-to-end authenticated functional validation remains deferred; no real OAuth login was exercised in this release.",
+    "Raster/tiles/Atlas runtime and durable asset availability in deployment remain unverified and may be unavailable.",
+    "IBGE JSON statistical APIs and population-to-mesh join are not enabled; upstream connectivity validation is pending.",
+    "The IBGE 2010 municipal reference does not replace the independent 2025 source used by Atena."
   ],
-  "newValidationLimits": [
-    "The 0014 schema was applied and verified on the managed target; transaction coordination was tested with local MySQL, not functionally exercised on TiDB Serverless.",
-    "Visual component harness uses synthetic in-memory tRPC, not real OAuth or backend persistence.",
-    "LLM, official remote sources, generated remote PDFs and storage were not functionally exercised in this integration."
-  ],
-  "note": "This marker identifies source content. A sandbox file or checkpoint is not proof of production deployment."
+  "validationEvidence": {
+    "localVitestTestsPassed": 35,
+    "realMysqlRegistrationCases": 7,
+    "localVisualHarnessCasesPassed": 5,
+    "localVisualHarnessAssertionsPassed": 82,
+    "remoteWmsBrowserAssertionsPassed": 7,
+    "remoteWmsImagesDecoded": 15,
+    "typecheck": "passed",
+    "build": "passed",
+    "existingBaseLayersFingerprintPreserved": true,
+    "managedTidbRegistrationTransaction": "completed and verified; no schema or server-configuration change"
+  },
+  "note": "This marker identifies source content. A sandbox file or checkpoint alone does not prove the deployed production SHA. WMS browser proof used a local harness with real remote images and synthetic session/catalog; it is not OAuth homologation."
 }

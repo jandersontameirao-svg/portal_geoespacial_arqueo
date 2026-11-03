@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import IbgeSourceCard from "@/components/IbgeSourceCard";
 import { Link } from "wouter";
 import {
   Download,
@@ -214,6 +215,8 @@ export default function BaseLayers() {
           </Button>
         </Link>
       </div>
+
+      <div className="mb-6"><IbgeSourceCard /></div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* FUNAI - Terras Indígenas */}

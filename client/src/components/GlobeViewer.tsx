@@ -55,6 +55,7 @@ import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
 import LeafletDrawControl from "./LeafletDrawControl";
 import GlobalMapPanels from "./GlobalMapPanels";
 import { BaseLayerMapOverlays } from "./BaseLayersPanel";
+import InstitutionalMapLayers, { InstitutionalLayersProvider } from "./InstitutionalMapLayers";
 import {
   isWorkspaceFeatureCollection,
   standaloneWorkspaceGeometry,
@@ -537,6 +538,7 @@ export default function GlobeViewer({
   };
 
   return (
+    <InstitutionalLayersProvider viewMode={viewMode}>
     <div
       ref={containerRef}
       className="relative w-full h-full overflow-hidden bg-slate-950"
@@ -618,6 +620,7 @@ export default function GlobeViewer({
             url={activeBasemap.url!}
           />
           <BaseLayerMapOverlays />
+          <InstitutionalMapLayers />
           {enabledIds.map(id => (
             <ProjectLayerDataOverlays key={id} projectId={id} />
           ))}
@@ -1365,5 +1368,6 @@ export default function GlobeViewer({
         />
       )}
     </div>
+    </InstitutionalLayersProvider>
   );
 }
