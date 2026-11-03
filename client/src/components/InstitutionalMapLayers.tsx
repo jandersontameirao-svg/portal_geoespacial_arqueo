@@ -15,8 +15,13 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
   completeViewportCollection,
-  ibgeAttribution,
-  isIbgePublishedLayer,
+  institutionalAttribution,
+  institutionalPublisher,
+  institutionalTitle,
+  institutionalEdition,
+  isInstitutionalPublishedLayer,
+  isIbgeVariant,
+  type InstitutionalSource,
   viewportIssue,
   type InstitutionalLayerStatus,
   type InstitutionalPublishedLayer,
@@ -28,6 +33,9 @@ type InstitutionalState = {
   layers: InstitutionalPublishedLayer[];
   isLoading: boolean;
   isError: boolean;
+  sources: InstitutionalSource[];
+  sourcesError: boolean;
+  sourcesLoading: boolean;
   refetch: () => void;
   viewMode: "2d" | "3d";
   enabled: number[];
@@ -55,21 +63,66 @@ export function InstitutionalLayersProvider({
     enabled: !!user,
     retry: false,
   });
+  // Optional access keeps older isolated harnesses readable: missing API is an explicit error, never an IBGE failure.
+  const sourcesQuery = trpc.institutionalCatalog?.listSources?.useQuery(
+    undefined,
+    {
+      enabled: !!user,
+      retry: false,
+    }
+  );
+  const sources = (sourcesQuery?.data ?? []) as InstitutionalSource[];
+  const sourcesError =
+    !!user &&
+    (!sourcesQuery ||
+      !!sourcesQuery.isError ||
+      (!sourcesQuery.isLoading && !sourcesQuery.data));
   const [enabled, setEnabled] = useState<number[]>([]);
   const [statuses, setStatuses] = useState<
     Record<number, InstitutionalLayerStatus>
   >({});
   const [request, setRequest] = useState<QueryRequest | null>(null);
   const sequence = useRef(0);
-  const layers = useMemo(
-    () =>
-      catalog.isError
-        ? []
-        : ((catalog.data ?? []) as InstitutionalPublishedLayer[]).filter(
-            isIbgePublishedLayer
-          ),
-    [catalog.data, catalog.isError]
-  );
+  const layers = useMemo(() => {
+    if (catalog.isError) return [];
+    return ((catalog.data ?? []) as InstitutionalPublishedLayer[])
+      .filter(isInstitutionalPublishedLayer)
+      .map(layer => {
+        const reference = layer.selected ?? layer.primary;
+        if (!reference || isIbgeVariant(reference)) return layer;
+        const source = sources.find(
+          item => item.publisher === institutionalPublisher(reference)
+        );
+        const enrich = (variant: InstitutionalVariant) => ({
+          ...variant,
+          publisher: institutionalPublisher(variant) ?? undefined,
+          title: source?.title || source?.label || variant.title,
+          edition: source?.edition ?? variant.edition,
+          wmsVersion:
+            source?.wmsVersion ?? variant.wmsVersion ?? ("1.1.1" as const),
+        });
+        if (
+          sourcesError ||
+          source?.status !== "validated" ||
+          (reference.serviceType === "wms"
+            ? !source.supportsWms
+            : !source.supportsWfs)
+        )
+          return {
+            ...layer,
+            selected: null,
+            primary: enrich(reference),
+            reason:
+              source?.blocker ||
+              "Origem não validada; consulte o estado do catálogo institucional.",
+          };
+        return {
+          ...layer,
+          selected: layer.selected ? enrich(layer.selected) : null,
+          primary: layer.primary ? enrich(layer.primary) : undefined,
+        };
+      });
+  }, [catalog.data, catalog.isError, sourcesQuery?.data, sourcesError]);
   const report = useCallback(
     (id: number, status: InstitutionalLayerStatus) =>
       setStatuses(current => ({ ...current, [id]: status })),
@@ -95,6 +148,16 @@ export function InstitutionalLayersProvider({
     setStatuses({});
   }, [user?.id, catalog.isError]);
   useEffect(() => {
+    const available = new Set(
+      layers.flatMap(layer => (layer.selected ? [layer.selected.id] : []))
+    );
+    setEnabled(current =>
+      current.some(id => !available.has(id))
+        ? current.filter(id => available.has(id))
+        : current
+    );
+  }, [layers]);
+  useEffect(() => {
     if (viewMode === "3d") {
       setRequest(null);
       setStatuses({});
@@ -106,8 +169,12 @@ export function InstitutionalLayersProvider({
         layers,
         isLoading: catalog.isLoading,
         isError: catalog.isError,
+        sources,
+        sourcesError,
+        sourcesLoading: !!sourcesQuery?.isLoading,
         refetch: () => {
           void catalog.refetch();
+          void sourcesQuery?.refetch();
         },
         viewMode,
         enabled,
@@ -158,11 +225,11 @@ function InstitutionalWms({ variant }: { variant: InstitutionalVariant }) {
     <WMSTileLayer
       url={variant.endpoint}
       layers={variant.remoteLayer}
-      version="1.1.1"
+      version={variant.wmsVersion ?? "1.1.1"}
       format="image/png"
       transparent
       crs={L.CRS.EPSG3857}
-      attribution={ibgeAttribution(variant)}
+      attribution={institutionalAttribution(variant)}
       eventHandlers={events}
     />
   );
@@ -176,6 +243,7 @@ export default function InstitutionalMapLayers() {
     token: number;
     collection: FeatureCollection;
     attribution: string;
+    variant: InstitutionalVariant;
   } | null>(null);
   const enabledRef = useRef(enabled);
   const requestRef = useRef(request);
@@ -211,7 +279,24 @@ export default function InstitutionalMapLayers() {
       state: "loading",
       message: "Consultando somente o recorte visível (limite 50)…",
     });
-    void clientRef.current.ogcCatalog.queryIbgeViewport
+    const publisher = institutionalPublisher(variant);
+    const query =
+      publisher === "IBGE"
+        ? clientRef.current.ogcCatalog.queryIbgeViewport
+        : publisher === "IPHAN" ||
+            publisher === "FUNAI" ||
+            publisher === "INCRA"
+          ? clientRef.current.institutionalCatalog?.queryViewport
+          : null;
+    if (!query) {
+      report(variant.id, {
+        state: "error",
+        message:
+          "Consulta institucional indisponível; nenhuma requisição foi enviada.",
+      });
+      return;
+    }
+    void query
       .query({ variantId: variant.id, bbox, limit: 50 })
       .then(response => {
         if (
@@ -235,6 +320,7 @@ export default function InstitutionalMapLayers() {
           token: request.token,
           collection,
           attribution: response.attribution,
+          variant,
         });
         report(variant.id, {
           state: "ready",
@@ -286,12 +372,15 @@ export default function InstitutionalMapLayers() {
           <GeoJSON
             key={`${result.variantId}-${result.token}`}
             data={result.collection}
-            attribution={ibgeAttribution({ attribution: result.attribution })}
+            attribution={institutionalAttribution({
+              ...result.variant,
+              attribution: result.attribution,
+            })}
             style={{ color: "#0f766e", weight: 2, fillOpacity: 0.1 }}
             onEachFeature={(feature, layer) => {
               const popup = document.createElement("div");
               const title = document.createElement("strong");
-              title.textContent = "Município — referência 2010";
+              title.textContent = `${institutionalTitle(result.variant)} — edição ${institutionalEdition(result.variant)}`;
               popup.append(title);
               for (const [key, value] of Object.entries(
                 feature.properties ?? {}
@@ -301,7 +390,7 @@ export default function InstitutionalMapLayers() {
                 popup.append(row);
               }
               const source = document.createElement("p");
-              source.textContent = `Fonte: IBGE — ${result.attribution}`;
+              source.textContent = `Fonte: ${institutionalPublisher(result.variant)} — ${result.attribution}`;
               popup.append(source);
               layer.bindPopup(popup);
             }}

@@ -15,6 +15,7 @@ import { gisUploadsRouter } from "./gisUploadsRouter";
 import { gisDiagnosticsRouter } from "./gisDiagnosticsRouter";
 import { gisAnalysisRouter } from "./gisAnalysisRouter";
 import { ogcCatalogRouter } from "./ogcCatalogRouter";
+import { institutionalCatalogRouter } from "./institutionalCatalogRouter";
 import { rasterRouter } from "./rasterRouter";
 import { layersRouter } from "./layersRouter";
 import { projectSelectionRouter } from "./projectSelectionRouter";
@@ -648,6 +649,7 @@ export const appRouter = router({
   gisDiagnostics: gisDiagnosticsRouter,
   gisAnalysis: gisAnalysisRouter,
   ogcCatalog: ogcCatalogRouter,
+  institutionalCatalog: institutionalCatalogRouter,
   raster: rasterRouter,
   layers: layersRouter,
   projectSelection: projectSelectionRouter,

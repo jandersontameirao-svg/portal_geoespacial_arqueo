@@ -30,6 +30,9 @@ import {
   registerIbgePreset,
 } from "./ibgeRegistration";
 import { probeIbgePreset, queryIbgeRemote } from "./ibgeRemote";
+import { INSTITUTIONAL_SOURCES, INSTITUTIONAL_REMOTE_ONLY_MESSAGE } from "../shared/institutionalOgc";
+import { isInstitutionalCatalogEntry } from "./institutionalOgcRegistration";
+import { probeInstitutionalSource } from "./institutionalOgcRemote";
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin")
@@ -379,6 +382,28 @@ export const ogcCatalogRouter = router({
           };
         }
       }
+      if (isInstitutionalCatalogEntry(service)) {
+        const source = INSTITUTIONAL_SOURCES.find(s => s.publisher === service.publisher);
+        const config = source?.protocols[service.serviceType];
+        if (!source || !config || config.endpoint !== service.endpoint || service.capabilities?.presetId !== source.presetId)
+          throw new TRPCError({ code: "CONFLICT", message: "Serviço não corresponde ao preset institucional; nada foi alterado" });
+        try {
+          const evidence = await probeInstitutionalSource(source.publisher);
+          await database.update(ogcServices).set({
+            health: "healthy", status: service.enabled ? "published" : "validated",
+            lastValidatedAt: new Date(), lastHealthyAt: new Date(), lastError: null,
+            revision: service.revision + 1,
+            capabilities: { ...service.capabilities, healthCheck: "targeted-layer-probe", provenance: evidence },
+          }).where(eq(ogcServices.id, service.id));
+          await audit(ctx, "ogc.institutional.service.validate", service.id, { publisher: source.publisher, health: "healthy", evidence });
+          return { health: "healthy" as const, latencyMs: Number(evidence.protocols[service.serviceType]?.elapsedMs ?? 0), httpStatus: 200, method: "targeted-layer-probe", evidence, capabilities: undefined };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Probe institucional indisponível";
+          await database.update(ogcServices).set({ health: "http_error", status: "degraded", lastValidatedAt: new Date(), lastError: message.slice(0, 500), revision: service.revision + 1 }).where(eq(ogcServices.id, service.id));
+          await audit(ctx, "ogc.institutional.service.validate", service.id, { publisher: source.publisher, health: "http_error", details: message });
+          return { health: "http_error" as const, latencyMs: 0, details: message, method: "targeted-layer-probe", capabilities: undefined };
+        }
+      }
       const check = await probeOgcCapabilities(
         service.endpoint,
         service.serviceType,
@@ -550,6 +575,11 @@ export const ogcCatalogRouter = router({
         throw new TRPCError({
           code: "FORBIDDEN",
           message: IBGE_REMOTE_ONLY_MESSAGE,
+        });
+      if (isInstitutionalCatalogEntry(row.service, row.variant))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: INSTITUTIONAL_REMOTE_ONLY_MESSAGE,
         });
       const project = await db.getProjectById(input.projectId);
       const bounds = project?.aoiBounds as {

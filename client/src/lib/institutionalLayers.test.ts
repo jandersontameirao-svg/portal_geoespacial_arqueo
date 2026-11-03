@@ -7,6 +7,13 @@ import {
   isIbgePublishedLayer,
   isIbgeVariant,
   viewportIssue,
+  institutionalPublisher,
+  institutionalTitle,
+  institutionalEdition,
+  institutionalAttribution,
+  isInstitutionalPublishedLayer,
+  sourceIsRegistered,
+  type InstitutionalSource,
   type IbgeViewportResult,
   type InstitutionalVariant,
 } from "./institutionalLayers";
@@ -101,5 +108,103 @@ describe("camadas institucionais — helpers UI", () => {
     expect(ibgeAttribution({ attribution: "IBGE & parceiros" })).toBe(
       "Fonte: IBGE — IBGE &amp; parceiros"
     );
+  });
+});
+
+describe("catálogo multiórgão — limites puros", () => {
+  it("normaliza somente os quatro publicadores fixos, sem inferir por URL ou prefixo", () => {
+    for (const publisher of ["IBGE", "IPHAN", "FUNAI", "INCRA"]) {
+      expect(
+        institutionalPublisher({
+          publisher: ` ${publisher.toLowerCase()} `,
+          remoteLayer: "org:camada",
+        })
+      ).toBe(publisher);
+    }
+    for (const publisher of [
+      "FUNAI externo",
+      "INCRAevil",
+      "https://funai.gov.br",
+      "OUTRO",
+    ]) {
+      expect(
+        institutionalPublisher({
+          publisher,
+          remoteLayer: IBGE_MUNICIPALITIES_2010,
+        })
+      ).toBeNull();
+    }
+    expect(
+      institutionalPublisher({ remoteLayer: "https://funai.gov.br/camada" })
+    ).toBeNull();
+  });
+  it("usa o publicador da variante selecionada sem herdar a identidade da primária", () => {
+    const layer = {
+      logicalLayer: "camada",
+      selected: { ...variant, publisher: "externo" },
+      primary: variant,
+      isFallback: true,
+      reason: null,
+    };
+    expect(isInstitutionalPublishedLayer(layer)).toBe(false);
+    expect(isIbgePublishedLayer(layer)).toBe(false);
+    expect(
+      isInstitutionalPublishedLayer({
+        ...layer,
+        selected: { ...variant, publisher: " IPHAN " },
+      })
+    ).toBe(true);
+  });
+  it("não atribui município/2010/IBGE a outros órgãos e escapa HTML", () => {
+    for (const publisher of ["IPHAN", "FUNAI", "INCRA"]) {
+      const org = {
+        ...variant,
+        publisher,
+        remoteLayer: "org:camada",
+        attribution: '<a href="x">A & B</a>',
+      };
+      expect(institutionalTitle(org)).toBe(publisher);
+      expect(institutionalEdition(org)).toBe("não declarada");
+      expect(institutionalAttribution(org)).toBe(
+        `Fonte: ${publisher} — &lt;a href=&quot;x&quot;&gt;A &amp; B&lt;/a&gt;`
+      );
+      expect(institutionalTitle({ ...org, title: "Título validado" })).toBe(
+        "Título validado"
+      );
+      expect(institutionalEdition({ ...org, edition: "2024" })).toBe("2024");
+    }
+  });
+  it("distingue origem validada de tipos realmente cadastrados no banco", () => {
+    const source: InstitutionalSource = {
+      publisher: "FUNAI",
+      label: "FUNAI",
+      title: "Terras",
+      edition: null,
+      sourceCrs: null,
+      status: "validated",
+      blocker: null,
+      presetId: "fixed",
+      supportsWms: true,
+      supportsWfs: true,
+      registeredTypes: [],
+      wmsVersion: "1.1.1",
+    };
+    expect(sourceIsRegistered(source)).toBe(false);
+    expect(sourceIsRegistered({ ...source, registeredTypes: ["wms"] })).toBe(
+      false
+    );
+    expect(
+      sourceIsRegistered({ ...source, registeredTypes: ["WMS", " wfs "] })
+    ).toBe(true);
+    expect(
+      sourceIsRegistered({
+        ...source,
+        supportsWfs: false,
+        registeredTypes: ["wms"],
+      })
+    ).toBe(true);
+    expect(
+      sourceIsRegistered({ ...source, supportsWms: false, supportsWfs: false })
+    ).toBe(false);
   });
 });
