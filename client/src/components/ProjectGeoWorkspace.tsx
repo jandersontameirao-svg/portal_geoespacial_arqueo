@@ -10,6 +10,7 @@ import LayersTree from "@/components/LayersTree";
 import ThematicLayerTree, { moveThematicItem, type ThematicLayerItem } from "@/components/ThematicLayerTree";
 import MapPrintPreview from "@/components/MapPrintPreview";
 import { captureMapSnapshot } from "@/lib/captureMapSnapshot";
+import { assertIndeMapPrintReady } from "@/lib/indeMapPrintGuard";
 import { trpc } from "@/lib/trpc";
 import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
 import { Button } from "@/components/ui/button";
@@ -285,6 +286,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
   }, [analysisLayers, geometries, projectVectorLayers, publishedOgcLayers, rasterLayers, selectedIds, selectedVectorLayerIds, visibleOgcLayerIds, visibleRasterIds]);
   const captureCurrentMap = useCallback(async (signal?: AbortSignal) => {
     if (!mapRef.current) throw new Error("Aguarde o mapa do projeto carregar antes de imprimir.");
+    assertIndeMapPrintReady(mapRef.current);
     const snapshot = await captureMapSnapshot(mapRef.current, { signal });
     return { ...snapshot, legend: thematicItems.filter(item => item.visible).map(item => ({ label: item.name, color: item.color })) };
   }, [thematicItems]);

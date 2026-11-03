@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FolderKanban, Layers, Map as MapIcon, X } from "lucide-react";
-import { BASEMAPS, DEFAULT_BASEMAP } from "@/lib/basemaps";
 import { Button } from "./ui/button";
+import BasemapQuickSelector from "./BasemapQuickSelector";
 import MyProjectsPanel from "./MyProjectsPanel";
 import BaseLayersPanel from "./BaseLayersPanel";
 import InstitutionalLayersPanel from "./InstitutionalLayersPanel";
@@ -13,6 +13,7 @@ interface GlobalMapPanelsProps {
   basemapId: string;
   onBasemapChange: (id: string) => void;
   viewMode: "2d" | "3d";
+  onRequest2D?: () => void;
   contextualProjectId?: number;
   selectionReady: boolean;
   selectionPending: boolean;
@@ -37,6 +38,7 @@ export default function GlobalMapPanels({
   basemapId,
   onBasemapChange,
   viewMode,
+  onRequest2D,
   contextualProjectId,
   selectionReady,
   selectionPending,
@@ -53,8 +55,7 @@ export default function GlobalMapPanels({
     layers: null,
   });
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const selectedBasemap =
-    BASEMAPS.find(basemap => basemap.id === basemapId) ?? DEFAULT_BASEMAP;
+  const drawerOpen = activePanel !== null && activePanel !== "basemap";
   const closePanel = useCallback(() => {
     if (!activePanel) return;
     const previous = activePanel;
@@ -68,7 +69,7 @@ export default function GlobalMapPanels({
     setActivePanel(panel);
   };
   useEffect(() => {
-    if (!activePanel) return;
+    if (!activePanel || activePanel === "basemap") return;
     headingRef.current?.focus();
     const onEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !event.defaultPrevented) {
@@ -83,7 +84,8 @@ export default function GlobalMapPanels({
   return (
     <div
       data-testid="global-map-panels"
-      className="pointer-events-none absolute inset-0 z-[1000]"
+      data-html2canvas-ignore="true"
+      className="pointer-events-none absolute inset-0 z-[1000] print:hidden"
     >
       <div
         role="group"
@@ -91,7 +93,17 @@ export default function GlobalMapPanels({
         className="pointer-events-auto absolute left-16 top-3 flex gap-1 rounded-xl border border-border bg-background/95 p-1 text-foreground shadow-lg backdrop-blur"
         style={{ width: "min(21rem, calc(100% - 8rem))" }}
       >
-        {panelOptions.map(({ id, label, icon: Icon }) => (
+        {panelOptions.map(({ id, label, icon: Icon }) => id === "basemap" ? (
+          <BasemapQuickSelector
+            key={id}
+            basemapId={basemapId}
+            onBasemapChange={onBasemapChange}
+            viewMode={viewMode}
+            onRequest2D={onRequest2D}
+            open={activePanel === "basemap"}
+            onOpenChange={open => setActivePanel(current => open ? "basemap" : current === "basemap" ? null : current)}
+          />
+        ) : (
           <Button
             key={id}
             ref={element => {
@@ -121,9 +133,9 @@ export default function GlobalMapPanels({
           id="global-map-panel-drawer"
           role="region"
           aria-labelledby="global-map-panel-heading"
-          hidden={!activePanel}
+          hidden={!drawerOpen}
           data-testid="map-panel-drawer"
-          className={`pointer-events-auto absolute left-3 top-16 flex-col overflow-hidden rounded-xl border border-border bg-background/95 text-foreground shadow-2xl backdrop-blur sm:left-16 ${activePanel ? "flex" : "hidden"}`}
+          className={`pointer-events-auto absolute left-3 top-16 flex-col overflow-hidden rounded-xl border border-border bg-background/95 text-foreground shadow-2xl backdrop-blur sm:left-16 ${drawerOpen ? "flex" : "hidden"}`}
           style={{
             width: "min(23rem, calc(100% - 4.5rem))",
             maxHeight: "min(72vh, calc(100% - 7rem))",
@@ -161,68 +173,6 @@ export default function GlobalMapPanels({
                   onRetrySelection={onRetrySelection}
                   contextualProjectId={contextualProjectId}
                 />
-              </div>
-            )}
-            {visitedPanels.has("basemap") && (
-              <div hidden={activePanel !== "basemap"} className="space-y-3 p-2">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="global-basemap-select"
-                    className="text-sm font-medium"
-                  >
-                    Mapa de fundo cartográfico
-                  </label>
-                  <select
-                    id="global-basemap-select"
-                    value={selectedBasemap.id}
-                    onChange={event => onBasemapChange(event.target.value)}
-                    className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm text-foreground"
-                  >
-                    {BASEMAPS.map(basemap => (
-                      <option
-                        key={basemap.id}
-                        value={basemap.id}
-                        disabled={
-                          !basemap.url ||
-                          !["available", "legacy-available"].includes(
-                            basemap.availability
-                          )
-                        }
-                      >
-                        {basemap.name}
-                        {basemap.availability === "requires-approved-provider"
-                          ? " (requer provedor aprovado)"
-                          : basemap.availability === "planned-review"
-                            ? " (em revisão)"
-                            : basemap.availability === "legacy-available"
-                              ? " (legado)"
-                              : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {selectedBasemap.description}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedBasemap.attribution}
-                </p>
-                {selectedBasemap.licenseUrl && (
-                  <a
-                    href={selectedBasemap.licenseUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block text-xs underline"
-                  >
-                    Condições da fonte
-                  </a>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {viewMode === "3d"
-                    ? "A escolha será aplicada em 2D; a textura do globo 3D é independente."
-                    : "Mapa-base aplicado à visualização 2D."}{" "}
-                  O catálogo atual não oferece WMS temporal.
-                </p>
               </div>
             )}
             {visitedPanels.has("layers") && (

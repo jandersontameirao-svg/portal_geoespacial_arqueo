@@ -1159,3 +1159,13 @@ Pendências expressas: APIs estatísticas/união com população não habilitada
 - [x] Aprovar harness offline: 5 cenários/92 asserções, desktop/mobile e 4 PDFs reais, TypeScript/build.
 
 As pendências históricas acima não foram apagadas ou automaticamente aprovadas. OAuth real/homologação integral, 11 objetos, FUNAI/INCRA remotos, estatística IBGE e runtime raster produtivo permanecem nos gates próprios.
+
+
+## Catálogo INDE e seletor compacto — 02/11/2026
+
+- [x] Seletor compacto com cinco fundos, indicação de seleção e escolha em um clique, sem mudar automaticamente de 3D para 2D.
+- [x] Catálogo de 71 serviços agrupado por nível/instituição, busca local e descoberta sob demanda.
+- [x] Ativação/desativação WMS no mapa 2D e adaptador de imagens globais no globo 3D; até quatro camadas.
+- [x] Backend restrito por catálogo, TLS/DNS seguros, limites, cancelamento e validação WMS 1.3.0/1.1.1.
+- [x] Testes remotos ANM/BNDES/ICMBio, 249 testes de contrato/unidade e provas visuais sintéticas 2D/3D; não equivalem a OAuth real.
+- [ ] Validação autenticada integral no deployment e demais serviços institucionais conforme disponibilidade remota.

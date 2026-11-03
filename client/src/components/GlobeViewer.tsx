@@ -52,11 +52,13 @@ import GeometryImport from "./GeometryImport";
 import SavedMapsPanel from "./SavedMapsPanel";
 import MapPrintPreview from "./MapPrintPreview";
 import { captureMapSnapshot } from "@/lib/captureMapSnapshot";
+import { assertIndeMapPrintReady } from "@/lib/indeMapPrintGuard";
 import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
 import LeafletDrawControl from "./LeafletDrawControl";
 import GlobalMapPanels from "./GlobalMapPanels";
 import { BaseLayerMapOverlays } from "./BaseLayersPanel";
 import InstitutionalMapLayers, { InstitutionalLayersProvider } from "./InstitutionalMapLayers";
+import IndeGlobeLayers from "./IndeGlobeLayers";
 import {
   isWorkspaceFeatureCollection,
   standaloneWorkspaceGeometry,
@@ -223,6 +225,7 @@ export default function GlobeViewer({
   const mapRef = useRef<L.Map | null>(null);
   const captureCurrentMap = useCallback((signal?: AbortSignal) => {
     if (!mapRef.current) throw new Error("Abra o mapa 2D e aguarde seu carregamento antes de imprimir.");
+    assertIndeMapPrintReady(mapRef.current);
     return captureMapSnapshot(mapRef.current, { signal });
   }, []);
   const [dimensions, setDimensions] = useState({ width: 1, height: 1 });
@@ -241,6 +244,7 @@ export default function GlobeViewer({
   const [shapeDescription, setShapeDescription] = useState("");
   const [shapeColor, setShapeColor] = useState("#3b82f6");
   const [isLoading, setIsLoading] = useState(true);
+  const [globeReadyRevision, setGlobeReadyRevision] = useState(0);
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
   const [isPanMode, setIsPanMode] = useState(true);
   const [mouseCoords, setMouseCoords] = useState<{
@@ -569,6 +573,7 @@ export default function GlobeViewer({
           waitForGlobeReady={true}
           onGlobeReady={() => {
             setIsLoading(false);
+            setGlobeReadyRevision(revision => revision + 1);
             globeEl.current?.pointOfView(
               {
                 lat: currentPosition.latitude,
@@ -1127,6 +1132,10 @@ export default function GlobeViewer({
         )}
       </div>
 
+      {viewMode === "3d" && (
+        <IndeGlobeLayers globeRef={globeEl} readyRevision={globeReadyRevision} />
+      )}
+
       <GlobalMapPanels
         enabledIds={enabledIds}
         onChange={changeSelection}
@@ -1140,6 +1149,9 @@ export default function GlobeViewer({
             setBasemapId(id);
         }}
         viewMode={viewMode}
+        onRequest2D={() => {
+          if (viewMode === "3d") handleToggleView();
+        }}
         contextualProjectId={projectId}
         selectionReady={selectionReady}
         selectionPending={selectionMutation.isPending}

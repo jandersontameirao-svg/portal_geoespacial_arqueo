@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useInstitutionalLayers } from "./InstitutionalMapLayers";
+import { IndeCatalogPanel } from "./IndeCatalogLayers";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import {
@@ -36,10 +37,13 @@ export default function InstitutionalLayersPanel() {
       <div>
         <h3 className="font-semibold">GeoServer · serviços institucionais</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          WMS visual e WFS consultado sob demanda. Nenhum dado é importado para
-          o projeto.
+          Escolha a instituição e marque uma camada para exibir no mapa.
+          Nenhum arquivo é importado para o projeto.
         </p>
       </div>
+      <IndeCatalogPanel />
+      <details className="rounded-lg border p-2">
+      <summary className="cursor-pointer py-1 font-medium">Conectores cadastrados · IBGE, IPHAN, FUNAI e INCRA</summary>
       {is3d && (
         <p
           className="rounded border border-amber-500/40 p-2 text-xs"
@@ -244,6 +248,7 @@ export default function InstitutionalLayersPanel() {
           Gerenciar catálogo GeoServer
         </Link>
       )}
+      </details>
     </section>
   );
 }

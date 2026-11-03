@@ -13,6 +13,7 @@ import L from "leaflet";
 import type { FeatureCollection } from "geojson";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { IndeCatalogProvider, IndeMapLayers } from "./IndeCatalogLayers";
 import {
   completeViewportCollection,
   institutionalAttribution,
@@ -164,6 +165,7 @@ export function InstitutionalLayersProvider({
     }
   }, [viewMode]);
   return (
+    <IndeCatalogProvider viewMode={viewMode}>
     <Context.Provider
       value={{
         layers,
@@ -188,6 +190,7 @@ export function InstitutionalLayersProvider({
     >
       {children}
     </Context.Provider>
+    </IndeCatalogProvider>
   );
 }
 function InstitutionalWms({ variant }: { variant: InstitutionalVariant }) {
@@ -361,6 +364,7 @@ export default function InstitutionalMapLayers() {
   );
   return (
     <>
+      <IndeMapLayers />
       {variants
         .filter(variant => variant.serviceType === "wms")
         .map(variant => (
