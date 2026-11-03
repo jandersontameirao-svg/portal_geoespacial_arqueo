@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import IbgeSourceCard from "@/components/IbgeSourceCard";
 import InstitutionalSourcesCard from "@/components/InstitutionalSourcesCard";
+import AneelSigaCard from "@/components/AneelSigaCard";
+import FunaiOnlineSourceCard from "@/components/FunaiOnlineSourceCard";
 import { Link } from "wouter";
 import {
   Download,
@@ -219,6 +221,8 @@ export default function BaseLayers() {
 
       <div className="mb-6"><IbgeSourceCard /></div>
       <div className="mb-6"><InstitutionalSourcesCard /></div>
+      <div className="mb-6"><AneelSigaCard /></div>
+      <div className="mb-6"><FunaiOnlineSourceCard /></div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* FUNAI - Terras Indígenas */}

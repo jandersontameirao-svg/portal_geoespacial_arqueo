@@ -17,6 +17,7 @@ import { gisAnalysisRouter } from "./gisAnalysisRouter";
 import { ogcCatalogRouter } from "./ogcCatalogRouter";
 import { institutionalCatalogRouter } from "./institutionalCatalogRouter";
 import { indeCatalogRouter } from "./indeCatalogRouter";
+import { aneelSigaRouter } from "./aneelSigaRouter";
 import { rasterRouter } from "./rasterRouter";
 import { layersRouter } from "./layersRouter";
 import { projectSelectionRouter } from "./projectSelectionRouter";
@@ -652,6 +653,7 @@ export const appRouter = router({
   ogcCatalog: ogcCatalogRouter,
   institutionalCatalog: institutionalCatalogRouter,
   indeCatalog: indeCatalogRouter,
+  aneelSiga: aneelSigaRouter,
   raster: rasterRouter,
   layers: layersRouter,
   projectSelection: projectSelectionRouter,
