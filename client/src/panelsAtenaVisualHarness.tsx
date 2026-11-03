@@ -9,6 +9,7 @@ import { Toaster } from "sonner";
 import type { AppRouter } from "../../server/routers";
 import { trpc } from "./lib/trpc";
 import GlobalMapPanels from "./components/GlobalMapPanels";
+import { InstitutionalLayersProvider } from "./components/InstitutionalMapLayers";
 import AtenaPanel from "./components/AtenaPanel";
 import { DEFAULT_BASEMAP } from "./lib/basemaps";
 import "./index.css";
@@ -62,6 +63,7 @@ const memoryLink: TRPCLink<AppRouter> = () => ({ op }) => observable(observer =>
         }
         case "layers.setVisibility": { const node = nodes.find(row => row.id === input.id); if (!node) throw new Error("MOCK_NODE_MISSING"); node.userVisible = input.visible === true; data = { success: true, persisted: false }; break; }
         case "baseLayers.catalog": data = []; break;
+        case "ogcCatalog.listPublished": data = []; break;
         case "atena.status": data = { ai: { configured: true, mode: "MOCK: interpretação em memória; nenhum modelo" }, skills: [], skillVersions: {}, codeVersion: "synthetic-ui-only" }; break;
         case "atena.templates": data = [{ id: "areas_influencia", title: "Áreas de influência (sintético bloqueado)", purpose: "MOCK", status: "blocked", blockedReason: "MOCK: fonte remota bloqueada, sem fallback local", roles: [], version: "synthetic", defaultPageSize: "A3", defaultOrientation: "landscape" }]; break;
         case "atena.layers": data = nodes.filter(node => !node.isGroup); break;
@@ -85,7 +87,7 @@ function Harness() {
   const [basemapId, setBasemapId] = useState(DEFAULT_BASEMAP.id);
   return <main className="min-h-screen bg-muted/20 text-foreground" data-testid="panels-atena-real-harness">
     <header className="border-b border-amber-300 bg-amber-50 p-3 text-amber-950"><h1 className="text-sm font-bold">HARNESS OFFLINE · APIs 100% SIMULADAS</h1><p className="text-xs">Componentes reais · tRPC em memória · sem App/OAuth/cookies/storage. Não prova autenticação nem backend. Nenhum mapa-base/tile é montado.</p></header>
-    {caseId.startsWith("atena") ? <section className="mx-auto max-w-4xl p-3" data-testid="real-atena"><AtenaPanel embedded initialProjectId={caseId.includes("unauthorized") ? 999999 : undefined} /></section> : <section className="relative h-[calc(100dvh-5.5rem)] min-h-[480px] bg-slate-100 dark:bg-slate-900" data-testid="real-map-panels"><div className="absolute bottom-3 left-3 rounded border bg-white p-2 text-xs text-slate-700">Canvas sintético sem tiles · sem dados geográficos</div><GlobalMapPanels enabledIds={enabledIds} onChange={setEnabledIds} basemapId={basemapId} onBasemapChange={setBasemapId} viewMode="2d" selectionReady selectionPending={false} onRetrySelection={() => {}} /></section>}
+    {caseId.startsWith("atena") ? <section className="mx-auto max-w-4xl p-3" data-testid="real-atena"><AtenaPanel embedded initialProjectId={caseId.includes("unauthorized") ? 999999 : undefined} /></section> : <section className="relative h-[calc(100dvh-5.5rem)] min-h-[480px] bg-slate-100 dark:bg-slate-900" data-testid="real-map-panels"><div className="absolute bottom-3 left-3 rounded border bg-white p-2 text-xs text-slate-700">Canvas sintético sem tiles · sem dados geográficos</div><InstitutionalLayersProvider viewMode="2d"><GlobalMapPanels enabledIds={enabledIds} onChange={setEnabledIds} basemapId={basemapId} onBasemapChange={setBasemapId} viewMode="2d" selectionReady selectionPending={false} onRetrySelection={() => {}} /></InstitutionalLayersProvider></section>}
     <Toaster />
   </main>;
 }

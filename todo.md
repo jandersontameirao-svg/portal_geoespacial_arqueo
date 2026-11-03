@@ -1128,3 +1128,19 @@
 - [ ] Overlay visível no portal
 - [ ] Logs do QGIS Server sem erros críticos
 - [ ] Documentação de como rodar e reproduzir
+
+
+## Entrega IBGE remota e menus — 02/11/2026, 21:06 BRT
+
+- [x] Preservar backup Git e desenvolver em worktree isolada.
+- [x] Validar endpoints remotos WMS/WFS reais com TLS estrito, sem salvar malhas.
+- [x] Cadastrar IBGE no catálogo OGC existente: 2 serviços, 2 variantes e 4 auditorias.
+- [x] Preservar as 4 bases existentes por fingerprint; manter journal15 sem DDL.
+- [x] Separar Projetos, Mapa de fundo e GeoServer; conservar globo e caches legados.
+- [x] Implementar WMS visual e consulta WFS explícita, limitada e somente em memória.
+- [x] Aplicar atribuição Fonte: IBGE e identificar municípios como referência 2010.
+- [x] Aprovar 35 testes dirigidos (7 com MySQL/Drizzle reais), typecheck e build.
+- [x] Aprovar 5 casos visuais offline/82 assertivas e WMS real/15 tiles/7 assertivas.
+- [x] Preservar compatibilidade do harness anterior, sem modificar OAuth.
+
+Pendências expressas: APIs estatísticas/união com população não habilitadas; OAuth real/homologação integral não exercitados; verificação anônima do marcador no domínio retornou403. Os demais TODOs históricos não foram marcados como concluídos por esta entrega.
