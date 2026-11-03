@@ -1144,3 +1144,18 @@
 - [x] Preservar compatibilidade do harness anterior, sem modificar OAuth.
 
 Pendências expressas: APIs estatísticas/união com população não habilitadas; OAuth real/homologação integral não exercitados; verificação anônima do marcador no domínio retornou403. Os demais TODOs históricos não foram marcados como concluídos por esta entrega.
+
+
+## Melhoria validada 02/11/2026 — impressão simples e cinco fundos
+
+- [x] Preservar checkpoint 70c2e8b6 e backup Git antes da cópia isolada.
+- [x] Habilitar cinco fundos explícitos com créditos, limites e CORS: Esri Satélite, OSM, OpenTopoMap, Esri Light Gray e Dark Gray.
+- [x] Integrar captura real 2D ao globo e ao workspace, preservando GIS, globo 3D, Atena, Atlas e GeoServer separado.
+- [x] Implementar escolha simples de modelos Vista livre, Técnico e Apresentação, prévia automática e PDF da mesma cena.
+- [x] Salvar modelos por ação explícita na API Atlas existente, sem sobrescrever templates/defaults e sem migration.
+- [x] Manter proporção, créditos, limites, escala central aproximada e DPI real; A4/A3/A1/A0 sem superamostragem fictícia.
+- [x] Reproduzir e corrigir tiles falhos; bloquear PDF incompleto/CORS e respeitar cancelamento.
+- [x] Aprovar 137 casos puros relacionados e 2 casos MySQL/Drizzle reais de modelos.
+- [x] Aprovar harness offline: 5 cenários/92 asserções, desktop/mobile e 4 PDFs reais, TypeScript/build.
+
+As pendências históricas acima não foram apagadas ou automaticamente aprovadas. OAuth real/homologação integral, 11 objetos, FUNAI/INCRA remotos, estatística IBGE e runtime raster produtivo permanecem nos gates próprios.
