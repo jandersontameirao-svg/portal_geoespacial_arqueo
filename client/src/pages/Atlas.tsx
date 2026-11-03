@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import RasterRealPixelExport from "@/components/RasterRealPixelExport";
+import { isMapPrintLayoutConfig } from "@shared/mapPrintLayouts";
 
 export default function Atlas() {
   const { user } = useAuth();
@@ -67,10 +68,12 @@ export default function Atlas() {
     { projectId: parseInt(selectedProject) },
     { enabled: !!selectedProject && !isNaN(parseInt(selectedProject)) }
   );
-  const { data: atlasTemplates, refetch: refetchTemplates } = trpc.atlas.templates.list.useQuery(
+  const { data: allProjectTemplates, refetch: refetchTemplates } = trpc.atlas.templates.list.useQuery(
     { projectId: parseInt(selectedProject) },
     { enabled: !!selectedProject && !isNaN(parseInt(selectedProject)) }
   );
+  // Layouts de uma folha têm namespace próprio; não são templates de grade Atlas.
+  const atlasTemplates = useMemo(() => (allProjectTemplates || []).filter(template => !isMapPrintLayoutConfig(template.config)), [allProjectTemplates]);
   const { data: rasterLayers } = trpc.raster.listForMap.useQuery(
     { projectId: parseInt(selectedProject) },
     { enabled: !!selectedProject && !isNaN(parseInt(selectedProject)) }

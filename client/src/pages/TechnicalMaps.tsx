@@ -135,10 +135,10 @@ export default function TechnicalMaps() {
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
                 <Printer className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              Mapas Técnicos ABNT
+              Impressão e mapas técnicos
             </h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">
-              Gere mapas técnicos padronizados com elementos cartográficos completos
+              Escolha o projeto, abra o mapa e use Imprimir mapa para selecionar um modelo e baixar o PDF da vista atual.
             </p>
           </div>
         </div>
@@ -177,6 +177,13 @@ export default function TechnicalMaps() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-50">
+                  <p className="text-sm font-semibold">Impressão simples com modelos</p>
+                  <p className="text-xs">Enquadre o mapa, ative as camadas desejadas e clique em Imprimir mapa. A prévia e o PDF usam a mesma captura, com fonte, legenda e escala aproximada. Os modelos do projeto podem ser salvos pelos perfis autorizados.</p>
+                  {selectedProject ? <Link href={`/projects/${selectedProject}?tab=map`}><Button type="button" variant="outline"><Printer className="mr-2 h-4 w-4" />Abrir mapa para imprimir</Button></Link> : <p className="text-xs">Selecione um projeto para abrir sua área de impressão.</p>}
+                </div>
+                <p className="text-xs text-amber-800 dark:text-amber-200">O formulário abaixo preserva as solicitações técnicas antigas. Criar um job pendente não gera um PDF automaticamente; para baixar a vista atual, use o fluxo acima.</p>
 
                 {/* Nome do Job */}
                 <div className="space-y-2">

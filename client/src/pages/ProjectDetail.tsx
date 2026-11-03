@@ -427,7 +427,7 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="map" className={isMapWorkspace ? "mt-0 min-h-0 flex-1" : "space-y-6"}>
-            <ProjectGeoWorkspace projectId={projectId} canEdit={canEdit} />
+            <ProjectGeoWorkspace projectId={projectId} canEdit={canEdit} projectName={project.name} clientName={project.clientName || undefined} />
           </TabsContent>
 
           {/* Aba: Histórico */}

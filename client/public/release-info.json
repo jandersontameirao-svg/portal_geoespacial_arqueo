@@ -1,9 +1,9 @@
 {
-  "releaseId": "geoportal-orgaos-remotos-20261102-2130",
+  "releaseId": "geoportal-impressao-modelos-20261102",
   "application": "Portal Geoespacial Corporativo - Grupo Arqueo",
   "targetDomain": "https://geoportal.manus.space",
-  "functionalSourceCommit": "d960ac3c383097ba6c2a7f85a706d92d29a1d295",
-  "baselineCheckpoint": "ec21353375e32cdc07054ea19dc76fc5f7cba309",
+  "functionalSourceCommit": "6e8c8e6e03af48ac43f5bced8d41e2bb9ef24d5d",
+  "baselineCheckpoint": "70c2e8b63f6692ff125c14c857ebaaa4e33d0084",
   "schemaJournalCount": 15,
   "schemaChangedByThisRelease": false,
   "ibgeRegistration": {
@@ -27,39 +27,150 @@
     "FUNAI remote service blocked by TLS chain validation; certificate verification was not disabled.",
     "INCRA quilombola remote services not validated: legacy DNS and federal mirror WAF; existing cache preserved.",
     "IPHAN SICG:Bem_Protecao is protected material heritage, not the legacy archaeological cache.",
-    "New institutional browser proof is a synthetic local harness; actual WMS pixels and OAuth flow are not homologated for IPHAN."
+    "New institutional browser proof is a synthetic local harness; actual WMS pixels and OAuth flow are not homologated for IPHAN.",
+    "Print is actual 2D viewport snapshot, not a new high-resolution GIS render; A1/A0 does not create detail or certify scale.",
+    "WMS without pixel-read CORS permission blocks printing; no open proxy, certificate bypass, or silent layer omission."
   ],
   "validationEvidence": {
-    "localBackendTestsPassed": 31,
-    "realMysqlRegistrationCases": 7,
-    "frontendPureHelperTestsPassed": 10,
-    "localVisualHarnessCasesPassed": 6,
-    "localVisualHarnessAssertionsPassed": 124,
-    "realWmsHttpStatus": 200,
-    "realWfsHttpStatus": 200,
-    "realWfsProbeFeatureCount": 102,
+    "purePrintAndBasemapCasesPassed": 137,
+    "realMysqlLayoutPersistenceCasesPassed": 2,
+    "localVisualHarnessCasesPassed": 5,
+    "localVisualHarnessAssertionsPassed": 92,
+    "realPdfsExported": 4,
     "typecheck": "passed",
     "build": "passed",
-    "existingBaseLayersFingerprintPreserved": true,
-    "existingIbgeServicesAndVariantsFingerprintsPreserved": true,
-    "managedTidbRegistrationTransaction": "completed and verified; no DDL/configuration/secret changes"
+    "OAuthExercised": false,
+    "productionDatabaseAccessInThisImprovement": false
   },
   "note": "Source marker only: a checkpoint is not independent proof of production deployment SHA. Real remote probes and actual metadata registrations are distinct from the synthetic UI tests.",
   "previousRelease": {
-    "releaseId": "geoportal-ibge-remoto-menus-20261102-2106",
-    "functionalSourceCommit": "0cebcf445df18186d4982934a1b67db6f11589d0",
-    "baselineCheckpoint": "7d07233042b5231752f1086dff669a5919814d68",
+    "releaseId": "geoportal-orgaos-remotos-20261102-2130",
+    "application": "Portal Geoespacial Corporativo - Grupo Arqueo",
+    "targetDomain": "https://geoportal.manus.space",
+    "functionalSourceCommit": "d960ac3c383097ba6c2a7f85a706d92d29a1d295",
+    "baselineCheckpoint": "ec21353375e32cdc07054ea19dc76fc5f7cba309",
+    "schemaJournalCount": 15,
+    "schemaChangedByThisRelease": false,
+    "ibgeRegistration": {
+      "completedAt": "2026-11-03T00:06:40.775Z",
+      "publisher": "IBGE",
+      "edition": 2010,
+      "remoteLayer": "CGEO:C02_recortes_territoriais_municipio_2010",
+      "wmsServiceId": 1,
+      "wfsServiceId": 2,
+      "wmsVariantId": 1,
+      "wfsVariantId": 2,
+      "attribution": "Fonte: IBGE",
+      "mode": "remote services only; no geographic file download or persistent WFS import"
+    },
+    "acceptedLimitations": [
+      "Recovery of 11 legacy file/base-layer objects remains deferred; their records are preserved.",
+      "End-to-end authenticated functional validation remains deferred; no real OAuth login was exercised in this release.",
+      "Raster/tiles/Atlas runtime and durable asset availability in deployment remain unverified and may be unavailable.",
+      "IBGE JSON statistical APIs and population-to-mesh join are not enabled; upstream connectivity validation is pending.",
+      "The IBGE 2010 municipal reference does not replace the independent 2025 source used by Atena.",
+      "FUNAI remote service blocked by TLS chain validation; certificate verification was not disabled.",
+      "INCRA quilombola remote services not validated: legacy DNS and federal mirror WAF; existing cache preserved.",
+      "IPHAN SICG:Bem_Protecao is protected material heritage, not the legacy archaeological cache.",
+      "New institutional browser proof is a synthetic local harness; actual WMS pixels and OAuth flow are not homologated for IPHAN."
+    ],
     "validationEvidence": {
-      "localVitestTestsPassed": 35,
+      "localBackendTestsPassed": 31,
       "realMysqlRegistrationCases": 7,
-      "localVisualHarnessCasesPassed": 5,
-      "localVisualHarnessAssertionsPassed": 82,
-      "remoteWmsBrowserAssertionsPassed": 7,
-      "remoteWmsImagesDecoded": 15,
+      "frontendPureHelperTestsPassed": 10,
+      "localVisualHarnessCasesPassed": 6,
+      "localVisualHarnessAssertionsPassed": 124,
+      "realWmsHttpStatus": 200,
+      "realWfsHttpStatus": 200,
+      "realWfsProbeFeatureCount": 102,
       "typecheck": "passed",
       "build": "passed",
       "existingBaseLayersFingerprintPreserved": true,
-      "managedTidbRegistrationTransaction": "completed and verified; no schema or server-configuration change"
+      "existingIbgeServicesAndVariantsFingerprintsPreserved": true,
+      "managedTidbRegistrationTransaction": "completed and verified; no DDL/configuration/secret changes"
+    },
+    "note": "Source marker only: a checkpoint is not independent proof of production deployment SHA. Real remote probes and actual metadata registrations are distinct from the synthetic UI tests.",
+    "previousRelease": {
+      "releaseId": "geoportal-ibge-remoto-menus-20261102-2106",
+      "functionalSourceCommit": "0cebcf445df18186d4982934a1b67db6f11589d0",
+      "baselineCheckpoint": "7d07233042b5231752f1086dff669a5919814d68",
+      "validationEvidence": {
+        "localVitestTestsPassed": 35,
+        "realMysqlRegistrationCases": 7,
+        "localVisualHarnessCasesPassed": 5,
+        "localVisualHarnessAssertionsPassed": 82,
+        "remoteWmsBrowserAssertionsPassed": 7,
+        "remoteWmsImagesDecoded": 15,
+        "typecheck": "passed",
+        "build": "passed",
+        "existingBaseLayersFingerprintPreserved": true,
+        "managedTidbRegistrationTransaction": "completed and verified; no schema or server-configuration change"
+      }
+    },
+    "institutionalRegistration": {
+      "completedAt": "2026-11-03T00:29:34.997Z",
+      "registeredPublishers": [
+        "IPHAN"
+      ],
+      "services": [
+        {
+          "id": 30001,
+          "name": "IPHAN — Proteção — Bens Materiais (SICG/IPHAN) (WMS)",
+          "publisher": "IPHAN",
+          "serviceType": "wms",
+          "endpoint": "https://geoserver.iphan.gov.br/geoserver/wms",
+          "endpointHash": "f7685bfc3b3be011ac09fc8fb76415b6eb3804426f7e42d8568f7835d52290f8",
+          "status": "published",
+          "enabled": 1,
+          "health": "healthy",
+          "lastValidatedAt": "2026-11-03T00:29:35.000Z"
+        },
+        {
+          "id": 30002,
+          "name": "IPHAN — Proteção — Bens Materiais (SICG/IPHAN) (WFS)",
+          "publisher": "IPHAN",
+          "serviceType": "wfs",
+          "endpoint": "https://geoserver.iphan.gov.br/geoserver/ows",
+          "endpointHash": "28bc993a96861af439146a8432399484d165baa8a947ce5263341cf24179c873",
+          "status": "published",
+          "enabled": 1,
+          "health": "healthy",
+          "lastValidatedAt": "2026-11-03T00:29:35.000Z"
+        }
+      ],
+      "variants": [
+        {
+          "id": 30001,
+          "logicalLayer": "iphan:bens-protegidos:wms",
+          "serviceId": 30001,
+          "remoteLayer": "SICG:Bem_Protecao",
+          "displayCrs": "EPSG:3857",
+          "attribution": "Fonte: IPHAN",
+          "enabled": 1
+        },
+        {
+          "id": 30002,
+          "logicalLayer": "iphan:bens-protegidos:wfs",
+          "serviceId": 30002,
+          "remoteLayer": "SICG:Bem_Protecao",
+          "displayCrs": "EPSG:4674",
+          "attribution": "Fonte: IPHAN",
+          "enabled": 1
+        }
+      ],
+      "unavailableSources": [
+        {
+          "publisher": "FUNAI",
+          "registered": false,
+          "reason": "TLS estrito falhou: UNABLE_TO_VERIFY_LEAF_SIGNATURE em capabilities WMS, GetMap e WFS 1.0.0; cadeia de certificados não verificável"
+        },
+        {
+          "publisher": "INCRA",
+          "registered": false,
+          "reason": "INCRA legado com ENOTFOUND; workspace candidato INDE 404/sem tipos; WMS/WFS Ibama bloqueados HTTP 403; nenhuma camada OGC comprovada"
+        }
+      ],
+      "mode": "Remote WMS and bounded authenticated WFS only; no permanent geographic import"
     }
   },
   "institutionalRegistration": {
@@ -126,5 +237,29 @@
       }
     ],
     "mode": "Remote WMS and bounded authenticated WFS only; no permanent geographic import"
-  }
+  },
+  "printLayouts": {
+    "available": [
+      "Vista livre",
+      "Técnico",
+      "Apresentação"
+    ],
+    "saveMode": "explicit user action in existing project Atlas model API; no default overwritten",
+    "paper": [
+      "A4",
+      "A3",
+      "A1",
+      "A0"
+    ],
+    "snapshotPixelLimit": 12000000,
+    "crs": "EPSG:3857",
+    "remoteFailurePolicy": "no incomplete snapshot or PDF; fail on active broken tile/CORS"
+  },
+  "basemaps": [
+    "Satélite Esri",
+    "OpenStreetMap",
+    "OpenTopoMap",
+    "Esri Light Gray",
+    "Esri Dark Gray"
+  ]
 }

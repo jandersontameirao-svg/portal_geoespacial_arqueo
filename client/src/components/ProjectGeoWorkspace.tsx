@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FeatureGroup, GeoJSON, MapContainer, Marker, Pane as MapPane, Polygon, Polyline, Popup, TileLayer, useMap, WMSTileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -8,6 +8,8 @@ import RasterIngestionPanel from "@/components/RasterIngestionPanel";
 import RasterRealPixelExport from "@/components/RasterRealPixelExport";
 import LayersTree from "@/components/LayersTree";
 import ThematicLayerTree, { moveThematicItem, type ThematicLayerItem } from "@/components/ThematicLayerTree";
+import MapPrintPreview from "@/components/MapPrintPreview";
+import { captureMapSnapshot } from "@/lib/captureMapSnapshot";
 import { trpc } from "@/lib/trpc";
 import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
 import { Button } from "@/components/ui/button";
@@ -19,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Clock, Download, Layers, Loader2, Pencil, Ruler, Save, Sparkles } from "lucide-react";
+import { Clock, Download, Layers, Loader2, Pencil, Printer, Ruler, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { storedPolygonToGeoJSON } from "../../../shared/geometry-coordinates";
@@ -144,8 +146,10 @@ function InvalidateMapOnResize() {
   return null;
 }
 
-export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId: number; canEdit: boolean }) {
+export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, clientName }: { projectId: number; canEdit: boolean; projectName?: string; clientName?: string }) {
   const utils = trpc.useUtils();
+  const mapRef = useRef<L.Map | null>(null);
+  const [printOpen, setPrintOpen] = useState(false);
   const { data: rawGeometries, isLoading: geometriesLoading } = trpc.geometries.list.useQuery({ projectId });
   const { data: rawAnalysisLayers, isLoading: layersLoading } = trpc.gisAnalysis.list.useQuery({ projectId });
   const { data: rawRasterLayers, isLoading: rastersLoading } = trpc.raster.listForMap.useQuery({ projectId });
@@ -279,6 +283,11 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
     }));
     return [...drawings, ...vectors, ...rasters, ...ogc, ...results];
   }, [analysisLayers, geometries, projectVectorLayers, publishedOgcLayers, rasterLayers, selectedIds, selectedVectorLayerIds, visibleOgcLayerIds, visibleRasterIds]);
+  const captureCurrentMap = useCallback(async (signal?: AbortSignal) => {
+    if (!mapRef.current) throw new Error("Aguarde o mapa do projeto carregar antes de imprimir.");
+    const snapshot = await captureMapSnapshot(mapRef.current, { signal });
+    return { ...snapshot, legend: thematicItems.filter(item => item.visible).map(item => ({ label: item.name, color: item.color })) };
+  }, [thematicItems]);
   const visibleOgcLayers = useMemo(() => publishedOgcLayers.filter((layer) => layer.selected?.serviceType === "wms" && visibleOgcLayerIds.includes(layer.logicalLayer)), [publishedOgcLayers, visibleOgcLayerIds]);
   useEffect(() => {
     setVisibleRasterIds((current) => {
@@ -479,13 +488,13 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
     <div className="grid min-h-[480px] gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
       <Card className="flex min-h-[480px] min-w-0 flex-col overflow-hidden lg:min-h-0">
         <CardHeader className="border-b bg-slate-50 dark:bg-slate-900">
-          <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5 text-blue-600" />Mapa e análise do projeto</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2"><CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5 text-blue-600" />Mapa e análise do projeto</CardTitle><Button size="sm" variant="outline" onClick={() => setPrintOpen(true)}><Printer className="mr-2 h-4 w-4" />Imprimir mapa</Button></div>
           <CardDescription>Desenhe, edite, selecione e gere resultados espaciais persistidos com proveniência.</CardDescription>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 p-0">
-          <MapContainer center={center} zoom={11} style={{ height: "100%", width: "100%" }} className="min-h-[420px] flex-1 lg:min-h-0">
+          <MapContainer ref={mapRef} center={center} zoom={11} style={{ height: "100%", width: "100%" }} className="isolate z-0 min-h-[420px] flex-1 lg:min-h-0">
             <InvalidateMapOnResize />
-            <TileLayer attribution={activeBasemap.attribution} url={activeBasemap.url!} />
+            <TileLayer key={activeBasemap.id} attribution={activeBasemap.attribution} url={activeBasemap.url!} crossOrigin={activeBasemap.crossOrigin} minNativeZoom={activeBasemap.minZoom} maxNativeZoom={activeBasemap.maxZoom} />
             {thematicItems.map((item) => <MapPane key={item.id} name={thematicPaneName(item.id)} style={{ zIndex: thematicZIndex(item.id) }} />)}
             {rasterLayers.filter((layer) => layer.isVisible && visibleRasterIds.includes(layer.id)).map((layer) => (
               <TileLayer key={`raster-${layer.id}`} pane={thematicPaneName(`raster-${layer.id}`)} url={layer.tileTemplate} minZoom={layer.minZoom} maxZoom={layer.maxZoom} opacity={rasterOpacity / 100} />
@@ -553,7 +562,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
         {publishedWfsLayers.length > 0 && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Importar base WFS</CardTitle><CardDescription>Importa GeoJSON paginado, recortado pela AOI e inicialmente oculto. WMS continua exclusivamente visual.</CardDescription></CardHeader><CardContent className="space-y-2">{publishedWfsLayers.map((layer) => <div key={layer.logicalLayer} className="flex items-center justify-between gap-2 rounded border p-2"><div className="min-w-0"><p className="truncate text-sm font-medium">{layer.logicalLayer}</p><p className="truncate text-xs text-muted-foreground">{layer.selected?.remoteLayer}</p></div><Button size="sm" variant="outline" disabled={!canEdit || importWfsLayer.isPending || !layer.selected} onClick={() => layer.selected && importWfsLayer.mutate({ projectId, variantId: layer.selected.id })}>{importWfsLayer.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Importar"}</Button></div>)}<p className="text-xs text-muted-foreground">Limites fixos: até 5.000 feições, 10 páginas e 15 MB por importação.</p></CardContent></Card>}
 
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Mapa-base</CardTitle><CardDescription>OSM/OpenTopo exigem provedor aprovado e não usam o servidor público como fallback.</CardDescription></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Mapa de fundo</CardTitle><CardDescription>Escolha explícita do fundo; camadas de órgãos permanecem na árvore temática. Sem download em lote ou fallback silencioso.</CardDescription></CardHeader>
           <CardContent className="space-y-2"><Select value={basemapId} onValueChange={setBasemapId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SELECTABLE_BASEMAPS.map((basemap) => <SelectItem key={basemap.id} value={basemap.id}>{basemap.name}{basemap.availability === "legacy-available" ? " — legado" : ""}</SelectItem>)}</SelectContent></Select>{activeBasemap.availability === "legacy-available" && <p className="text-xs text-amber-700">Base raster Esri em suporte maduro, com retirada prevista em dezembro de 2029.</p>}</CardContent>
         </Card>
 
@@ -580,6 +589,8 @@ export default function ProjectGeoWorkspace({ projectId, canEdit }: { projectId:
         </Card>
 
       </aside>
+
+      <MapPrintPreview projectId={projectId} projectName={projectName || `Projeto ${projectId}`} clientName={clientName} open={printOpen} onClose={() => setPrintOpen(false)} captureMap={captureCurrentMap} />
 
       <Dialog open={Boolean(pending)} onOpenChange={(open) => { if (!open) { if (pendingLayerRef.current && editableLayers) editableLayers.removeLayer(pendingLayerRef.current); pendingLayerRef.current = null; setPending(null); } }}>
         <DialogContent>

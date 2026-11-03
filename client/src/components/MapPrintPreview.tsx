@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -12,616 +11,638 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { Checkbox } from "./ui/checkbox";
-import { Printer, Download, Eye, FileText, Loader2 } from "lucide-react";
+  AlertCircle,
+  ChevronDown,
+  Download,
+  Eye,
+  Loader2,
+  Printer,
+  Save,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+import type { MapPrintSnapshot } from "@shared/mapPrint";
+import {
+  PRINT_LAYOUT_SEEDS,
+  PRINT_PAPER_SIZES,
+  isMapPrintLayoutConfig,
+  readMapPrintLayoutConfig,
+  writeMapPrintLayoutConfig,
+  type PrintLayoutConfig,
+  type PrintPaper,
+  type PrintOrientation,
+} from "@shared/mapPrintLayouts";
+import {
+  buildPrintScene,
+  createMapPrintPdf,
+  decodePrintSnapshot,
+  printSceneSvg,
+  type PrintDocumentInput,
+} from "@/lib/mapPrintRender";
 
-interface MapPrintPreviewProps {
+export interface MapPrintPreviewProps {
   projectId: number;
   projectName: string;
   clientName?: string;
+  /** Compatibility hint only: exports always use the actual captured extent. */
   bounds?: { north: number; south: number; east: number; west: number };
   onClose: () => void;
   open: boolean;
+  captureMap?: (signal?: AbortSignal) => Promise<MapPrintSnapshot>;
 }
-
-// Tamanhos de página em mm
-const PAGE_SIZES = {
-  A4: { width: 210, height: 297, label: "A4 (210×297mm)" },
-  A3: { width: 297, height: 420, label: "A3 (297×420mm)" },
-  A1: { width: 594, height: 841, label: "A1 (594×841mm)" },
-  A0: { width: 841, height: 1189, label: "A0 (841×1189mm)" },
+const selectClass =
+  "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const copyLayout = (layout: PrintLayoutConfig): PrintLayoutConfig => ({
+  ...layout,
+  elements: { ...layout.elements },
+});
+const messageOf = (error: unknown) => {
+  const message =
+    error instanceof Error
+      ? error.message
+      : "Não foi possível preparar o mapa. Tente novamente.";
+  return /cors|taint|cross.?origin|seguran[cç]a|security|exportar pixels/i.test(
+    message
+  )
+    ? `${message} Uma fonte permite visualizar, mas não exportar pixels; desative-a ou use uma fonte com permissão de impressão.`
+    : message;
 };
-
-// Escalas padrão
-const STANDARD_SCALES = [500, 1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000];
-
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        className="h-4 w-4 accent-teal-700"
+        checked={checked}
+        onChange={event => onChange(event.target.checked)}
+      />
+      {label}
+    </label>
+  );
+}
 export default function MapPrintPreview({
   projectId,
   projectName,
   clientName,
-  bounds,
   onClose,
   open,
+  captureMap,
 }: MapPrintPreviewProps) {
-  const printRef = useRef<HTMLDivElement>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-
-  // Form state
-  const [title, setTitle] = useState(`Mapa - ${projectName}`);
+  const [title, setTitle] = useState(`Mapa — ${projectName}`);
   const [subtitle, setSubtitle] = useState("");
-  const [author, setAuthor] = useState("Grupo Arqueo");
-  const [pageSize, setPageSize] = useState<keyof typeof PAGE_SIZES>("A3");
-  const [orientation, setOrientation] = useState<"portrait" | "landscape">("landscape");
-  const [scale, setScale] = useState(10000);
-  const [showNorthArrow, setShowNorthArrow] = useState(true);
-  const [showScaleBar, setShowScaleBar] = useState(true);
-  const [showLegend, setShowLegend] = useState(true);
-  const [showGrid, setShowGrid] = useState(true);
-  const [showFrame, setShowFrame] = useState(true);
-
-  // Calcular fuso UTM baseado nos bounds
-  const utmZone = bounds
-    ? Math.floor(((bounds.east + bounds.west) / 2 + 180) / 6) + 1
-    : 23;
-
-  // Dimensões do layout
-  const pageDims = PAGE_SIZES[pageSize];
-  const layoutWidth = orientation === "landscape" ? pageDims.height : pageDims.width;
-  const layoutHeight = orientation === "landscape" ? pageDims.width : pageDims.height;
-
-  // Escala de preview (para caber na tela)
-  const previewScale = Math.min(800 / layoutWidth, 600 / layoutHeight);
-
-  const createPrintJob = trpc.printJobs.create.useMutation({
-    onSuccess: () => {
-      toast.success("Job de impressão criado com sucesso!");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar job de impressão");
-    },
+  const [author, setAuthor] = useState("");
+  const [layout, setLayout] = useState<PrintLayoutConfig>(() =>
+    copyLayout(PRINT_LAYOUT_SEEDS[0].config)
+  );
+  const [modelId, setModelId] = useState<string>(PRINT_LAYOUT_SEEDS[0].id);
+  const [modelName, setModelName] = useState("");
+  const [snapshot, setSnapshot] = useState<MapPrintSnapshot | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const captureRef = useRef(captureMap);
+  const captureController = useRef<AbortController | null>(null);
+  const exportController = useRef<AbortController | null>(null);
+  useEffect(() => {
+    captureRef.current = captureMap;
+  }, [captureMap]);
+  const userQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: open,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
-
-  const handleGeneratePDF = async () => {
-    if (!printRef.current) return;
-
-    setIsGenerating(true);
+  const templatesQuery = trpc.atlas.templates.list.useQuery(
+    { projectId },
+    {
+      enabled: open && projectId > 0,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const canSave =
+    userQuery.data?.role === "admin" || userQuery.data?.role === "editor";
+  const saveModel = trpc.atlas.templates.create.useMutation({
+    onSuccess: data => {
+      toast.success("Modelo de impressão salvo no projeto.");
+      setModelName("");
+      setModelId(`saved:${data.id}`);
+      void templatesQuery.refetch();
+    },
+    onError: err =>
+      toast.error(`Não foi possível salvar o modelo: ${err.message}`),
+  });
+  const startCapture = useCallback(async () => {
+    captureController.current?.abort();
+    exportController.current?.abort();
+    const controller = new AbortController();
+    captureController.current = controller;
+    setSnapshot(null);
+    setError(null);
+    setExportError(null);
+    setIsGenerating(false);
+    setIsCapturing(true);
     try {
-      // Capturar o elemento como canvas
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-
-      // Criar PDF
-      const pdf = new jsPDF({
-        orientation: orientation,
-        unit: "mm",
-        format: [layoutWidth, layoutHeight],
-      });
-
-      // Adicionar imagem ao PDF
-      const imgData = canvas.toDataURL("image/png");
-      pdf.addImage(imgData, "PNG", 0, 0, layoutWidth, layoutHeight);
-
-      // Salvar PDF
-      const filename = `mapa_${projectName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
-      pdf.save(filename);
-
-      toast.success("PDF gerado com sucesso!");
-
-      // Criar registro no banco
-      createPrintJob.mutate({
-        projectId,
-        name: title,
-        templateType: "abnt_tecnico",
-        pageSize,
-        orientation,
-        scale,
-        title,
-        subtitle: subtitle || undefined,
-        author,
-        showNorthArrow,
-        showScaleBar,
-        showLegend,
-        showGrid,
-        showFrame,
-        bounds,
-      });
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      toast.error("Erro ao gerar PDF");
+      if (!captureRef.current)
+        throw new Error(
+          "A captura do mapa não está disponível nesta vista. Abra a impressão a partir do mapa 2D."
+        );
+      const result = await captureRef.current(controller.signal);
+      if (controller.signal.aborted) return;
+      await decodePrintSnapshot(result, controller.signal);
+      if (!controller.signal.aborted) setSnapshot(result);
+    } catch (err) {
+      if (!controller.signal.aborted) setError(messageOf(err));
     } finally {
+      if (!controller.signal.aborted) setIsCapturing(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (open) void startCapture();
+    else {
+      setSnapshot(null);
+      setIsCapturing(false);
       setIsGenerating(false);
     }
-  };
-
-  // Gerar coordenadas da grade UTM
-  const generateGridLines = () => {
-    if (!bounds || !showGrid) return { horizontal: [], vertical: [] };
-
-    const gridSpacing = scale >= 25000 ? 10000 : scale >= 10000 ? 5000 : 1000;
-    const horizontal: number[] = [];
-    const vertical: number[] = [];
-
-    // Simplificado - em produção usaria proj4 para conversão UTM real
-    const latStep = gridSpacing / 111320;
-    const lonStep = gridSpacing / (111320 * Math.cos(((bounds.north + bounds.south) / 2) * Math.PI / 180));
-
-    for (let lat = Math.floor(bounds.south / latStep) * latStep; lat <= bounds.north; lat += latStep) {
-      horizontal.push(lat);
+    return () => {
+      captureController.current?.abort();
+      exportController.current?.abort();
+    };
+  }, [open, projectId, startCapture]);
+  const previousProject = useRef(projectId);
+  useEffect(() => {
+    if (previousProject.current !== projectId) {
+      previousProject.current = projectId;
+      setTitle(`Mapa — ${projectName}`);
+      setModelId(PRINT_LAYOUT_SEEDS[0].id);
+      setLayout(copyLayout(PRINT_LAYOUT_SEEDS[0].config));
+      setModelName("");
     }
-
-    for (let lon = Math.floor(bounds.west / lonStep) * lonStep; lon <= bounds.east; lon += lonStep) {
-      vertical.push(lon);
+  }, [projectId, projectName]);
+  const input = useMemo<PrintDocumentInput | null>(
+    () =>
+      snapshot
+        ? { snapshot, layout, title, subtitle, author, projectName, clientName }
+        : null,
+    [snapshot, layout, title, subtitle, author, projectName, clientName]
+  );
+  const rendered = useMemo(() => {
+    if (!input) return { scene: null, svg: null, error: null };
+    try {
+      const scene = buildPrintScene(input);
+      return { scene, svg: printSceneSvg(scene), error: null };
+    } catch (err) {
+      return { scene: null, svg: null, error: messageOf(err) };
     }
-
-    return { horizontal, vertical };
+  }, [input]);
+  const previewUrl = useMemo(
+    () =>
+      rendered.svg
+        ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(rendered.svg)}`
+        : undefined,
+    [rendered.svg]
+  );
+  const changeElement = (
+    key: keyof PrintLayoutConfig["elements"],
+    value: boolean
+  ) =>
+    setLayout(current => ({
+      ...current,
+      elements: { ...current.elements, [key]: value },
+    }));
+  const selectModel = (id: string) => {
+    const seed = PRINT_LAYOUT_SEEDS.find(item => item.id === id);
+    const saved = templatesQuery.data?.find(item => `saved:${item.id}` === id);
+    const config = seed?.config ?? readMapPrintLayoutConfig(saved?.config);
+    if (config) {
+      setModelId(id);
+      setLayout(copyLayout(config));
+      setExportError(null);
+    }
   };
-
-  const gridLines = generateGridLines();
-
+  const close = () => {
+    captureController.current?.abort();
+    exportController.current?.abort();
+    onClose();
+  };
+  const download = async () => {
+    if (
+      !input ||
+      !rendered.scene ||
+      !title.trim() ||
+      isCapturing ||
+      isGenerating
+    )
+      return;
+    exportController.current?.abort();
+    const controller = new AbortController();
+    exportController.current = controller;
+    setIsGenerating(true);
+    setExportError(null);
+    try {
+      // Paint first. No page-sized raster or canvas is allocated.
+      await new Promise(resolve => setTimeout(resolve, 25));
+      if (controller.signal.aborted) return;
+      const pdf = createMapPrintPdf(input, rendered.scene);
+      if (controller.signal.aborted) return;
+      const name =
+        projectName
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9_-]+/g, "_")
+          .slice(0, 80) || "projeto";
+      pdf.save(`mapa_${name}_${new Date().toISOString().slice(0, 10)}.pdf`);
+      toast.success("PDF baixado localmente. Nenhum job foi criado.");
+    } catch (err) {
+      if (!controller.signal.aborted)
+        setExportError(`Não foi possível baixar o PDF: ${messageOf(err)}`);
+    } finally {
+      if (!controller.signal.aborted) setIsGenerating(false);
+    }
+  };
+  const eligible =
+    templatesQuery.data?.filter(template =>
+      readMapPrintLayoutConfig(template.config)
+    ) ?? [];
+  const unsupported =
+    templatesQuery.data?.filter(
+      template => !readMapPrintLayoutConfig(template.config)
+    ) ?? [];
+  const visibleError = error || rendered.error || exportError;
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={value => {
+        if (!value) close();
+      }}
+    >
+      <DialogContent className="max-h-[94dvh] overflow-y-auto p-4 sm:max-w-6xl sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Printer className="w-5 h-5" />
-            Gerar Mapa Técnico ABNT
+            <Printer className="h-5 w-5 text-teal-700" />
+            Imprimir mapa
           </DialogTitle>
           <DialogDescription>
-            Configure o layout do mapa técnico no padrão ABNT NBR 13133
+            Escolha o modelo e baixe a vista atual em PDF. O mapa usa os pixels
+            e os limites reais da captura.
           </DialogDescription>
         </DialogHeader>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Configurações */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Título do Mapa *</Label>
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="map-print-title">Título do mapa</Label>
               <Input
-                id="title"
+                id="map-print-title"
+                maxLength={160}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Título principal do mapa"
+                onChange={event => setTitle(event.target.value)}
+                placeholder="Informe o título"
               />
+              {!title.trim() && (
+                <p className="text-xs text-destructive">
+                  Informe um título para baixar o PDF.
+                </p>
+              )}
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="subtitle">Subtítulo</Label>
-              <Input
-                id="subtitle"
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
-                placeholder="Subtítulo opcional"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="author">Autor / Responsável</Label>
-              <Input
-                id="author"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="Nome do responsável técnico"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Tamanho da Folha</Label>
-                <Select value={pageSize} onValueChange={(v) => setPageSize(v as keyof typeof PAGE_SIZES)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(PAGE_SIZES).map(([key, val]) => (
-                      <SelectItem key={key} value={key}>{val.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Orientação</Label>
-                <Select value={orientation} onValueChange={(v) => setOrientation(v as "portrait" | "landscape")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="landscape">Paisagem</SelectItem>
-                    <SelectItem value="portrait">Retrato</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Escala</Label>
-              <Select value={scale.toString()} onValueChange={(v) => setScale(parseInt(v))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STANDARD_SCALES.map((s) => (
-                    <SelectItem key={s} value={s.toString()}>1:{s.toLocaleString()}</SelectItem>
+            <div className="space-y-1.5">
+              <Label htmlFor="map-print-model">Modelo de layout</Label>
+              <select
+                id="map-print-model"
+                className={selectClass}
+                value={modelId}
+                onChange={event => selectModel(event.target.value)}
+              >
+                <optgroup label="Modelos iniciais">
+                  {PRINT_LAYOUT_SEEDS.map(seed => (
+                    <option key={seed.id} value={seed.id}>
+                      {seed.name}
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
+                </optgroup>
+                {eligible.length > 0 && (
+                  <optgroup label="Modelos salvos no projeto">
+                    {eligible.map(template => (
+                      <option key={template.id} value={`saved:${template.id}`}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {unsupported.length > 0 && (
+                  <optgroup label="Outros modelos preservados (não aplicáveis)">
+                    {unsupported.map(template => (
+                      <option
+                        disabled
+                        key={template.id}
+                        value={`unsupported:${template.id}`}
+                      >
+                        {template.name} —{" "}
+                        {isMapPrintLayoutConfig(template.config)
+                          ? "versão incompatível"
+                          : "Atlas multipágina"}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {
+                  PRINT_LAYOUT_SEEDS.find(seed => seed.id === layout.signature)
+                    ?.description
+                }{" "}
+                Alterações abaixo valem para esta impressão.
+              </p>
+              {templatesQuery.isLoading && (
+                <p className="text-xs text-muted-foreground">
+                  Carregando modelos do projeto…
+                </p>
+              )}
+              {templatesQuery.isError && (
+                <p className="text-xs text-amber-700">
+                  Modelos salvos indisponíveis. Os modelos iniciais e a
+                  exportação local continuam disponíveis.
+                </p>
+              )}
             </div>
-
-            <div className="space-y-3 pt-2">
-              <Label className="text-sm font-medium">Elementos do Layout</Label>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox id="northArrow" checked={showNorthArrow} onCheckedChange={(c) => setShowNorthArrow(!!c)} />
-                <label htmlFor="northArrow" className="text-sm">Seta Norte</label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox id="scaleBar" checked={showScaleBar} onCheckedChange={(c) => setShowScaleBar(!!c)} />
-                <label htmlFor="scaleBar" className="text-sm">Escala Gráfica e Numérica</label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox id="legend" checked={showLegend} onCheckedChange={(c) => setShowLegend(!!c)} />
-                <label htmlFor="legend" className="text-sm">Legenda</label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox id="grid" checked={showGrid} onCheckedChange={(c) => setShowGrid(!!c)} />
-                <label htmlFor="grid" className="text-sm">Grade UTM com Coordenadas</label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox id="frame" checked={showFrame} onCheckedChange={(c) => setShowFrame(!!c)} />
-                <label htmlFor="frame" className="text-sm">Moldura Cartográfica</label>
-              </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-3 rounded-lg border p-3">
+              <Toggle
+                label="Legenda"
+                checked={layout.elements.legend}
+                onChange={value => changeElement("legend", value)}
+              />
+              <Toggle
+                label="Grade geográfica"
+                checked={layout.elements.grid}
+                onChange={value => changeElement("grid", value)}
+              />
             </div>
-
-            <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <div className="font-medium mb-2">Informações do Sistema</div>
-              <div className="text-gray-600 space-y-1">
-                <div>CRS: SIRGAS 2000 / UTM zona {utmZone}S (EPSG:319{80 + utmZone})</div>
-                <div>Datum: SIRGAS 2000</div>
-                <div>Projeção: UTM</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Preview */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Preview do Layout</Label>
-              <Button variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)}>
-                <Eye className="w-4 h-4 mr-1" />
-                {showPreview ? "Ocultar" : "Mostrar"} Preview
-              </Button>
-            </div>
-
-            {showPreview && (
-              <div className="border rounded-lg p-4 bg-gray-100 overflow-auto">
-                {/* Layout do Mapa para Impressão */}
-                <div
-                  ref={printRef}
-                  style={{
-                    width: layoutWidth * previewScale,
-                    height: layoutHeight * previewScale,
-                    backgroundColor: "white",
-                    position: "relative",
-                    fontFamily: "Arial, sans-serif",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                  }}
-                >
-                  {/* Moldura Externa */}
-                  {showFrame && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 5 * previewScale,
-                        left: 5 * previewScale,
-                        right: 5 * previewScale,
-                        bottom: 5 * previewScale,
-                        border: `${2 * previewScale}px solid #000`,
-                      }}
-                    />
-                  )}
-
-                  {/* Moldura Interna */}
-                  {showFrame && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 10 * previewScale,
-                        left: 10 * previewScale,
-                        right: 10 * previewScale,
-                        bottom: 10 * previewScale,
-                        border: `${1 * previewScale}px solid #000`,
-                      }}
-                    />
-                  )}
-
-                  {/* Área do Mapa */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 35 * previewScale,
-                      left: 15 * previewScale,
-                      right: showLegend ? 80 * previewScale : 15 * previewScale,
-                      bottom: 60 * previewScale,
-                      backgroundColor: "#e8f4e8",
-                      border: `${1 * previewScale}px solid #666`,
-                    }}
-                  >
-                    {/* Grade UTM */}
-                    {showGrid && (
-                      <svg width="100%" height="100%" style={{ position: "absolute" }}>
-                        {/* Linhas horizontais */}
-                        {[0.2, 0.4, 0.6, 0.8].map((pos, i) => (
-                          <line
-                            key={`h${i}`}
-                            x1="0"
-                            y1={`${pos * 100}%`}
-                            x2="100%"
-                            y2={`${pos * 100}%`}
-                            stroke="#999"
-                            strokeWidth="0.5"
-                            strokeDasharray="4,4"
-                          />
-                        ))}
-                        {/* Linhas verticais */}
-                        {[0.2, 0.4, 0.6, 0.8].map((pos, i) => (
-                          <line
-                            key={`v${i}`}
-                            x1={`${pos * 100}%`}
-                            y1="0"
-                            x2={`${pos * 100}%`}
-                            y2="100%"
-                            stroke="#999"
-                            strokeWidth="0.5"
-                            strokeDasharray="4,4"
-                          />
-                        ))}
-                      </svg>
-                    )}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "50%",
-                        left: "50%",
-                        transform: "translate(-50%, -50%)",
-                        color: "#666",
-                        fontSize: 12 * previewScale,
-                        textAlign: "center",
-                      }}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              A grade usa latitude/longitude em graus, posicionadas em
+              EPSG:3857. Não é uma grade UTM.
+            </p>
+            <details className="group rounded-lg border">
+              <summary className="flex cursor-pointer list-none items-center justify-between p-3 text-sm font-medium">
+                Opções avançadas
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-4 border-t p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="map-print-paper">Papel</Label>
+                    <select
+                      id="map-print-paper"
+                      className={selectClass}
+                      value={layout.paper}
+                      onChange={event =>
+                        setLayout(current => ({
+                          ...current,
+                          paper: event.target.value as PrintPaper,
+                        }))
+                      }
                     >
-                      [Área do Mapa]
-                      <br />
-                      <span style={{ fontSize: 10 * previewScale }}>
-                        Camadas do projeto serão renderizadas aqui
-                      </span>
-                    </div>
+                      {Object.entries(PRINT_PAPER_SIZES).map(([key, paper]) => (
+                        <option key={key} value={key}>
+                          {key} · {paper.width} × {paper.height} mm
+                        </option>
+                      ))}
+                    </select>
                   </div>
-
-                  {/* Coordenadas da Grade (bordas) */}
-                  {showGrid && (
-                    <>
-                      {/* Coordenadas superiores */}
-                      <div style={{
-                        position: "absolute",
-                        top: 25 * previewScale,
-                        left: 15 * previewScale,
-                        right: showLegend ? 80 * previewScale : 15 * previewScale,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 6 * previewScale,
-                      }}>
-                        <span>500.000 E</span>
-                        <span>510.000 E</span>
-                        <span>520.000 E</span>
-                      </div>
-                      {/* Coordenadas laterais */}
-                      <div style={{
-                        position: "absolute",
-                        top: 35 * previewScale,
-                        left: 2 * previewScale,
-                        bottom: 60 * previewScale,
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        fontSize: 6 * previewScale,
-                        writingMode: "vertical-rl",
-                        textOrientation: "mixed",
-                      }}>
-                        <span>7.500.000 N</span>
-                        <span>7.490.000 N</span>
-                        <span>7.480.000 N</span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Título */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 12 * previewScale,
-                      left: 15 * previewScale,
-                      right: 15 * previewScale,
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ fontSize: 14 * previewScale, fontWeight: "bold" }}>
-                      {title || "TÍTULO DO MAPA"}
-                    </div>
-                    {subtitle && (
-                      <div style={{ fontSize: 10 * previewScale, marginTop: 2 * previewScale }}>
-                        {subtitle}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Seta Norte */}
-                  {showNorthArrow && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 40 * previewScale,
-                        right: showLegend ? 85 * previewScale : 20 * previewScale,
-                        width: 30 * previewScale,
-                        height: 40 * previewScale,
-                        textAlign: "center",
-                      }}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="map-print-orientation">Orientação</Label>
+                    <select
+                      id="map-print-orientation"
+                      className={selectClass}
+                      value={layout.orientation}
+                      onChange={event =>
+                        setLayout(current => ({
+                          ...current,
+                          orientation: event.target.value as PrintOrientation,
+                        }))
+                      }
                     >
-                      <svg viewBox="0 0 40 60" width="100%" height="100%">
-                        <polygon points="20,0 25,20 20,15 15,20" fill="#000" />
-                        <polygon points="20,15 25,20 20,60 15,20" fill="#666" />
-                        <text x="20" y="58" textAnchor="middle" fontSize="12" fontWeight="bold">N</text>
-                      </svg>
-                    </div>
-                  )}
-
-                  {/* Legenda */}
-                  {showLegend && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 90 * previewScale,
-                        right: 15 * previewScale,
-                        width: 60 * previewScale,
-                        padding: 5 * previewScale,
-                        border: `${1 * previewScale}px solid #000`,
-                        backgroundColor: "white",
-                        fontSize: 7 * previewScale,
-                      }}
-                    >
-                      <div style={{ fontWeight: "bold", marginBottom: 5 * previewScale, textAlign: "center" }}>
-                        LEGENDA
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", marginBottom: 3 * previewScale }}>
-                        <div style={{ width: 15 * previewScale, height: 8 * previewScale, backgroundColor: "#3b82f6", marginRight: 3 * previewScale }} />
-                        <span>Área de estudo</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", marginBottom: 3 * previewScale }}>
-                        <div style={{ width: 15 * previewScale, height: 2 * previewScale, backgroundColor: "#ef4444", marginRight: 3 * previewScale }} />
-                        <span>Limite</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center" }}>
-                        <div style={{ width: 8 * previewScale, height: 8 * previewScale, backgroundColor: "#22c55e", borderRadius: "50%", marginRight: 3 * previewScale }} />
-                        <span>Ponto</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Escala Gráfica */}
-                  {showScaleBar && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 45 * previewScale,
-                        left: 15 * previewScale,
-                        fontSize: 8 * previewScale,
-                      }}
-                    >
-                      <div style={{ marginBottom: 2 * previewScale }}>Escala 1:{scale.toLocaleString()}</div>
-                      <div style={{ display: "flex", alignItems: "center" }}>
-                        <div style={{ width: 40 * previewScale, height: 6 * previewScale, backgroundColor: "#000" }} />
-                        <div style={{ width: 40 * previewScale, height: 6 * previewScale, backgroundColor: "#fff", border: "1px solid #000" }} />
-                        <div style={{ width: 40 * previewScale, height: 6 * previewScale, backgroundColor: "#000" }} />
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", width: 120 * previewScale }}>
-                        <span>0</span>
-                        <span>{(scale / 1000).toFixed(0)}km</span>
-                        <span>{(scale * 2 / 1000).toFixed(0)}km</span>
-                        <span>{(scale * 3 / 1000).toFixed(0)}km</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Carimbo Técnico */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 12 * previewScale,
-                      left: 15 * previewScale,
-                      right: 15 * previewScale,
-                      height: 30 * previewScale,
-                      border: `${1 * previewScale}px solid #000`,
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
-                      fontSize: 6 * previewScale,
-                    }}
-                  >
-                    {/* Logo */}
-                    <div style={{ borderRight: `${1 * previewScale}px solid #000`, padding: 2 * previewScale, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ fontWeight: "bold", fontSize: 8 * previewScale, color: "#f97316" }}>
-                        GRUPO<br/>ARQUEO
-                      </div>
-                    </div>
-                    {/* Projeto */}
-                    <div style={{ borderRight: `${1 * previewScale}px solid #000`, padding: 2 * previewScale }}>
-                      <div style={{ fontWeight: "bold" }}>PROJETO:</div>
-                      <div>{projectName}</div>
-                    </div>
-                    {/* Cliente */}
-                    <div style={{ borderRight: `${1 * previewScale}px solid #000`, padding: 2 * previewScale }}>
-                      <div style={{ fontWeight: "bold" }}>CLIENTE:</div>
-                      <div>{clientName || "-"}</div>
-                    </div>
-                    {/* Autor/Data */}
-                    <div style={{ borderRight: `${1 * previewScale}px solid #000`, padding: 2 * previewScale }}>
-                      <div style={{ fontWeight: "bold" }}>AUTOR:</div>
-                      <div>{author}</div>
-                      <div style={{ marginTop: 2 * previewScale }}>
-                        <span style={{ fontWeight: "bold" }}>DATA: </span>
-                        {new Date().toLocaleDateString("pt-BR")}
-                      </div>
-                    </div>
-                    {/* CRS */}
-                    <div style={{ padding: 2 * previewScale }}>
-                      <div style={{ fontWeight: "bold" }}>CRS:</div>
-                      <div>SIRGAS 2000</div>
-                      <div>UTM {utmZone}S</div>
-                    </div>
+                      <option value="landscape">Paisagem</option>
+                      <option value="portrait">Retrato</option>
+                    </select>
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="map-print-subtitle">Subtítulo</Label>
+                  <Input
+                    id="map-print-subtitle"
+                    maxLength={200}
+                    value={subtitle}
+                    onChange={event => setSubtitle(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="map-print-author">Autor / responsável</Label>
+                  <Input
+                    id="map-print-author"
+                    maxLength={100}
+                    value={author}
+                    onChange={event => setAuthor(event.target.value)}
+                    placeholder="Opcional"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Toggle
+                    label="Norte"
+                    checked={layout.elements.north}
+                    onChange={value => changeElement("north", value)}
+                  />
+                  <Toggle
+                    label="Moldura"
+                    checked={layout.elements.frame}
+                    onChange={value => changeElement("frame", value)}
+                  />
+                  <Toggle
+                    label="Escala calculada"
+                    checked={layout.elements.scale}
+                    onChange={value => changeElement("scale", value)}
+                  />
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  A escala é calculada para o centro da captura e para o tamanho
+                  real do mapa na folha. Ela varia com a latitude; não
+                  representa certificação técnica. A1/A0 não acrescentam
+                  resolução aos pixels capturados.
+                </p>
+                <div className="space-y-2 border-t pt-3">
+                  <Label htmlFor="map-print-save-name">
+                    Salvar como novo modelo
+                  </Label>
+                  <Input
+                    id="map-print-save-name"
+                    disabled={!canSave}
+                    maxLength={255}
+                    value={modelName}
+                    onChange={event => setModelName(event.target.value)}
+                    placeholder="Nome do modelo (mín. 3 caracteres)"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={
+                      !canSave ||
+                      modelName.trim().length < 3 ||
+                      saveModel.isPending ||
+                      projectId <= 0
+                    }
+                    onClick={() => {
+                      if (!canSave) return;
+                      saveModel.mutate({
+                        projectId,
+                        name: modelName.trim(),
+                        templateType:
+                          layout.signature === "tecnico"
+                            ? "abnt_tecnico"
+                            : "cliente",
+                        config: writeMapPrintLayoutConfig(layout),
+                        isDefault: false,
+                      });
+                    }}
+                  >
+                    {saveModel.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Salvar modelo
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {canSave
+                      ? "Salva papel, orientação e elementos. Não inclui imagem, título ou dados do mapa e não altera modelos existentes."
+                      : "Somente editores e administradores podem salvar modelos. A impressão local continua disponível."}
+                  </p>
+                </div>
+              </div>
+            </details>
+            {visibleError && (
+              <div
+                role="alert"
+                className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{visibleError}</span>
               </div>
             )}
           </div>
+          <section
+            aria-label="Pré-visualização de impressão"
+            className="min-w-0 rounded-xl border bg-slate-100 p-3 text-slate-800 sm:p-4"
+          >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Prévia · {layout.paper} ·{" "}
+                {layout.orientation === "landscape" ? "Paisagem" : "Retrato"}
+              </span>
+              <span className="text-xs text-slate-500">
+                {rendered.scene
+                  ? `${Math.round(rendered.scene.effectiveDpi)} DPI efetivos do mapa`
+                  : "Vista atual"}
+              </span>
+            </div>
+            {isCapturing ? (
+              <div
+                role="status"
+                className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm"
+              >
+                <Loader2 className="h-7 w-7 animate-spin text-teal-700" />
+                Capturando a vista real do mapa…
+              </div>
+            ) : previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="Prévia da folha com a captura real do mapa, legenda e créditos"
+                className="mx-auto h-auto max-h-[60vh] w-full object-contain drop-shadow-lg"
+              />
+            ) : (
+              <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-5 text-center text-sm text-slate-600">
+                <Printer className="h-8 w-8 text-slate-400" />
+                <p>
+                  {visibleError
+                    ? "A prévia não está disponível. Corrija o problema e tente novamente."
+                    : "Aguardando uma captura real do mapa."}
+                </p>
+                <p className="text-xs">
+                  Nenhum mapa de exemplo ou PDF vazio será gerado.
+                </p>
+              </div>
+            )}
+            {snapshot && (
+              <div className="mt-3 space-y-1 text-xs leading-relaxed text-slate-600">
+                <p>
+                  Captura:{" "}
+                  {new Date(snapshot.capturedAt).toLocaleString("pt-BR")} ·{" "}
+                  {snapshot.width} × {snapshot.height} px · EPSG:3857
+                </p>
+                <p>
+                  Proporção original preservada. O PDF mantém textos e linhas
+                  vetoriais; o mapa é a imagem da vista, sem inventar 300 DPI.
+                </p>
+              </div>
+            )}
+            {!!rendered.scene?.warnings.length && (
+              <div
+                role="status"
+                className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900"
+              >
+                <p className="mb-1 font-semibold">Observações da captura</p>
+                <ul className="list-inside list-disc space-y-1">
+                  {rendered.scene.warnings.map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="gap-2 border-t pt-4 sm:justify-between">
+          <Button type="button" variant="ghost" onClick={close}>
             Cancelar
           </Button>
-          <Button onClick={() => setShowPreview(true)} variant="outline">
-            <Eye className="w-4 h-4 mr-2" />
-            Visualizar
-          </Button>
-          <Button onClick={handleGeneratePDF} disabled={isGenerating || !title}>
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Gerando...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 mr-2" />
-                Exportar PDF
-              </>
-            )}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isCapturing || isGenerating}
+              onClick={() => void startCapture()}
+            >
+              {isCapturing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Eye className="mr-2 h-4 w-4" />
+              )}
+              Pré-visualizar
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                !input ||
+                !rendered.scene ||
+                !title.trim() ||
+                isCapturing ||
+                isGenerating
+              }
+              onClick={() => void download()}
+            >
+              {isGenerating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isGenerating ? "Gerando PDF…" : "Baixar PDF"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

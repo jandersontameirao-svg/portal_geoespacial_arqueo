@@ -876,8 +876,12 @@ export default function BaseLayersViewer() {
               className="rounded-lg"
             >
               <TileLayer
+                key={activeBasemap.id}
                 attribution={activeBasemap.attribution}
                 url={activeBasemap.url!}
+                crossOrigin={activeBasemap.crossOrigin}
+                minNativeZoom={activeBasemap.minZoom}
+                maxNativeZoom={activeBasemap.maxZoom}
               />
 
               {/* Renderizar camadas visíveis */}

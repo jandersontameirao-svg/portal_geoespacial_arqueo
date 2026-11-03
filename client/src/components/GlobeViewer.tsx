@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Globe from "react-globe.gl";
 import {
@@ -51,6 +51,7 @@ import { formatUTMCoordinates } from "@/lib/utmHelper";
 import GeometryImport from "./GeometryImport";
 import SavedMapsPanel from "./SavedMapsPanel";
 import MapPrintPreview from "./MapPrintPreview";
+import { captureMapSnapshot } from "@/lib/captureMapSnapshot";
 import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
 import LeafletDrawControl from "./LeafletDrawControl";
 import GlobalMapPanels from "./GlobalMapPanels";
@@ -220,6 +221,10 @@ export default function GlobeViewer({
   const globeEl = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const captureCurrentMap = useCallback((signal?: AbortSignal) => {
+    if (!mapRef.current) throw new Error("Abra o mapa 2D e aguarde seu carregamento antes de imprimir.");
+    return captureMapSnapshot(mapRef.current, { signal });
+  }, []);
   const [dimensions, setDimensions] = useState({ width: 1, height: 1 });
   const [basemapId, setBasemapId] = useState(DEFAULT_BASEMAP.id);
   const activeBasemap =
@@ -618,6 +623,9 @@ export default function GlobeViewer({
             key={activeBasemap.id}
             attribution={activeBasemap.attribution}
             url={activeBasemap.url!}
+            crossOrigin={activeBasemap.crossOrigin}
+            minNativeZoom={activeBasemap.minZoom}
+            maxNativeZoom={activeBasemap.maxZoom}
           />
           <BaseLayerMapOverlays />
           <InstitutionalMapLayers />
@@ -1098,7 +1106,7 @@ export default function GlobeViewer({
             size="icon"
             onClick={() => setPrintDialogOpen(true)}
             className="bg-white/90 hover:bg-white shadow-lg"
-            title="Gerar Mapa Técnico ABNT"
+            title="Imprimir mapa · escolher layout"
           >
             <Printer className="w-5 h-5" />
           </Button>
@@ -1357,12 +1365,7 @@ export default function GlobeViewer({
           clientName={
             projects?.find(p => p.id === projectId)?.clientName || undefined
           }
-          bounds={{
-            north: currentPosition.latitude + 0.1,
-            south: currentPosition.latitude - 0.1,
-            east: currentPosition.longitude + 0.1,
-            west: currentPosition.longitude - 0.1,
-          }}
+          captureMap={captureCurrentMap}
           open={printDialogOpen}
           onClose={() => setPrintDialogOpen(false)}
         />
