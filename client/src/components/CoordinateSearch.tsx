@@ -58,7 +58,7 @@ export function CoordinateSearch({ onNavigate }: CoordinateSearchProps) {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       parseAndNavigate();
     }
@@ -97,7 +97,7 @@ export function CoordinateSearch({ onNavigate }: CoordinateSearchProps) {
             placeholder="23K 500000 8000000 ou -15.7801, -47.9292"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             className="mb-2"
             autoFocus
           />

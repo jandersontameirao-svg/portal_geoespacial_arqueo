@@ -5,21 +5,11 @@ import { Checkbox } from "./ui/checkbox";
 import { Slider } from "./ui/slider";
 import { ChevronRight, ChevronLeft, Layers, MapPin, Route, Square, Trash2, Download } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { mimeForFilename } from "@/lib/exportMime";
 import { toast } from "sonner";
 
 interface LayersPanelProps {
   projectId?: number;
-}
-
-// MIME correto por extensão do arquivo exportado (nome vem do servidor).
-const EXPORT_MIME: Record<string, string> = {
-  geojson: "application/geo+json",
-  kml: "application/vnd.google-earth.kml+xml",
-};
-
-function mimeForFilename(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase() || "";
-  return EXPORT_MIME[ext] || "application/octet-stream";
 }
 
 export default function LayersPanel({ projectId }: LayersPanelProps) {
@@ -54,6 +44,19 @@ export default function LayersPanel({ projectId }: LayersPanelProps) {
       delete next[id];
       return next;
     });
+
+  // Limite do servidor por exportação (geometriesRouter: max 500 ids).
+  const EXPORT_LIMIT = 500;
+  const exportGeometries = (format: "geojson" | "kml") => {
+    if (!geometries || geometries.length === 0) return;
+    const ids = geometries.slice(0, EXPORT_LIMIT).map((g) => g.id);
+    if (geometries.length > EXPORT_LIMIT) {
+      toast.warning(
+        `Exportando as primeiras ${EXPORT_LIMIT} de ${geometries.length} geometrias (limite por exportação).`
+      );
+    }
+    exportMutation.mutate({ geometryIds: ids, format });
+  };
   
   const exportMutation = trpc.geometries.export.useMutation({
     onSuccess: (data) => {
@@ -143,10 +146,8 @@ export default function LayersPanel({ projectId }: LayersPanelProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        const ids = geometries.map(g => g.id);
-                        exportMutation.mutate({ geometryIds: ids, format: "geojson" });
-                      }}
+                      disabled={exportMutation.isPending}
+                      onClick={() => exportGeometries("geojson")}
                       title="Exportar como GeoJSON"
                     >
                       <Download className="w-4 h-4 mr-1" />
@@ -155,10 +156,8 @@ export default function LayersPanel({ projectId }: LayersPanelProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        const ids = geometries.map(g => g.id);
-                        exportMutation.mutate({ geometryIds: ids, format: "kml" });
-                      }}
+                      disabled={exportMutation.isPending}
+                      onClick={() => exportGeometries("kml")}
                       title="Exportar como KML"
                     >
                       <Download className="w-4 h-4 mr-1" />

@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { ChevronDown, ChevronRight, ExternalLink, Folder } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { mimeForFilename } from "@/lib/exportMime";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -29,7 +30,7 @@ function ProjectGeometryExport({ projectId }: { projectId: number }) {
   const exportGeometries = trpc.geometries.export.useMutation({
     onSuccess: data => {
       const url = URL.createObjectURL(
-        new Blob([data.data], { type: "text/plain;charset=utf-8" })
+        new Blob([data.data], { type: mimeForFilename(data.filename) })
       );
       const anchor = document.createElement("a");
       anchor.href = url;
