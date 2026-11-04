@@ -77,7 +77,8 @@ export default function MapViewer({
 
     L.tileLayer(DEFAULT_BASEMAP.url!, {
       attribution: DEFAULT_BASEMAP.attribution,
-      maxZoom: 19,
+      maxZoom: DEFAULT_BASEMAP.maxZoom ?? 19,
+      crossOrigin: DEFAULT_BASEMAP.crossOrigin,
     }).addTo(map);
     L.control.zoom({ position: "topright" }).addTo(map);
 

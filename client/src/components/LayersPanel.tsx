@@ -11,9 +11,23 @@ interface LayersPanelProps {
   projectId?: number;
 }
 
+// MIME correto por extensão do arquivo exportado (nome vem do servidor).
+const EXPORT_MIME: Record<string, string> = {
+  geojson: "application/geo+json",
+  kml: "application/vnd.google-earth.kml+xml",
+};
+
+function mimeForFilename(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  return EXPORT_MIME[ext] || "application/octet-stream";
+}
+
 export default function LayersPanel({ projectId }: LayersPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
-  
+  // Valor em arraste do slider de opacidade, por geometria. Dá feedback
+  // instantâneo sem gravar no backend a cada passo (grava só ao soltar).
+  const [opacityDraft, setOpacityDraft] = useState<Record<number, number>>({});
+
   // Buscar geometrias do projeto
   const { data: geometries, refetch } = trpc.geometries.list.useQuery(
     { projectId: projectId! },
@@ -32,10 +46,18 @@ export default function LayersPanel({ projectId }: LayersPanelProps) {
       refetch();
     },
   });
+
+  const clearOpacityDraft = (id: number) =>
+    setOpacityDraft((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
   
   const exportMutation = trpc.geometries.export.useMutation({
     onSuccess: (data) => {
-      const blob = new Blob([data.data], { type: "text/plain" });
+      const blob = new Blob([data.data], { type: mimeForFilename(data.filename) });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -205,15 +227,18 @@ export default function LayersPanel({ projectId }: LayersPanelProps) {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">Opacidade</span>
-                          <span className="text-xs font-medium">{geometry.opacity}%</span>
+                          <span className="text-xs font-medium">{opacityDraft[geometry.id] ?? geometry.opacity}%</span>
                         </div>
                         <Slider
-                          value={[geometry.opacity]}
+                          value={[opacityDraft[geometry.id] ?? geometry.opacity]}
                           onValueChange={([value]) => {
-                            updateOpacityMutation.mutate({
-                              id: geometry.id,
-                              opacity: value,
-                            });
+                            setOpacityDraft((current) => ({ ...current, [geometry.id]: value }));
+                          }}
+                          onValueCommit={([value]) => {
+                            clearOpacityDraft(geometry.id);
+                            if (value !== geometry.opacity) {
+                              updateOpacityMutation.mutate({ id: geometry.id, opacity: value });
+                            }
                           }}
                           max={100}
                           step={10}
