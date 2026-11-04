@@ -113,6 +113,13 @@
       "when": 1793801920879,
       "tag": "0015_romantic_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1793813649208,
+      "tag": "0016_whole_silvermane",
+      "breakpoints": true
     }
   ]
 }

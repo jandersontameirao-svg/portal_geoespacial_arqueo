@@ -707,3 +707,67 @@ export const atenaRuns = mysqlTable("atena_runs", {
 
 export type AtenaRun = typeof atenaRuns.$inferSelect;
 export type InsertAtenaRun = typeof atenaRuns.$inferInsert;
+
+// ============================================================================
+// OBSERVAÇÕES — canal interno de feedback (reclamações, bugs, melhorias)
+// ============================================================================
+
+export const observacoes = mysqlTable("observacoes", {
+  id: int("id").autoincrement().primaryKey(),
+  titulo: varchar("titulo", { length: 255 }).notNull(),
+  descricao: text("descricao").notNull(),
+  categoria: mysqlEnum("categoria", ["reclamacao", "melhoria", "bug", "caracteristica"]).notNull(),
+  // Área do sistema a que se refere (ex.: "Pipeline", "Propostas", "Mapa").
+  area: varchar("area", { length: 120 }),
+  // Prints anexados como data-URI base64 (self-contained; sem storage externo).
+  imagens: json("imagens").$type<Array<{ url: string; name: string }>>(),
+  status: mysqlEnum("status", ["aberta", "em_analise", "resolvida"]).default("aberta").notNull(),
+  criadoPorId: int("criadoPorId"),
+  criadoPorNome: varchar("criadoPorNome", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  statusIdx: index("observacoes_status_idx").on(table.status),
+  autorIdx: index("observacoes_autor_idx").on(table.criadoPorId),
+  createdIdx: index("observacoes_created_idx").on(table.createdAt),
+}));
+
+export type Observacao = typeof observacoes.$inferSelect;
+export type InsertObservacao = typeof observacoes.$inferInsert;
+
+// ============================================================================
+// ATENA — assistente operacional conversacional (chat, memórias, ações)
+// ============================================================================
+
+// Diretrizes reutilizáveis ensinadas pelo usuário; injetadas no system prompt.
+export const atenaMemories = mysqlTable("atena_memories", {
+  id: int("id").autoincrement().primaryKey(),
+  categoria: mysqlEnum("categoria", ["custo", "processo", "preferencia", "comercial", "tecnico", "prazo", "modelo_escopo", "geral"]).default("geral").notNull(),
+  diretriz: text("diretriz").notNull(),
+  ativo: boolean("ativo").default(true).notNull(),
+  criadoPorId: int("criadoPorId"),
+  criadoPorNome: varchar("criadoPorNome", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  ativoIdx: index("atena_memories_ativo_idx").on(table.ativo),
+}));
+
+export type AtenaMemory = typeof atenaMemories.$inferSelect;
+export type InsertAtenaMemory = typeof atenaMemories.$inferInsert;
+
+// Histórico de conversa. projectId nulo = chat geral; preenchido = chat do projeto.
+export const atenaChatMessages = mysqlTable("atena_chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId"),
+  role: mysqlEnum("role", ["user", "assistant"]).notNull(),
+  content: text("content").notNull(),
+  autorId: int("autorId"),
+  autorNome: varchar("autorNome", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  scopeIdx: index("atena_chat_scope_idx").on(table.projectId, table.createdAt),
+}));
+
+export type AtenaChatMessage = typeof atenaChatMessages.$inferSelect;
+export type InsertAtenaChatMessage = typeof atenaChatMessages.$inferInsert;

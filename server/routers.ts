@@ -25,6 +25,8 @@ import { atenaRouter } from "./atenaRouter";
 import { prospectRouter } from "./prospectRouter";
 import { influenceRouter } from "./influenceRouter";
 import { officialRouter } from "./officialRouter";
+import { observacoesRouter } from "./observacoesRouter";
+import { atenaChatRouter } from "./atenaChatRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { verifyPassword, DUMMY_PASSWORD_HASH } from "./_core/password";
@@ -757,6 +759,8 @@ export const appRouter = router({
   prospect: prospectRouter,
   influence: influenceRouter,
   official: officialRouter,
+  observacoes: observacoesRouter,
+  atenaChat: atenaChatRouter,
 });
 
 export type AppRouter = typeof appRouter;

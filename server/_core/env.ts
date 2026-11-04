@@ -7,4 +7,9 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // LLM próprio (ex.: OpenAI). Tem precedência sobre o Forge quando definido.
+  // OPENAI_API_KEY + (opcional) OPENAI_BASE_URL/LLM_MODEL no .env da VPS.
+  llmApiKey: process.env.OPENAI_API_KEY ?? process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  llmBaseUrl: process.env.OPENAI_BASE_URL ?? process.env.BUILT_IN_FORGE_API_URL ?? "",
+  llmModel: process.env.LLM_MODEL ?? "",
 };

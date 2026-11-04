@@ -28,7 +28,9 @@ import {
   Layers,
   Map as MapIcon,
   Sparkles,
-  Server
+  Server,
+  MessageSquare,
+  MessageSquarePlus
 } from "lucide-react";
 import GlobalSearch from "./GlobalSearch";
 import { NotificationBell } from "./NotificationBell";
@@ -127,6 +129,24 @@ export default function Header() {
                       <div>
                         <span>Atena Cartógrafa</span>
                         <p className="text-xs text-slate-500">Planos, análises e modelos por projeto</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/assistente">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <MessageSquare className="mr-2 h-4 w-4 text-orange-500" />
+                      <div>
+                        <span>Assistente Atena</span>
+                        <p className="text-xs text-slate-500">Chat operacional, memórias e ações</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/observacoes">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <MessageSquarePlus className="mr-2 h-4 w-4 text-rose-500" />
+                      <div>
+                        <span>Observações</span>
+                        <p className="text-xs text-slate-500">Feedback, bugs e melhorias do sistema</p>
                       </div>
                     </DropdownMenuItem>
                   </Link>
@@ -344,6 +364,18 @@ export default function Header() {
                   <DropdownMenuItem className="cursor-pointer">
                     <Sparkles className="mr-2 h-4 w-4 text-orange-500" />
                     Atena Cartógrafa
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/assistente">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <MessageSquare className="mr-2 h-4 w-4 text-orange-500" />
+                    Assistente Atena
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/observacoes">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <MessageSquarePlus className="mr-2 h-4 w-4 text-rose-500" />
+                    Observações
                   </DropdownMenuItem>
                 </Link>
                 <Link href="/technical-maps">

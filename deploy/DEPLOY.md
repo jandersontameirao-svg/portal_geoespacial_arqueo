@@ -115,6 +115,12 @@ Preencha:
 - `JWT_SECRET` com o valor do `openssl rand -hex 32`.
 - `VITE_APP_ID` pode ficar como `geoportal-arqueo`.
 - `PORT=8002`, `HOST=127.0.0.1`, `NODE_ENV=production` (já vêm preenchidos).
+- **IA (opcional):** `OPENAI_API_KEY` para ativar o Assistente Atena e o
+  "Organizar com Atena" das Observações. Sem a chave, esses recursos ficam
+  desativados com aviso; o resto do sistema (incluindo o CRUD de Observações)
+  funciona normalmente. `OPENAI_BASE_URL` e `LLM_MODEL` são opcionais (padrão:
+  OpenAI oficial + `gpt-4o-mini`). A chave **não** precisa estar presente no
+  `pnpm build` — só no runtime do servidor.
 
 Salve: `Ctrl+O`, `Enter`, `Ctrl+X`.
 

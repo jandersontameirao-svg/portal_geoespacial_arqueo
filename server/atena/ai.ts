@@ -9,14 +9,13 @@
  * Sem provedor configurado, a interpretação fica BLOQUEADA e informa isso.
  * Não há respostas fixas simulando IA.
  */
-import { ENV } from "../_core/env";
-import { invokeLLM } from "../_core/llm";
+import { invokeLLM, isLLMConfigured } from "../_core/llm";
 import { structuredRequestSchema, SKILL_IDS, SKILLS, type StructuredRequest } from "./skills";
 
 export type AiStatus = { configured: true } | { configured: false; reason: string };
 
 export function aiStatus(): AiStatus {
-  if (ENV.forgeApiUrl && ENV.forgeApiKey) return { configured: true };
+  if (isLLMConfigured()) return { configured: true };
   return {
     configured: false,
     reason: "Interpretação por IA bloqueada: provedor de IA não configurado neste ambiente. Use o formulário estruturado para montar o pedido.",

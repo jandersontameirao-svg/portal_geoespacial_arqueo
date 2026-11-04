@@ -209,14 +209,32 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+const resolveBaseUrl = () => {
+  const base = ENV.llmBaseUrl && ENV.llmBaseUrl.trim().length > 0 ? ENV.llmBaseUrl.trim() : "";
+  if (base) return base.replace(/\/$/, "");
+  // Sem base configurada: assume OpenAI oficial.
+  return "https://api.openai.com";
+};
+
+const resolveApiUrl = () => `${resolveBaseUrl()}/v1/chat/completions`;
+
+// O Forge/Manus usa modelo gemini e o campo não-padrão `thinking`; OpenAI e
+// endpoints compatíveis não. Detecta pelo host do endpoint.
+const isForgeEndpoint = () => /manus|forge/i.test(resolveBaseUrl());
+
+const resolveModel = () => {
+  if (ENV.llmModel && ENV.llmModel.trim().length > 0) return ENV.llmModel.trim();
+  return isForgeEndpoint() ? "gemini-2.5-flash" : "gpt-4o-mini";
+};
+
+const resolveApiKey = () => ENV.llmApiKey || ENV.forgeApiKey;
+
+/** True quando há um provedor de IA utilizável (chave configurada). */
+export const isLLMConfigured = () => Boolean(resolveApiKey());
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  if (!resolveApiKey()) {
+    throw new Error("Provedor de IA não configurado (defina OPENAI_API_KEY).");
   }
 };
 
@@ -279,8 +297,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     response_format,
   } = params;
 
+  const forge = isForgeEndpoint();
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: resolveModel(),
     messages: messages.map(normalizeMessage),
   };
 
@@ -296,9 +315,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
+  // Forge aceita 32k e o campo não-padrão `thinking`; OpenAI usa limites menores
+  // e rejeita campos desconhecidos.
+  payload.max_tokens = forge ? 32768 : 4096;
+  if (forge) {
+    payload.thinking = { budget_tokens: 128 };
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
@@ -316,7 +337,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${resolveApiKey()}`,
     },
     body: JSON.stringify(payload),
   });
