@@ -14,6 +14,9 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  // Hash de senha (scrypt) para login próprio e-mail+senha. Nulo para contas
+  // sem senha local (ex.: criadas por convite ainda não ativado).
+  passwordHash: varchar("passwordHash", { length: 255 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["admin", "editor", "client"]).default("client").notNull(),
   mfaEnabled: boolean("mfaEnabled").default(false).notNull(),

@@ -32,9 +32,14 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  const ENV_IS_PRODUCTION = process.env.NODE_ENV === "production";
   const app = express();
   const server = createServer(app);
-  
+
+  // Atrás do nginx (reverse proxy): confia no primeiro proxy para ler
+  // X-Forwarded-Proto/For (cookie `secure` e rate-limit por IP real).
+  app.set("trust proxy", 1);
+
   // Rate limiting para endpoints sensíveis
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
@@ -160,14 +165,22 @@ async function startServer() {
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  // Em produção a porta é fixa (gerenciada pelo PM2/nginx): falha ruidosamente
+  // se estiver ocupada, em vez de migrar para outra porta silenciosamente.
+  const port = ENV_IS_PRODUCTION
+    ? preferredPort
+    : await findAvailablePort(preferredPort);
 
-  if (port !== preferredPort) {
+  if (!ENV_IS_PRODUCTION && port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  // Em produção escuta somente no loopback (HOST=127.0.0.1): só o nginx acessa.
+  // Em desenvolvimento mantém o comportamento aberto para o preview do Vite.
+  const host = process.env.HOST || (ENV_IS_PRODUCTION ? "127.0.0.1" : undefined);
+
+  server.listen(port, host, () => {
+    console.log(`Server running on http://${host ?? "localhost"}:${port}/`);
   });
 }
 

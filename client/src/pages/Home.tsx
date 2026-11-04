@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { startLogin } from "@/const";
+import { LoginForm } from "@/components/LoginForm";
 import { trpc } from "@/lib/trpc";
 import {
   Globe,
@@ -193,16 +193,9 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* CTA */}
+              {/* CTA — login próprio e-mail+senha */}
               <div className="pt-8">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-6 text-lg shadow-lg shadow-orange-500/25"
-                  onClick={startLogin}
-                >
-                  Acessar Sistema
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
+                <LoginForm />
               </div>
             </div>
           </div>

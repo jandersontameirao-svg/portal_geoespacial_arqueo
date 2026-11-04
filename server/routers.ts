@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { filesRouter } from "./filesRouter";
 import { geometriesRouter } from "./geometriesRouter";
 import { adminRouter } from "./adminRouter";
@@ -26,6 +26,9 @@ import { prospectRouter } from "./prospectRouter";
 import { influenceRouter } from "./influenceRouter";
 import { officialRouter } from "./officialRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
+import { verifyPassword } from "./_core/password";
+import * as OTPLib from "otplib";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -98,7 +101,82 @@ async function logAudit(
 
 const authRouter = router({
   me: publicProcedure.query(opts => opts.ctx.user),
-  
+
+  // Login próprio e-mail+senha. Emite a mesma sessão JWT (cookie webdev_app_session)
+  // usada no resto do app, então nenhuma outra rota precisa mudar.
+  login: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string().min(1),
+        // Código TOTP de 6 dígitos, exigido somente quando o usuário tem MFA ativo.
+        totp: z.string().length(6).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.trim().toLowerCase();
+      const user = await db.getUserByEmail(email);
+
+      // Resposta uniforme para e-mail inexistente ou senha errada (evita enumeração).
+      const invalid = () =>
+        new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou senha inválidos" });
+
+      if (!user || !user.passwordHash) {
+        throw invalid();
+      }
+
+      const ok = await verifyPassword(input.password, user.passwordHash);
+      if (!ok) {
+        throw invalid();
+      }
+
+      // Segundo fator, quando ativo para a conta.
+      if (user.mfaEnabled) {
+        if (!input.totp) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "MFA_REQUIRED",
+          });
+        }
+        const totpOk =
+          !!user.mfaSecret &&
+          OTPLib.verify({ token: input.totp, secret: user.mfaSecret });
+        if (!totpOk) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Código MFA inválido" });
+        }
+      }
+
+      const sessionToken = await sdk.createSessionToken(user.openId, {
+        name: user.name || "",
+        expiresInMs: ONE_YEAR_MS,
+      });
+
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, sessionToken, {
+        ...cookieOptions,
+        maxAge: ONE_YEAR_MS,
+      });
+
+      await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+
+      await logAudit(
+        user.id,
+        user.email || undefined,
+        user.name || undefined,
+        "auth.login",
+        undefined,
+        undefined,
+        undefined,
+        { method: "password" },
+        ctx.req
+      );
+
+      return {
+        success: true as const,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      };
+    }),
+
   logout: publicProcedure.mutation(({ ctx }) => {
     const cookieOptions = getSessionCookieOptions(ctx.req);
     ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
