@@ -27,7 +27,7 @@ import { influenceRouter } from "./influenceRouter";
 import { officialRouter } from "./officialRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
-import { verifyPassword } from "./_core/password";
+import { verifyPassword, DUMMY_PASSWORD_HASH } from "./_core/password";
 import * as OTPLib from "otplib";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -37,6 +37,19 @@ import { nanoid } from "nanoid";
 import * as db from "./db";
 import { createAuditLog } from "./db";
 import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
+
+// ============================================================================
+// HELPER: Remover campos sensíveis do usuário antes de enviar ao cliente
+// ============================================================================
+
+// Nunca devolver hash de senha nem segredo de MFA pela API. Mantém os demais
+// campos (inclui mfaEnabled, que a UI usa) intactos.
+function toSafeUser<
+  T extends { passwordHash?: unknown; mfaSecret?: unknown }
+>(user: T): Omit<T, "passwordHash" | "mfaSecret"> {
+  const { passwordHash: _passwordHash, mfaSecret: _mfaSecret, ...safe } = user;
+  return safe;
+}
 
 // ============================================================================
 // HELPER: Admin Procedure
@@ -100,7 +113,9 @@ async function logAudit(
 // ============================================================================
 
 const authRouter = router({
-  me: publicProcedure.query(opts => opts.ctx.user),
+  me: publicProcedure.query(opts =>
+    opts.ctx.user ? toSafeUser(opts.ctx.user) : null
+  ),
 
   // Login próprio e-mail+senha. Emite a mesma sessão JWT (cookie webdev_app_session)
   // usada no resto do app, então nenhuma outra rota precisa mudar.
@@ -122,6 +137,9 @@ const authRouter = router({
         new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou senha inválidos" });
 
       if (!user || !user.passwordHash) {
+        // Gasta o mesmo tempo de um scrypt real para não revelar, pelo tempo de
+        // resposta, se o e-mail existe (complementa a mensagem uniforme).
+        await verifyPassword(input.password, DUMMY_PASSWORD_HASH);
         throw invalid();
       }
 
@@ -687,7 +705,7 @@ const usersRouter = router({
     .input(z.object({ search: z.string().optional() }).optional())
     .query(async ({ input }) => {
       const search = input?.search;
-      const users = await db.getAllUsers();
+      const users = (await db.getAllUsers()).map(toSafeUser);
 
       if (search) {
         const query = search.toLowerCase();

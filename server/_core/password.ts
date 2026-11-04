@@ -1,6 +1,7 @@
 import {
   randomBytes,
   scrypt as scryptCb,
+  scryptSync,
   timingSafeEqual,
   type ScryptOptions,
 } from "node:crypto";
@@ -19,7 +20,7 @@ function scrypt(
   });
 }
 
-// Parâmetros scrypt (padrão recomendado). O custo N=2^15 equilibra segurança e
+// Parâmetros scrypt (padrão recomendado). O custo N=2^14 equilibra segurança e
 // latência de login em uma VPS de porte médio. Formato persistido:
 //   scrypt$<N>$<r>$<p>$<saltHex>$<hashHex>
 const N = 16384; // 2^14
@@ -27,6 +28,14 @@ const R = 8;
 const P = 1;
 const KEYLEN = 64;
 const SALT_BYTES = 16;
+
+// Hash descartável, em formato válido, usado para equalizar o tempo de resposta
+// do login quando o e-mail não existe ou não tem senha local — assim o tempo de
+// verificação não revela se a conta existe (proteção contra enumeração).
+const DUMMY_SALT = randomBytes(SALT_BYTES);
+export const DUMMY_PASSWORD_HASH = `scrypt$${N}$${R}$${P}$${DUMMY_SALT.toString(
+  "hex"
+)}$${scryptSync("", DUMMY_SALT, KEYLEN, { N, r: R, p: P }).toString("hex")}`;
 
 /**
  * Gera o hash de uma senha em texto puro. O resultado é auto-descritivo
