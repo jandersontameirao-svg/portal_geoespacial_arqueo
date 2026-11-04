@@ -30,7 +30,8 @@ import {
   Sparkles,
   Server,
   MessageSquare,
-  MessageSquarePlus
+  MessageSquarePlus,
+  Grid3x3
 } from "lucide-react";
 import GlobalSearch from "./GlobalSearch";
 import { NotificationBell } from "./NotificationBell";
@@ -147,6 +148,15 @@ export default function Header() {
                       <div>
                         <span>Observações</span>
                         <p className="text-xs text-slate-500">Feedback, bugs e melhorias do sistema</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/malha-campo">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Grid3x3 className="mr-2 h-4 w-4 text-teal-500" />
+                      <div>
+                        <span>Malha de Campo</span>
+                        <p className="text-xs text-slate-500">Gerar malha de pontos e cruzar municípios</p>
                       </div>
                     </DropdownMenuItem>
                   </Link>
@@ -376,6 +386,12 @@ export default function Header() {
                   <DropdownMenuItem className="cursor-pointer">
                     <MessageSquarePlus className="mr-2 h-4 w-4 text-rose-500" />
                     Observações
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/malha-campo">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Grid3x3 className="mr-2 h-4 w-4 text-teal-500" />
+                    Malha de Campo
                   </DropdownMenuItem>
                 </Link>
                 <Link href="/technical-maps">

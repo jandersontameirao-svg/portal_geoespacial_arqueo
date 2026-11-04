@@ -26,6 +26,7 @@ import { GuidedTour } from "./components/GuidedTour";
 import Atena from "./pages/Atena";
 import AssistenteAtena from "./pages/AssistenteAtena";
 import Observacoes from "./pages/Observacoes";
+import MalhaCampo from "./pages/MalhaCampo";
 import AtenaChatWidget from "./components/AtenaChatWidget";
 
 function Router() {
@@ -45,6 +46,7 @@ function Router() {
         <Route path="/atena" component={Atena} />
         <Route path="/assistente" component={AssistenteAtena} />
         <Route path="/observacoes" component={Observacoes} />
+        <Route path="/malha-campo" component={MalhaCampo} />
         <Route path="/files" component={Files} />
         <Route path="/admin/backups" component={Backups} />
         <Route path="/admin/ogc-catalog" component={OgcCatalog} />
