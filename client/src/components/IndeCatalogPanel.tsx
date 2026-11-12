@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Star } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useIndeCatalog } from "./IndeCatalogLayers";
 import { Checkbox } from "./ui/checkbox";
@@ -37,6 +37,46 @@ const normalizeSearch = (value: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("pt-BR");
+
+/** Favoritos ficam s\u00f3 no navegador de quem est\u00e1 logado; n\u00e3o v\u00e3o ao servidor nem a terceiros. */
+function useIndeFavorites(identity: string | null) {
+  const storageKey = identity ? `inde:favorites:${identity}` : null;
+  const [favorites, setFavorites] = useState<string[]>([]);
+  useEffect(() => {
+    if (!storageKey || typeof window === "undefined") {
+      setFavorites([]);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setFavorites(
+        Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : []
+      );
+    } catch {
+      setFavorites([]);
+    }
+  }, [storageKey]);
+  const toggle = useCallback(
+    (orgId: string) => {
+      setFavorites(current => {
+        const next = current.includes(orgId)
+          ? current.filter(id => id !== orgId)
+          : [...current, orgId];
+        if (storageKey && typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(storageKey, JSON.stringify(next));
+          } catch {
+            /* armazenamento indispon\u00edvel: mant\u00e9m s\u00f3 em mem\u00f3ria */
+          }
+        }
+        return next;
+      });
+    },
+    [storageKey]
+  );
+  return { favorites, toggle };
+}
 
 function SelectedLayer({ layer }: { layer: IndeSelectedLayer }) {
   const { statuses, toggle } = useIndeCatalog();
@@ -257,8 +297,14 @@ function OrganizationLayers({
 }
 function OrganizationAccordion({
   organization,
+  activeCount,
+  isFavorite,
+  onToggleFavorite,
 }: {
   organization: IndeOrganization;
+  activeCount: number;
+  isFavorite: boolean;
+  onToggleFavorite: (orgId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const controlId = `inde-org-content-${encodeURIComponent(organization.id)}`;
@@ -267,45 +313,75 @@ function OrganizationAccordion({
       data-testid={`inde-org-${organization.id}`}
       className="overflow-hidden rounded-lg border border-border"
     >
-      <button
-        type="button"
-        onClick={() => setOpen(value => !value)}
-        aria-expanded={open}
-        aria-controls={controlId}
-        aria-label={`${open ? "Fechar" : "Abrir"} camadas de ${organization.label}${organization.name !== organization.label ? ` — ${organization.name}` : ""}`}
-        className="flex w-full items-start gap-2 p-2 text-left hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-      >
-        {open ? (
-          <ChevronDown
-            className="mt-0.5 h-3.5 w-3.5 shrink-0"
-            aria-hidden="true"
-          />
-        ) : (
-          <ChevronRight
-            className="mt-0.5 h-3.5 w-3.5 shrink-0"
-            aria-hidden="true"
-          />
-        )}
-        <span className="min-w-0 flex-1">
-          <span className="block break-words text-xs font-semibold">
-            {organization.label}
-          </span>
-          {organization.name !== organization.label && (
-            <span className="block break-words text-[10px] text-muted-foreground">
-              {organization.name}
-            </span>
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => setOpen(value => !value)}
+          aria-expanded={open}
+          aria-controls={controlId}
+          aria-label={`${open ? "Fechar" : "Abrir"} camadas de ${organization.label}${organization.name !== organization.label ? ` — ${organization.name}` : ""}`}
+          className="flex min-w-0 flex-1 items-start gap-2 p-2 text-left hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+        >
+          {open ? (
+            <ChevronDown
+              className="mt-0.5 h-3.5 w-3.5 shrink-0"
+              aria-hidden="true"
+            />
+          ) : (
+            <ChevronRight
+              className="mt-0.5 h-3.5 w-3.5 shrink-0"
+              aria-hidden="true"
+            />
           )}
-          <span
-            className={`mt-1 block text-[10px] ${organization.eligible ? "text-muted-foreground" : "text-destructive"}`}
-          >
-            {organization.eligible
-              ? "WMS · não consultado"
-              : organization.endpoint.toLowerCase().startsWith("http:")
-                ? "HTTP bloqueado"
-                : "WMS · bloqueado"}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="min-w-0 break-words text-xs font-semibold">
+                {organization.label}
+              </span>
+              {activeCount > 0 && (
+                <span
+                  className="shrink-0 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 text-primary-foreground"
+                  aria-label={`${activeCount} camada(s) ativa(s)`}
+                  title={`${activeCount} camada(s) ativa(s) no mapa`}
+                >
+                  {activeCount}
+                </span>
+              )}
+            </span>
+            {organization.name !== organization.label && (
+              <span className="block break-words text-[10px] text-muted-foreground">
+                {organization.name}
+              </span>
+            )}
+            <span
+              className={`mt-1 block text-[10px] ${organization.eligible ? "text-muted-foreground" : "text-destructive"}`}
+            >
+              {organization.eligible
+                ? "WMS · não consultado"
+                : organization.endpoint.toLowerCase().startsWith("http:")
+                  ? "HTTP bloqueado"
+                  : "WMS · bloqueado"}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggleFavorite(organization.id)}
+          aria-pressed={isFavorite}
+          aria-label={
+            isFavorite
+              ? `Remover ${organization.label} dos favoritos`
+              : `Adicionar ${organization.label} aos favoritos`
+          }
+          title={isFavorite ? "Remover dos favoritos" : "Fixar nos favoritos"}
+          className="shrink-0 px-2 text-muted-foreground hover:bg-muted/50 hover:text-amber-500 focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+        >
+          <Star
+            className={`h-4 w-4 ${isFavorite ? "fill-amber-400 text-amber-500" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+      </div>
       <div id={controlId} hidden={!open}>
         {open && <OrganizationLayers organization={organization} open={open} />}
       </div>
@@ -330,17 +406,41 @@ export default function IndeCatalogPanel() {
     refetchOnWindowFocus: false,
   });
   const organizations = catalog.data?.organizations ?? [];
+  const { favorites, toggle: toggleFavorite } = useIndeFavorites(identity);
+  const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
+  const activeByOrg = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const layer of selected)
+      counts.set(
+        layer.organizationId,
+        (counts.get(layer.organizationId) ?? 0) + 1
+      );
+    return counts;
+  }, [selected]);
+  const matchesSearch = useCallback(
+    (organization: IndeOrganization) => {
+      const filter = normalizeSearch(search.trim());
+      return (
+        !filter ||
+        normalizeSearch(
+          `${organization.label} ${organization.name}`
+        ).includes(filter)
+      );
+    },
+    [search]
+  );
+  const favoriteOrgs = useMemo(
+    () =>
+      organizations
+        .filter(org => favoriteSet.has(org.id) && matchesSearch(org))
+        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
+    [organizations, favoriteSet, matchesSearch]
+  );
   const groups = useMemo(() => {
-    const filter = normalizeSearch(search.trim());
     const grouped = new Map<string, IndeOrganization[]>();
     for (const organization of organizations) {
-      if (
-        filter &&
-        !normalizeSearch(`${organization.label} ${organization.name}`).includes(
-          filter
-        )
-      )
-        continue;
+      if (favoriteSet.has(organization.id)) continue;
+      if (!matchesSearch(organization)) continue;
       const level = organization.level || "Outros";
       grouped.set(level, [...(grouped.get(level) ?? []), organization]);
     }
@@ -352,7 +452,7 @@ export default function IndeCatalogPanel() {
     return Array.from(grouped.entries()).sort(
       ([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, "pt-BR")
     );
-  }, [organizations, search]);
+  }, [organizations, favoriteSet, matchesSearch]);
   return (
     <section
       data-testid="inde-catalog-panel"
@@ -451,12 +551,38 @@ export default function IndeCatalogPanel() {
                   className="w-full rounded-md border border-input bg-background p-2 text-foreground focus-visible:outline-2"
                 />
               </label>
-              {groups.length === 0 && (
+              {groups.length === 0 && favoriteOrgs.length === 0 && (
                 <p className="text-xs text-muted-foreground">
                   {search
                     ? "Nenhuma instituição corresponde à busca."
                     : "Nenhum serviço foi retornado pelo catálogo INDE."}
                 </p>
+              )}
+              {favoriteOrgs.length > 0 && (
+                <section
+                  className="space-y-2"
+                  aria-label="Instituições favoritas"
+                >
+                  <h4 className="flex items-center gap-1 text-xs font-semibold">
+                    <Star
+                      className="h-3 w-3 fill-amber-400 text-amber-500"
+                      aria-hidden="true"
+                    />
+                    Favoritas{" "}
+                    <span className="font-normal text-muted-foreground">
+                      ({favoriteOrgs.length})
+                    </span>
+                  </h4>
+                  {favoriteOrgs.map(organization => (
+                    <OrganizationAccordion
+                      key={`fav-${organization.id}`}
+                      organization={organization}
+                      activeCount={activeByOrg.get(organization.id) ?? 0}
+                      isFavorite
+                      onToggleFavorite={toggleFavorite}
+                    />
+                  ))}
+                </section>
               )}
               {groups.map(([level, group]) => (
                 <section
@@ -474,6 +600,9 @@ export default function IndeCatalogPanel() {
                     <OrganizationAccordion
                       key={organization.id}
                       organization={organization}
+                      activeCount={activeByOrg.get(organization.id) ?? 0}
+                      isFavorite={favoriteSet.has(organization.id)}
+                      onToggleFavorite={toggleFavorite}
                     />
                   ))}
                 </section>
