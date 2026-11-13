@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import IbgeLocalLayers from "./IbgeLocalLayers";
 import { FeatureGroup, GeoJSON, MapContainer, Marker, Pane as MapPane, Polygon, Polyline, Popup, TileLayer, useMap, WMSTileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -241,6 +242,11 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
       metadata: (layer.metadata || null) as ProjectVectorLayer["metadata"],
     }];
   }), [presentedLayers]);
+  const municipalProjectBounds = useMemo(() => {
+    const bounds = L.latLngBounds([]);
+    for (const layer of projectVectorLayers) bounds.extend(L.geoJSON(layer.layerData).getBounds());
+    return bounds.isValid() ? bounds.pad(0.15).toBBoxString() : "";
+  }, [projectVectorLayers]);
   const selectedVectorFeatures = useMemo(() => projectVectorLayers
     .filter((layer) => selectedVectorLayerIds.includes(layer.id))
     .flatMap((layer) => layer.layerData.features
@@ -547,6 +553,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
           <MapContainer ref={mapRef} center={center} zoom={11} style={{ height: "100%", width: "100%" }} className="isolate z-0 min-h-[420px] flex-1 lg:min-h-0">
             <InvalidateMapOnResize />
             <ScreenScaleIndicator />
+            <IbgeLocalLayers projectBounds={municipalProjectBounds} />
             <TileLayer key={activeBasemap.id} attribution={activeBasemap.attribution} url={activeBasemap.url!} crossOrigin={activeBasemap.crossOrigin} minNativeZoom={activeBasemap.minZoom} maxNativeZoom={activeBasemap.maxZoom} />
             {thematicItems.map((item) => <MapPane key={item.id} name={thematicPaneName(item.id)} style={{ zIndex: thematicZIndex(item.id) }} />)}
             {rasterLayers.filter((layer) => layer.isVisible && visibleRasterIds.includes(layer.id)).map((layer) => (
