@@ -237,7 +237,7 @@ export default function GlobeViewer({
   const [mapZoom, setMapZoom] = useState(
     Math.round(10 - initialPosition.altitude * 2)
   );
-  const [viewMode, setViewMode] = useState<"2d" | "3d">("3d");
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [currentShape, setCurrentShape] = useState<any>(null);
   const [shapeName, setShapeName] = useState("");

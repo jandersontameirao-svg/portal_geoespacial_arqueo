@@ -33,6 +33,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import GlobeViewer from "@/components/GlobeViewer";
+import { createPortal as createHomePanelPortal } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -60,13 +61,9 @@ export default function Home() {
   const isMobile = useIsMobile();
 
   // Preferência própria deste layout; inicia recolhido sem mexer no login.
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    try {
-      return localStorage.getItem("global-map-sidebar-open") === "true";
-    } catch {
-      return false;
-    }
-  });
+  // A sidebar vive encaixada na trilha lateral (preview-home-panel); mantê-la
+  // sempre aberta evita o drawer sobreposto da versão antiga.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -75,6 +72,10 @@ export default function Home() {
       return false;
     }
   });
+
+  // Destino do portal: o painel da trilha lateral renderizado pelo Header.
+  const [previewHomePanel, setPreviewHomePanel] = useState<HTMLElement | null>(null);
+  useEffect(() => setPreviewHomePanel(document.getElementById("preview-home-panel")), []);
 
   // Salvar preferências no localStorage
   useEffect(() => {
@@ -233,7 +234,7 @@ export default function Home() {
   // Dashboard autenticado
   return (
     <TooltipProvider>
-      <div className="h-[calc(100dvh-64px)] min-h-[360px] flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
+      <div className="preview-home-layout min-h-[360px] flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
         {/* Main Content */}
         <div className="min-h-0 flex-1 relative">
           {/* Botão Toggle Sidebar (mostrar/ocultar completamente) */}
@@ -262,7 +263,8 @@ export default function Home() {
             />
           )}
 
-          {/* Sidebar Compacto */}
+          {/* Sidebar Compacto — encaixada na trilha lateral via portal */}
+          {previewHomePanel && createHomePanelPortal(
           <aside
             id="home-navigation-sidebar"
             aria-label="Navegação do portal"
@@ -613,7 +615,8 @@ export default function Home() {
                 </Card>
               )}
             </div>
-          </aside>
+          </aside>,
+          previewHomePanel)}
 
           {/* Globe Viewer */}
           <div

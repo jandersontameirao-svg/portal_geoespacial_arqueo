@@ -250,3 +250,161 @@
     @apply bg-transparent hover:bg-accent/10;
   }
 }
+
+/* ======================================================================
+   Pele da prévia (Codex): trilha lateral, home enxuta e controles do mapa.
+   Portado do harness de desenvolvimento para produção.
+   ====================================================================== */
+.leaflet-tooltip.municipio-ibge-label {
+  background: transparent; border: 0; box-shadow: none; padding: 0;
+  color: #153624; font-weight: 700; font-size: 12px;
+  text-shadow: 0 0 2px white, 0 0 3px white, 0 0 4px white, 1px 1px white, -1px -1px white;
+}
+#preview-navigation {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(13rem, 88vw);
+  overflow-y: auto;
+  z-index: 1040;
+}
+#preview-navigation[data-open="false"] { display: none; }
+#preview-navigation > div:first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 1rem;
+  padding: 4.25rem .75rem 1rem;
+  height: auto;
+}
+#preview-navigation > div > nav {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+#preview-navigation > div > nav button { width: 100%; }
+#preview-navigation > div > nav > a > a { display: block; }
+#preview-navigation > div > a img { display: none; }
+#preview-home-panel:not(:empty) { border-top: 1px solid var(--border); }
+#preview-navigation > div > div:last-child { flex-wrap: wrap; gap: .5rem; }
+#preview-navigation [data-tour="search"] { width: 100%; }
+#preview-navigation [data-tour="search"] input { width: 100%; }
+#preview-navigation > div > div:last-child > button[aria-haspopup="dialog"] { display: none; }
+.preview-nav-rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 1050;
+  width: 3.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .6rem;
+  padding: .6rem .4rem;
+  background: var(--background);
+  border-right: 1px solid var(--border);
+}
+.preview-nav-rail img { width: 2.6rem; height: 2.6rem; object-fit: contain; }
+.preview-nav-rail:has(button[aria-expanded="true"]) {
+  inset: .5rem auto auto .6rem;
+  width: min(11.8rem, 81vw);
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+}
+.preview-nav-toggle {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: .5rem;
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 2px 8px #0003;
+}
+#home-sidebar-toggle,
+button[aria-label="Fechar navegação do portal"] { display: none; }
+#preview-home-panel #home-navigation-sidebar {
+  position: static;
+  width: auto;
+  max-width: none;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+#preview-home-panel #home-navigation-sidebar > div > div:first-child { display: none; }
+.preview-sidebar-dropdown { z-index: 1100 !important; }
+[data-tour="globe-viewer"] { left: 0 !important; }
+.preview-home-layout { height: 100dvh; }
+#root { padding-left: 3.5rem; }
+@media (min-width: 768px) {
+  body:has(#preview-navigation[data-open="true"]) #root { padding-left: 13rem; }
+}
+[aria-label="Seletores do mapa"] {
+  left: auto;
+  right: .75rem;
+  top: 3.75rem;
+  width: auto !important;
+  flex-direction: column;
+  gap: .5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+#map-panel-trigger-projects { display: none; }
+#map-panel-trigger-basemap, #map-panel-trigger-layers {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-height: 0;
+  flex: none;
+  padding: 0;
+  border-radius: .5rem;
+  box-shadow: 0 10px 15px -3px #0002;
+}
+#map-panel-trigger-basemap[aria-expanded="false"],
+#map-panel-trigger-layers[aria-expanded="false"] {
+  background: rgb(255 255 255 / .9);
+  color: #171717;
+}
+#map-panel-trigger-basemap[aria-expanded="false"]:hover,
+#map-panel-trigger-layers[aria-expanded="false"]:hover { background: white; }
+#map-panel-trigger-basemap > span, #map-panel-trigger-layers > span,
+#map-panel-trigger-basemap > svg:last-child { display: none; }
+#map-panel-trigger-basemap > svg:first-child, #map-panel-trigger-layers > svg {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.preview-ibge-control {
+  position: absolute;
+  top: .75rem;
+  right: .75rem;
+  z-index: 850;
+  color: #171717;
+}
+.preview-home-layout .preview-ibge-control { top: 9.25rem; }
+.preview-ibge-control > summary {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: .5rem;
+  background: rgb(255 255 255 / .9);
+  box-shadow: 0 10px 15px -3px #0002;
+  cursor: pointer;
+  list-style: none;
+}
+.preview-ibge-control > summary::-webkit-details-marker { display: none; }
+.preview-ibge-control > summary:hover { background: white; }
+.preview-ibge-control[open] > summary { background: #ea580c; color: white; }
+.preview-ibge-panel {
+  position: absolute;
+  top: 0;
+  right: calc(100% + .5rem);
+  width: min(12.5rem, 55vw);
+}
+div:has(> button[title="Aproximar"]):has(> button[title="Afastar"]) { top: 9.25rem; }
+.preview-home-layout:has(.preview-ibge-control) div:has(> button[title="Aproximar"]):has(> button[title="Afastar"]) { top: 12rem; }
+#global-map-panel-drawer { left: auto; right: 3.5rem; top: 3.75rem; }

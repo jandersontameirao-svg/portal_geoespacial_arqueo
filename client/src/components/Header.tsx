@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,8 +59,26 @@ export default function Header() {
     return location.startsWith(path);
   };
 
+  const [previewNavOpen, setPreviewNavOpen] = useState(false);
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm">
+    <>
+    <div className="preview-nav-rail">
+      <a href="/" aria-label="Grupo Arqueo — Início">
+        <img src="/grupo-arqueo-logo.webp" alt="Grupo Arqueo" />
+      </a>
+      <button
+        type="button"
+        className="preview-nav-toggle"
+        aria-label={previewNavOpen ? "Recolher menu lateral" : "Abrir menu lateral"}
+        aria-expanded={previewNavOpen}
+        aria-controls="preview-navigation"
+        onClick={() => setPreviewNavOpen((open) => !open)}
+      >
+        <Layers aria-hidden="true" className="size-4" />
+      </button>
+    </div>
+    <header id="preview-navigation" data-open={previewNavOpen} className="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm">
       <div className="container flex h-16 items-center justify-between">
         {/* Logo e Nome */}
         <Link href="/">
@@ -120,7 +139,7 @@ export default function Header() {
                   <ChevronDown className="w-3 h-3" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuContent side="right" sideOffset={10} align="start" collisionPadding={8} className="w-56 preview-sidebar-dropdown">
                 <DropdownMenuLabel>Ferramentas Geoespaciais</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
@@ -191,8 +210,8 @@ export default function Header() {
                     <DropdownMenuItem className="cursor-pointer">
                       <Database className="mr-2 h-4 w-4 text-amber-500" />
                       <div>
-                        <span>Camadas Base</span>
-                        <p className="text-xs text-slate-500">Dados oficiais (FUNAI, INCRA, IPHAN)</p>
+                        <span>Gestão e Conexões</span>
+                        <p className="text-xs text-slate-500">Cadastro de fontes e bases oficiais</p>
                       </div>
                     </DropdownMenuItem>
                   </Link>
@@ -219,12 +238,12 @@ export default function Header() {
                       : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}>
                     <Settings className="w-4 h-4" />
-                    Administração
+                    Configurações
                     <ChevronDown className="w-3 h-3" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuLabel>Painel Administrativo</DropdownMenuLabel>
+                <DropdownMenuContent side="right" sideOffset={10} align="start" collisionPadding={8} className="w-56 preview-sidebar-dropdown">
+                  <DropdownMenuLabel>Configurações do portal</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
                     <Link href="/admin">
@@ -298,7 +317,7 @@ export default function Header() {
                   <ChevronDown className="w-3 h-3 text-slate-400" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuContent side="right" sideOffset={10} align="start" collisionPadding={8} className="w-64 preview-sidebar-dropdown">
                 <DropdownMenuLabel>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold">
@@ -453,6 +472,8 @@ export default function Header() {
           )}
         </div>
       </div>
+      <div id="preview-home-panel" />
     </header>
+    </>
   );
 }
