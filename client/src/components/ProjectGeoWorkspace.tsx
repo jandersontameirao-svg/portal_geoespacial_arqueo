@@ -63,7 +63,7 @@ const operationLabels: Record<Operation, string> = {
   union: "União",
   clip: "Recorte",
   overlay: "Sobreposição",
-  grid: "Malha arqueológica",
+  grid: "Malha de pontos",
   area: "Cálculo de área (ADA)",
 };
 
@@ -178,6 +178,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
   const [gridSpacing, setGridSpacing] = useState("100");
   const [gridCode, setGridCode] = useState("MALHA");
   const [gridRotation, setGridRotation] = useState("0");
+  const [gridPattern, setGridPattern] = useState("quadrada");
   const [pending, setPending] = useState<{ type: StoredGeometry["type"]; coordinates: string } | null>(null);
   const [editableLayers, setEditableLayers] = useState<L.FeatureGroup | null>(null);
   const pendingLayerRef = useRef<L.Layer | null>(null);
@@ -414,7 +415,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
       return;
     }
     if (operation === "grid" && selectedInputs.length !== 1) {
-      toast.error("A malha arqueológica exige uma única área de recorte");
+      toast.error("A malha de pontos exige uma única área de recorte");
       return;
     }
     runAnalysis.mutate({
@@ -426,6 +427,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
         spacingMeters: Number(gridSpacing),
         originCode: gridCode.trim() || undefined,
         rotationDegrees: Number(gridRotation),
+        pattern: gridPattern === "triangular" ? "triangular" : "quadrada",
       } : undefined,
       sourceLabels: [...selectedGeometries.map((geometry) => geometry.name), ...projectVectorLayers.filter((layer) => selectedVectorLayerIds.includes(layer.id)).map((layer) => layer.name)],
     });
@@ -584,7 +586,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
               <SelectContent>{Object.entries(operationLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
             </Select>
             {operation === "buffer" && <div className="space-y-1"><Label htmlFor="buffer">Distância (metros)</Label><Input id="buffer" type="number" min="1" max="100000" value={bufferMeters} onChange={(event) => setBufferMeters(event.target.value)} /></div>}
-            {operation === "grid" && <><div className="space-y-1"><Label htmlFor="grid-spacing">Espaçamento (metros)</Label><Input id="grid-spacing" type="number" min="10" max="10000" value={gridSpacing} onChange={(event) => setGridSpacing(event.target.value)} /></div><div className="space-y-1"><Label htmlFor="grid-code">Prefixo</Label><Input id="grid-code" value={gridCode} onChange={(event) => setGridCode(event.target.value)} /></div><div className="space-y-1"><Label htmlFor="grid-rotation">Rotação (graus)</Label><Input id="grid-rotation" type="number" min="-180" max="180" value={gridRotation} onChange={(event) => setGridRotation(event.target.value)} /></div></>}
+            {operation === "grid" && <><p className="text-xs text-muted-foreground">Marque uma área em “Usar na análise”. Os pontos serão recortados pelo polígono selecionado.</p><div className="space-y-1"><Label htmlFor="grid-pattern">Formato da malha</Label><Select value={gridPattern} onValueChange={setGridPattern}><SelectTrigger id="grid-pattern"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="quadrada">Quadrada</SelectItem><SelectItem value="triangular">Triangular (linhas alternadas)</SelectItem></SelectContent></Select></div><div className="space-y-1"><Label htmlFor="grid-spacing">Espaçamento (metros)</Label><Input id="grid-spacing" type="number" min="10" max="10000" value={gridSpacing} onChange={(event) => setGridSpacing(event.target.value)} /></div><div className="space-y-1"><Label htmlFor="grid-code">Prefixo</Label><Input id="grid-code" value={gridCode} onChange={(event) => setGridCode(event.target.value)} /></div><div className="space-y-1"><Label htmlFor="grid-rotation">Rotação (graus)</Label><Input id="grid-rotation" type="number" min="-180" max="180" value={gridRotation} onChange={(event) => setGridRotation(event.target.value)} /></div></>}
             <p className="text-xs text-muted-foreground">Cálculos geodésicos em EPSG:4326. Distâncias em metros e área em m²; cada resultado fica salvo como camada vetorial do projeto.</p>
             <Button className="w-full" onClick={executeOperation} disabled={!canEdit || runAnalysis.isPending}>{runAnalysis.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ruler className="mr-2 h-4 w-4" />}{canEdit ? "Executar e salvar" : "Somente leitura"}</Button>
           </CardContent>

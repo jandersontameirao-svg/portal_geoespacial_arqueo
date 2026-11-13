@@ -30,7 +30,7 @@ function defaultName(operation: AnalysisOperation): string {
     union: "União",
     clip: "Recorte",
     overlay: "Sobreposição",
-    grid: "Malha arqueológica",
+    grid: "Malha de pontos",
     area: "Área de influência",
   };
   return labels[operation];
@@ -147,6 +147,7 @@ export const gisAnalysisRouter = router({
         spacingMeters: z.number().min(10).max(10_000),
         originCode: z.string().trim().min(1).max(60).optional(),
         rotationDegrees: z.number().min(-180).max(180).optional(),
+        pattern: z.enum(["quadrada", "triangular"]).optional(),
       }).optional(),
       style: styleSchema,
       sourceLabels: z.array(z.string().trim().min(1).max(255)).max(100).optional(),

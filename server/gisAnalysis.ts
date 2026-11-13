@@ -3,10 +3,9 @@ import area from "@turf/area";
 import buffer from "@turf/buffer";
 import { featureCollection } from "@turf/helpers";
 import intersect from "@turf/intersect";
-import squareGrid from "@turf/square-grid";
-import transformRotate from "@turf/transform-rotate";
 import union from "@turf/union";
-import type { Feature, FeatureCollection, GeoJsonProperties, Geometry, MultiPolygon, Polygon } from "geojson";
+import proj4 from "proj4";
+import type { Feature, FeatureCollection, GeoJsonProperties, Geometry, MultiPolygon, Polygon, Position } from "geojson";
 
 export type PolygonFeature = Feature<Polygon | MultiPolygon, GeoJsonProperties>;
 export type AnalysisOperation = "buffer" | "intersection" | "union" | "clip" | "overlay" | "grid" | "area";
@@ -19,8 +18,11 @@ export interface AnalysisRequest {
     spacingMeters: number;
     originCode?: string;
     rotationDegrees?: number;
+    pattern?: GridPattern;
   };
 }
+
+export type GridPattern = "quadrada" | "triangular";
 
 export interface AnalysisProvenance {
   engine: "turf";
@@ -85,6 +87,45 @@ function withProvenance(
       parameters,
     },
   };
+}
+
+function collectPositions(geometry: Geometry): Position[] {
+  switch (geometry.type) {
+    case "Point": return [geometry.coordinates as Position];
+    case "MultiPoint":
+    case "LineString": return geometry.coordinates as Position[];
+    case "MultiLineString":
+    case "Polygon": return (geometry.coordinates as Position[][]).flat();
+    case "MultiPolygon": return (geometry.coordinates as Position[][][]).flat(2);
+    case "GeometryCollection": return geometry.geometries.flatMap(collectPositions);
+    default: return [];
+  }
+}
+
+function pointInRing(point: Position, ring: Position[]): boolean {
+  let inside = false;
+  const x = point[0], y = point[1];
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersects = (yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+/** Ponto dentro do polígono (com buracos e multipolígono), sem dependência externa. */
+function pointInPolygonFeature(point: Position, feature: PolygonFeature): boolean {
+  const polygons: Position[][][] = feature.geometry.type === "Polygon"
+    ? [feature.geometry.coordinates as Position[][]]
+    : (feature.geometry.coordinates as Position[][][]);
+  for (const rings of polygons) {
+    const [outer, ...holes] = rings;
+    if (outer && pointInRing(point, outer) && !holes.some(hole => pointInRing(point, hole))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -152,37 +193,73 @@ export function executeAnalysis(request: AnalysisRequest): AnalysisResult {
 
   if (operation === "grid") {
     if (polygonInputs.length !== 1) {
-      throw new Error("A malha arqueológica exige exatamente uma área poligonal de recorte.");
+      throw new Error("A malha de pontos exige exatamente uma área poligonal de recorte.");
     }
     const spacingMeters = request.grid?.spacingMeters;
     if (!Number.isFinite(spacingMeters) || !spacingMeters || spacingMeters < 10 || spacingMeters > 10_000) {
       throw new Error("Informe espaçamento da malha entre 10 e 10000 metros.");
     }
     const rotationDegrees = request.grid?.rotationDegrees ?? 0;
+    if (!Number.isFinite(rotationDegrees) || Math.abs(rotationDegrees) > 180) {
+      throw new Error("Informe uma rotação entre -180 e 180 graus.");
+    }
+    const pattern: GridPattern = request.grid?.pattern === "triangular" ? "triangular" : "quadrada";
     const originCode = request.grid?.originCode?.trim() || "MALHA";
     const coverage = polygonInputs[0];
-    const rawGrid = squareGrid(bbox(coverage), spacingMeters / 1000, { units: "kilometers" });
-    const rotatedGrid = rotationDegrees === 0 ? rawGrid : transformRotate(rawGrid, rotationDegrees);
-    let sequence = 0;
-    const clipped = rotatedGrid.features.flatMap((cell) => {
-      const clippedCell = intersect(featureCollection([cell as PolygonFeature, coverage]));
-      if (!clippedCell) return [];
-      sequence += 1;
-      return [{
-        ...clippedCell,
-        properties: {
-          ...clippedCell.properties,
-          code: `${originCode}-${String(sequence).padStart(4, "0")}`,
-          sequence,
-          spacingMeters,
-          rotationDegrees,
-          operation: "grid",
-        },
-      }];
-    });
-    return withProvenance(operation, inputs, toCollection(clipped), {
+    const vertices = collectPositions(coverage.geometry);
+    if (vertices.length === 0) {
+      throw new Error("A área de recorte não possui vértices.");
+    }
+    // Lattice métrica em UTM: projeta os vértices, constrói a grade (quadrada ou
+    // triangular com linhas alternadas) e só mantém pontos dentro do polígono.
+    const originLon = vertices[0][0], originLat = vertices[0][1];
+    const zone = Math.min(60, Math.max(1, Math.floor((originLon + 180) / 6) + 1));
+    const projection = proj4("EPSG:4326", `+proj=utm +zone=${zone}${originLat < 0 ? " +south" : ""} +ellps=GRS80 +units=m +no_defs`);
+    const angle = (rotationDegrees * Math.PI) / 180;
+    const rotate = ([x, y]: number[], a: number): [number, number] => [
+      x * Math.cos(a) - y * Math.sin(a),
+      x * Math.sin(a) + y * Math.cos(a),
+    ];
+    const metric = vertices.map(position => rotate(projection.forward([position[0], position[1]]), -angle));
+    const xs = metric.map(p => p[0]);
+    const ys = metric.map(p => p[1]);
+    const rowStep = pattern === "triangular" ? (spacingMeters * Math.sqrt(3)) / 2 : spacingMeters;
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const firstRow = Math.ceil(Math.min(...ys) / rowStep);
+    const lastRow = Math.floor(Math.max(...ys) / rowStep);
+    if ((lastRow - firstRow + 1) * (2 + (maxX - minX) / spacingMeters) > 500_000) {
+      throw new Error("A área é grande para esse espaçamento. Aumente a distância ou selecione uma área menor.");
+    }
+    const features: Feature<Geometry, GeoJsonProperties>[] = [];
+    for (let row = firstRow; row <= lastRow; row++) {
+      const offset = pattern === "triangular" && row % 2 !== 0 ? spacingMeters / 2 : 0;
+      for (let x = Math.ceil((minX - offset) / spacingMeters) * spacingMeters + offset; x <= maxX; x += spacingMeters) {
+        const coordinates = projection.inverse(rotate([x, row * rowStep], angle)) as Position;
+        if (!pointInPolygonFeature(coordinates, coverage)) continue;
+        features.push({
+          type: "Feature",
+          geometry: { type: "Point", coordinates },
+          properties: {
+            code: `${originCode}-${String(features.length + 1).padStart(4, "0")}`,
+            sequence: features.length + 1,
+            spacingMeters,
+            rotationDegrees,
+            pattern,
+            operation: "grid",
+          },
+        });
+        if (features.length > 5000) {
+          throw new Error("A malha ultrapassa 5.000 pontos. Aumente o espaçamento.");
+        }
+      }
+    }
+    if (features.length === 0) {
+      throw new Error("Nenhum ponto caiu dentro da área selecionada.");
+    }
+    return withProvenance(operation, inputs, toCollection(features), {
       spacingMeters,
       rotationDegrees,
+      pattern,
       originCode,
       units: "meters",
       clip: true,

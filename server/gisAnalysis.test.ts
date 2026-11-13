@@ -32,16 +32,29 @@ describe("motor de análise GIS", () => {
     expect(result.provenance.operation).toBe("area");
   });
 
-  it("gera malha arqueológica recortada, codificada e rotacionada", () => {
+  it("gera malha de pontos quadrada recortada, codificada e rotacionada", () => {
     const result = executeAnalysis({
       operation: "grid",
       inputs: [areaA],
       grid: { spacingMeters: 500, originCode: "ADA-01", rotationDegrees: 15 },
     });
     expect(result.output.features.length).toBeGreaterThan(1);
+    expect(result.output.features.every((feature) => feature.geometry.type === "Point")).toBe(true);
     expect(result.output.features[0].properties?.code).toMatch(/^ADA-01-\d{4}$/);
     expect(result.output.features.every((feature) => feature.properties?.spacingMeters === 500)).toBe(true);
+    expect(result.output.features.every((feature) => feature.properties?.pattern === "quadrada")).toBe(true);
     expect(result.provenance.parameters.clip).toBe(true);
+  });
+
+  it("gera malha triangular com linhas alternadas", () => {
+    const result = executeAnalysis({
+      operation: "grid",
+      inputs: [areaA],
+      grid: { spacingMeters: 500, pattern: "triangular" },
+    });
+    expect(result.output.features.length).toBeGreaterThan(1);
+    expect(result.output.features.every((feature) => feature.geometry.type === "Point")).toBe(true);
+    expect(result.output.features.every((feature) => feature.properties?.pattern === "triangular")).toBe(true);
   });
 
   it("rejeita buffer sem unidade métrica válida e malha sem área", () => {
