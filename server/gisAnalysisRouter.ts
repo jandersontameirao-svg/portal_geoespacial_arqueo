@@ -68,6 +68,43 @@ export const gisAnalysisRouter = router({
       return { success: true };
     }),
 
+  updateVectorStyle: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      layerId: z.number(),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      weight: z.number().min(1).max(8),
+      fillOpacity: z.number().min(0).max(1).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireProjectEditor(input.projectId, ctx.user);
+      const layer = await db.getLayerById(input.layerId);
+      if (!layer || layer.projectId !== input.projectId || layer.layerType !== "vector" || !isPromotableVectorLayer(layer.layerData)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Camada vetorial do projeto não encontrada" });
+      }
+      const previousStyle = (layer.defaultStyle && typeof layer.defaultStyle === "object") ? layer.defaultStyle as Record<string, unknown> : {};
+      const defaultStyle = {
+        ...previousStyle,
+        color: input.color,
+        weight: input.weight,
+        ...(input.fillOpacity === undefined ? {} : { fillOpacity: input.fillOpacity }),
+      };
+      await db.updateLayer(input.layerId, { defaultStyle });
+      await db.createAuditLog({
+        userId: ctx.user.id,
+        userEmail: ctx.user.email || null,
+        userName: ctx.user.name || null,
+        action: "gis.vector_layer.style.update",
+        entityType: "layer",
+        entityId: input.layerId,
+        projectId: input.projectId,
+        details: { color: input.color, weight: input.weight, fillOpacity: input.fillOpacity ?? null },
+        ipAddress: ctx.req.ip || null,
+        userAgent: ctx.req.headers?.["user-agent"] || null,
+      });
+      return { success: true };
+    }),
+
   updateLayerPresentation: protectedProcedure
     .input(z.object({
       projectId: z.number(),

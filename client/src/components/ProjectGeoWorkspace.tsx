@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FeatureGroup, GeoJSON, MapContainer, Marker, Pane as MapPane, Polygon, Polyline, Popup, TileLayer, useMap, WMSTileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -147,8 +147,43 @@ function InvalidateMapOnResize() {
   return null;
 }
 
+function SidePanel({ title, children, defaultOpen = true }: { title: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
+  return (
+    <details open={defaultOpen} className="rounded-xl border bg-card text-card-foreground shadow-sm">
+      <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-base font-semibold [&::-webkit-details-marker]:hidden">{title}</summary>
+      <div className="px-4 pb-4 pt-0">{children}</div>
+    </details>
+  );
+}
+
+function ScreenScaleIndicator() {
+  const map = useMap();
+  const [scale, setScale] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const { x, y } = map.getSize().divideBy(2);
+      const metres = map.distance(map.containerPointToLatLng([x - 50, y]), map.containerPointToLatLng([x + 50, y]));
+      // Polegada CSS nominal = 96 px. Estimativa de tela, distinta da escala
+      // física do PDF calculada a partir do quadro em milímetros.
+      setScale(Math.round(metres / ((100 * 0.0254) / 96)));
+    };
+    update();
+    map.on("moveend", update);
+    map.on("resize", update);
+    return () => { map.off("moveend", update); map.off("resize", update); };
+  }, [map]);
+  if (scale <= 0) return null;
+  return <div className="pointer-events-none absolute rounded bg-white/90 px-2 py-1 text-xs font-semibold text-slate-900 shadow" style={{ left: 12, bottom: 16, zIndex: 850 }} title="Escala aproximada no centro do mapa, com referência de 96 pixels por polegada">
+    Escala aprox. 1:{scale.toLocaleString("pt-BR")}
+  </div>;
+}
+
 export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, clientName }: { projectId: number; canEdit: boolean; projectName?: string; clientName?: string }) {
   const utils = trpc.useUtils();
+  const updateStyle = trpc.gisAnalysis.updateVectorStyle.useMutation({
+    onSuccess: () => { void utils.gisAnalysis.list.invalidate({ projectId }); toast.success("Simbologia salva"); },
+    onError: (error) => toast.error(error.message || "Não foi possível salvar a simbologia"),
+  });
   const mapRef = useRef<L.Map | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
   const { data: rawGeometries, isLoading: geometriesLoading } = trpc.geometries.list.useQuery({ projectId });
@@ -498,6 +533,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
         <CardContent className="flex min-h-0 flex-1 p-0">
           <MapContainer ref={mapRef} center={center} zoom={11} style={{ height: "100%", width: "100%" }} className="isolate z-0 min-h-[420px] flex-1 lg:min-h-0">
             <InvalidateMapOnResize />
+            <ScreenScaleIndicator />
             <TileLayer key={activeBasemap.id} attribution={activeBasemap.attribution} url={activeBasemap.url!} crossOrigin={activeBasemap.crossOrigin} minNativeZoom={activeBasemap.minZoom} maxNativeZoom={activeBasemap.maxZoom} />
             {thematicItems.map((item) => <MapPane key={item.id} name={thematicPaneName(item.id)} style={{ zIndex: thematicZIndex(item.id) }} />)}
             {rasterLayers.filter((layer) => layer.isVisible && visibleRasterIds.includes(layer.id)).map((layer) => (
@@ -578,9 +614,37 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
 
         <RasterIngestionPanel projectId={projectId} canEdit={canEdit} />
 
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4 text-orange-500" />Operação espacial</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+        {canEdit && projectVectorLayers.length > 0 && (
+          <SidePanel title="Editar simbologia" defaultOpen={false}>
+            <div className="space-y-3">
+              {projectVectorLayers.map((layer) => {
+                const hasFill = layer.layerData?.features?.some((feature) => /Polygon$/.test(feature.geometry?.type ?? ""));
+                return (
+                  <form key={layer.id} className="grid gap-2 border-t pt-3 text-sm first:border-t-0 first:pt-0" onSubmit={(event) => {
+                    event.preventDefault();
+                    const data = new FormData(event.currentTarget);
+                    updateStyle.mutate({
+                      projectId,
+                      layerId: layer.id,
+                      color: String(data.get("color")),
+                      weight: Number(data.get("weight")),
+                      fillOpacity: hasFill ? Number(data.get("opacity")) / 100 : undefined,
+                    });
+                  }}>
+                    <strong className="truncate">{layer.name}</strong>
+                    <label className="flex items-center justify-between gap-2">Cor <input name="color" type="color" defaultValue={layer.defaultStyle?.color || "#2563eb"} /></label>
+                    <label className="flex items-center justify-between gap-2">Espessura <input name="weight" type="number" min="1" max="8" required defaultValue={layer.defaultStyle?.weight ?? 2} className="w-16 rounded border bg-background px-1" /></label>
+                    {hasFill && <label className="flex items-center justify-between gap-2">Preenchimento (%) <input name="opacity" type="number" min="0" max="100" required defaultValue={Math.round((layer.defaultStyle?.fillOpacity ?? 0.2) * 100)} className="w-16 rounded border bg-background px-1" /></label>}
+                    <Button type="submit" size="sm" variant="outline" disabled={updateStyle.isPending}>Salvar estilo</Button>
+                  </form>
+                );
+              })}
+            </div>
+          </SidePanel>
+        )}
+
+        <SidePanel title={<><Sparkles className="h-4 w-4 text-orange-500" />Operação espacial</>}>
+          <div className="space-y-3">
             <Select value={operation} onValueChange={(value) => setOperation(value as Operation)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{Object.entries(operationLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
@@ -589,8 +653,8 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
             {operation === "grid" && <><p className="text-xs text-muted-foreground">Marque uma área em “Usar na análise”. Os pontos serão recortados pelo polígono selecionado.</p><div className="space-y-1"><Label htmlFor="grid-pattern">Formato da malha</Label><Select value={gridPattern} onValueChange={setGridPattern}><SelectTrigger id="grid-pattern"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="quadrada">Quadrada</SelectItem><SelectItem value="triangular">Triangular (linhas alternadas)</SelectItem></SelectContent></Select></div><div className="space-y-1"><Label htmlFor="grid-spacing">Espaçamento (metros)</Label><Input id="grid-spacing" type="number" min="10" max="10000" value={gridSpacing} onChange={(event) => setGridSpacing(event.target.value)} /></div><div className="space-y-1"><Label htmlFor="grid-code">Prefixo</Label><Input id="grid-code" value={gridCode} onChange={(event) => setGridCode(event.target.value)} /></div><div className="space-y-1"><Label htmlFor="grid-rotation">Rotação (graus)</Label><Input id="grid-rotation" type="number" min="-180" max="180" value={gridRotation} onChange={(event) => setGridRotation(event.target.value)} /></div></>}
             <p className="text-xs text-muted-foreground">Cálculos geodésicos em EPSG:4326. Distâncias em metros e área em m²; cada resultado fica salvo como camada vetorial do projeto.</p>
             <Button className="w-full" onClick={executeOperation} disabled={!canEdit || runAnalysis.isPending}>{runAnalysis.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ruler className="mr-2 h-4 w-4" />}{canEdit ? "Executar e salvar" : "Somente leitura"}</Button>
-          </CardContent>
-        </Card>
+          </div>
+        </SidePanel>
 
       </aside>
 
