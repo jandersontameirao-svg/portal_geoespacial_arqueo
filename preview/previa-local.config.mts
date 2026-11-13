@@ -61,12 +61,13 @@ const demoApi = {
       return readFileSync(new URL("./previa-busca.tsx", import.meta.url), "utf8");
     }
     if (path.endsWith("/pages/BaseLayers.tsx")) {
-      return source.concat('\nimport PreviewConnections from "./PreviewConnections.tsx";')
-        .replace('import InstitutionalSourcesCard from "@/components/InstitutionalSourcesCard";', '')
-        .replace('<div className="mb-6"><InstitutionalSourcesCard /></div>', '')
-        .replace(">Camadas Base</h1>", ">Gestão e Conexões</h1>")
-        .replace("Gerencie camadas de dados geoespaciais de fontes oficiais brasileiras", "Gerencie fontes de dados geoespaciais e consulte as bases oficiais.")
-        .replace('<div className="mb-6"><IbgeSourceCard />', '<PreviewConnections /><h2 className="mb-4 text-xl font-semibold">Bases oficiais</h2><div className="mb-6"><IbgeSourceCard />');
+      return `import PreviewConnections from "./PreviewConnections.tsx";
+        export default function BaseLayers() {
+          return <main className="container mx-auto px-4 py-6">
+            <h1 className="mb-4 text-2xl font-bold">Gestão e Conexões</h1>
+            <PreviewConnections />
+          </main>;
+        }`;
     }
     if (path.endsWith("/components/AtenaChatWidget.tsx")) {
       return source
