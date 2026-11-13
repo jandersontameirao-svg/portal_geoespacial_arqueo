@@ -29,7 +29,9 @@ const previousMap = {
 };
 
 function source(path: string) {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
+  // Normaliza CRLF→LF para que as comparações de fonte independam do fim de
+  // linha do checkout (Windows usa CRLF; o servidor Linux usa LF).
+  return readFileSync(new URL(path, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 }
 
 const pageSource = source("../client/src/pages/Files.tsx");

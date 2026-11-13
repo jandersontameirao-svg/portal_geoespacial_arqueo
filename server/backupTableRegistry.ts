@@ -29,6 +29,9 @@ export const backupTableRegistry = [
   { name: "user_layer_visibility", primaryKey: "id" },
   { name: "user_base_layer_visibility", primaryKey: "id" },
   { name: "atena_runs", primaryKey: "id" },
+  { name: "atena_memories", primaryKey: "id" },
+  { name: "atena_chat_messages", primaryKey: "id" },
+  { name: "observacoes", primaryKey: "id" },
 ] as const;
 
 export type BackupTableName = (typeof backupTableRegistry)[number]["name"];

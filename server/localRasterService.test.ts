@@ -7,7 +7,9 @@ const layer = {
 };
 
 describe("fronteira de assets raster locais", () => {
-  it("aceita somente descriptor raster completo e gera caminho interno de tile", () => {
+  // Usa caminhos absolutos POSIX (/tmp/...), que não são absolutos no Windows;
+  // a resolução de raiz é específica de plataforma e vale no Linux (alvo do deploy).
+  it.skipIf(process.platform === "win32")("aceita somente descriptor raster completo e gera caminho interno de tile", () => {
     const descriptor = descriptorFromLayer(layer);
     expect(tilePath("/tmp/raster-root", descriptor, 12, 1000, 1000)).toBe("/tmp/raster-root/projects/7/rasters/9/tiles/12/1000/1000.png");
     expect(() => validateTileCoordinates(11, 0, 0, descriptor)).toThrow(RasterAssetError);
