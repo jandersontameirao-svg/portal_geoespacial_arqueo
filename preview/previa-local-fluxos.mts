@@ -134,7 +134,7 @@ function listConnections() {
   })), ...custom.filter(item => !officialConnections.some(connection => connection.id === item.id))];
 }
 
-export async function workflow(method: string, input: Row = {}, write = false) {
+export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
   if (method === "previewConnections.list" && !write) return listConnections();
   if (method === "previewConnections.save" && write) {
     const { id, type } = input;
@@ -165,6 +165,7 @@ export async function workflow(method: string, input: Row = {}, write = false) {
     const enabled = Boolean(input.enabled);
     if (enabled && (type !== "WMS" || !layer)) throw Error("Para exibir no mapa, informe a camada de uma fonte WMS.");
     const connection = { id: id ?? state.nextId, name, type, address, layer, enabled, status: enabled ? "Ligada no mapa" : "Desligada" };
+    if (validateOnly) return connection;
     save({ ...state, nextId: id == null ? state.nextId+1 : state.nextId,
       connections: [...connections.filter(item => item.id !== id), connection] });
     return connection;
@@ -248,6 +249,41 @@ export async function workflow(method: string, input: Row = {}, write = false) {
     case "atena.previewPlan":
     case "atena.previewRun": {
       const text = String(input.text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const request = String(input.text ?? "").trim();
+      if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra um projeto para executar o comando.");
+      const addSource = request.match(/^cadastrar fonte wms "([^"]+)" (https?:\/\/\S+) camada ([\w.:-]+)$/i);
+      if (addSource) {
+        const [, name, address, layer] = addSource;
+        const entry = { name, address, layer, type: "WMS", enabled: false };
+        if (listConnections().some(item => item.address === address && item.layer === layer)) throw Error("Esta fonte já está cadastrada.");
+        const planning = method === "atena.previewPlan";
+        await workflow("previewConnections.save", entry, true, planning);
+        if (planning) return { summary: `Cadastrar ${name} (${layer}) em ${address}, com a visualização desligada.` };
+        return { message: `${name} cadastrada em Gestão e Conexões.`, connectionChanged: true };
+      }
+      const toggledSource = text.match(/^(ligar|desligar) fonte (iphan|ibge|funai|incra|palmares|aneel)[.!]?$/);
+      if (toggledSource) {
+        const source = listConnections().find(item => item.official && item.name.toLowerCase().startsWith(toggledSource[2]));
+        if (!source?.layer) throw Error("Fonte cartográfica indisponível.");
+        const enabled = toggledSource[1] === "ligar";
+        const summary = `${enabled ? "Ligar" : "Desligar"} ${source.name} nos mapas da prévia.`;
+        if (method === "atena.previewPlan") return { summary };
+        await workflow("previewConnections.save", { ...source, enabled }, true);
+        return { message: `${source.name} ${enabled ? "ligada" : "desligada"} nos mapas da prévia.`, connectionChanged: true };
+      }
+      const copyLayer = request.match(/^criar camada "([^"]{1,100})" a partir de "([^"]{1,150})"[.!]?$/i);
+      if (copyLayer) {
+        const [, requestedName, origin] = copyLayer;
+        const baseName = requestedName.trim().replace(/\.geojson$/i, "").trim();
+        if (!baseName || /[<>:"/\\|?*\x00-\x1f]/.test(baseName)) throw Error("Informe um nome válido para a camada.");
+        const name = baseName + ".geojson";
+        const files = state.files.filter(file => file.projectId === input.projectId);
+        const matches = files.filter(file => file.vector && String(file.name).toLowerCase() === origin.trim().toLowerCase());
+        if (matches.length !== 1) throw Error("Informe o nome completo de uma única camada vetorial deste projeto.");
+        if (files.some(file => String(file.name).toLowerCase() === name.toLowerCase())) throw Error("Já existe uma camada ou arquivo com esse nome.");
+        if (method === "atena.previewPlan") return { summary: `Criar ${name} como cópia de ${matches[0].name} neste projeto.` };
+        return saveAnalysis(input.projectId, name, matches[0].vector);
+      }
       const wantsShape = /\b(shapefile|shape file|shp)\b/.test(text) && /\bmalha\b/.test(text);
       const wantsA2 = /\ba2\b/.test(text) && /\b(mapa|prancha|pdf)\b/.test(text);
       // The chat resolves only known local operations. It passes project IDs and
