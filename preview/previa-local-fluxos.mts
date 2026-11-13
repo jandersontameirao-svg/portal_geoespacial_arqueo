@@ -122,7 +122,7 @@ const officialConnections = [
   { id: -2, name: "IBGE · Estados, municípios e localidades", type: "GeoJSON", address: "https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html", layer: "ibge", enabled: true },
   { id: -3, name: "FUNAI/CMR · Terras indígenas", type: "WMS", address: "https://cmr.funai.gov.br/geoserver/ows", layer: "CMR-PUBLICO:lim_terra_indigena_a", enabled: false },
   { id: -4, name: "INCRA · Territórios quilombolas (via Ibama)", type: "ArcGIS REST", address: "https://pamgia.ibama.gov.br/server/rest/services/BasesSincronizadas/lim_quilombos_incra_a/MapServer", layer: "0", enabled: false },
-  { id: -5, name: "Palmares · Comunidades quilombolas certificadas", type: "Cadastro oficial", address: "https://www.gov.br/palmares/pt-br/departamentos/protecao-preservacao-e-articulacao/certificacao-quilombola", layer: "", enabled: false, status: "Cadastro tabular, sem geometria para exibir no mapa." },
+  { id: -5, name: "Palmares · Municípios com comunidades certificadas", type: "GeoJSON · Palmares e IBGE", address: "https://www.gov.br/palmares/pt-br/departamentos/protecao-preservacao-e-articulacao/certificacao-quilombola", layer: "palmares", enabled: false, status: "Destaque por município. Os polígonos representam limites municipais." },
   { id: -6, name: "ANEEL · Linhas de transmissão (GGT)", type: "ArcGIS REST", address: "https://sigel.aneel.gov.br/arcgis/rest/services/GGT/Dados_WebApp_GGT/MapServer", layer: "0", enabled: false },
 ].map(connection => ({ ...connection, official: true }));
 

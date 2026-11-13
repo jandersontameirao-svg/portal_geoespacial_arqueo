@@ -10,7 +10,9 @@ const layers = [
   { id: "localidades", label: "Localidades", color: "#f97316", zoom: 10 },
 ] as const;
 
-function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number]; projectBounds?: string }) {
+const palmaresLayer = { id: "palmares", label: "Municípios com comunidades certificadas", color: "#a855f7", zoom: 0 } as const;
+
+function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] | typeof palmaresLayer; projectBounds?: string }) {
   const map = useMap();
   const [result, setResult] = useState<FeatureCollection>();
   const [status, setStatus] = useState("");
@@ -52,9 +54,11 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number];
     return () => { controller?.abort(); map.off("moveend", update); };
   }, [layer, map, projectBounds]);
   return <>
-    {status && <span className="block text-[11px] text-slate-600" role="status">{status}</span>}
+    {status && layer.id !== "palmares" && <span className="block text-[11px] text-slate-600" role="status">{status}</span>}
     {result && <GeoJSON key={showNames + JSON.stringify(result.features.map(feature => feature.properties?.codigo))} data={result}
-      style={{ color: layer.color, weight: layer.id === "estados" ? 2 : 1, fillOpacity: 0 }}
+      style={{ color: layer.color, weight: layer.id === "estados" ? 2 : 1,
+        fillOpacity: layer.id === "palmares" ? 0.35 : 0,
+        className: layer.id === "palmares" ? "preview-palmares-municipio" : undefined }}
       pointToLayer={(_, point) => L.circleMarker(point, { radius: 3, color: layer.color, fillOpacity: 0.9 })}
       onEachFeature={(feature, item) => {
         const label = document.createElement("span");
@@ -65,7 +69,9 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number];
           item.getTooltip()?.setLatLng([lat, lon]);
         } else item.bindTooltip(label, { sticky: true });
         const popup = document.createElement("span");
-        popup.textContent = label.textContent + " — IBGE " + (layer.id === "localidades" ? "2022" : "2024");
+        popup.textContent = label.textContent + (layer.id === "palmares"
+          ? " — Município com comunidade certificada pela Fundação Cultural Palmares. Limite municipal do IBGE."
+          : " — IBGE " + (layer.id === "localidades" ? "2022" : "2024"));
         item.bindPopup(popup);
       }} />}
   </>;
@@ -101,6 +107,7 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
   const controlRef = useRef<HTMLDetailsElement>(null);
   const [enabled, setEnabled] = useState<Record<string, boolean>>({ municipios: true });
   const [ibgeEnabled, setIbgeEnabled] = useState(true);
+  const [palmaresEnabled, setPalmaresEnabled] = useState(false);
   const [sources, setSources] = useState<MapSource[]>([]);
   useEffect(() => {
     const controller = new AbortController();
@@ -109,6 +116,7 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
         if (controller.signal.aborted) return;
         const connections: MapSource[] = data.result?.data?.json ?? [];
         setIbgeEnabled(connections.find(source => source.id === -2)?.enabled ?? true);
+        setPalmaresEnabled(connections.some(source => source.layer === "palmares" && source.official && source.enabled));
         setSources(connections.filter(source => source.enabled && source.layer &&
           (source.type === "WMS" || (source.official && source.type === "ArcGIS REST"))));
       }).catch(() => {});
@@ -132,7 +140,8 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     control.querySelector("summary")?.focus();
   }
 
-  return <>{sources.map(source => source.type === "ArcGIS REST"
+  return <>{palmaresEnabled && <OfficialLayer layer={palmaresLayer} />}
+  {sources.map(source => source.type === "ArcGIS REST"
     ? <ArcGisTiles key={source.id} source={source} />
     : <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
   <details ref={controlRef} className="preview-ibge-control" onKeyDown={event => {

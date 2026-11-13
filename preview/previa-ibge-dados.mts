@@ -35,14 +35,24 @@ function loadLayer(id: keyof typeof files) {
   return cache.get(id)!;
 }
 
+let palmaresCodes: Set<string> | undefined;
+
 export function readIbgeLayer(id: string, bbox: string, projectBox: string | null = null) {
-  if (!Object.hasOwn(files, id)) return;
+  const palmares = id === "palmares";
+  if (!palmares && !Object.hasOwn(files, id)) return;
   const view = bbox.split(",").map(Number) as Box;
   if (view.length !== 4 || !view.every(Number.isFinite) || view[1] > view[3]) return;
   const region = projectBox?.split(",").map(Number);
   if (region && (region.length !== 4 || !region.every(Number.isFinite))) return;
   const [west, south, east, north] = view;
-  const features = loadLayer(id as keyof typeof files).filter(({ bounds: [a,b,c,d] }) => {
+  if (palmares) {
+    palmaresCodes ??= new Set(JSON.parse(readFileSync(
+      new URL("./previa-raster/angicos/palmares-municipios.json", import.meta.url), "utf8"
+    )).municipalityCodes);
+  }
+  const base = palmares ? "municipios" : id as keyof typeof files;
+  const features = loadLayer(base).filter(({ feature, bounds: [a,b,c,d] }) => {
+    if (palmares && !palmaresCodes!.has(String(feature.properties.codigo))) return false;
     if (region && (c < region[0] || a > region[2] || d < region[1] || b > region[3])) return false;
     if (b > north || d < south) return false;
     if (east - west >= 360) return true;
