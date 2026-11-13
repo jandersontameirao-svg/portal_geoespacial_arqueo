@@ -77,24 +77,26 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] 
   </>;
 }
 
-type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[] };
+type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[] };
 
 const childNames: Record<string, string> = {
   "SICG:sitios": "Sítios arqueológicos · pontos",
   "SICG:sitios_pol": "Sítios arqueológicos · polígonos",
+  "DBGEO:Empreendimentos": "Empreendimentos · FCA (grupo oficial)",
+  "fca:fca": "FCA · camada individual",
   "CMR-PUBLICO:lim_terra_indigena_a": "Terras indígenas",
   palmares: palmaresLayer.label,
 };
 
 function childrenFor(source: MapSource) {
   if (source.id === -2) return layers.map(layer => ({ id: layer.id, label: layer.label }));
-  return (source.layer || "").split(",").filter(Boolean).map(id => ({
+  return [...(source.availableLayers ?? []), ...(source.layer || "").split(",").filter(Boolean)].map(id => ({
     id, label: childNames[id] ?? (id === "0" ? source.name.split(" · ")[1] ?? id : id),
   }));
 }
 
 function selectedFor(source: MapSource) {
-  return source.selectedLayers ?? (source.id === -2 ? ["municipios"] : childrenFor(source).map(child => child.id));
+  return source.selectedLayers ?? (source.id === -2 ? ["municipios"] : (source.layer || "").split(",").filter(Boolean));
 }
 
 type CatalogLayer = { id: string; label: string };
@@ -254,6 +256,7 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
         ...(Array.isArray(catalog) ? catalog : []),
         ...childrenFor(source),
       ].map(child => [child.id, child])).values()];
+      children.sort((a, b) => Number((source.availableLayers ?? []).includes(b.id)) - Number((source.availableLayers ?? []).includes(a.id)));
       const selected = selectedFor(source);
       for (const id of selected) if (!children.some(child => child.id === id)) children.push({ id, label: id });
       const groupOn = source.enabled && selected.length > 0;
@@ -264,7 +267,8 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
           <input type="checkbox" aria-label={source.name} disabled={busy} checked={groupOn}
             className="ml-1 mr-2" onClick={event => event.stopPropagation()}
             ref={input => { if (input) input.indeterminate = groupOn && selected.length < children.length; }}
-            onChange={() => void saveVisibility(source, !groupOn, !groupOn && !selected.length ? childrenFor(source).map(child => child.id) : selected)} />
+            onChange={() => void saveVisibility(source, !groupOn, !groupOn && !selected.length
+              ? childrenFor(source).filter(child => !source.availableLayers?.includes(child.id)).map(child => child.id) : selected)} />
           <span>{source.name.split(" · ")[0]}</span>
         </summary>
         {catalog === "loading" && <p role="status" className="ml-5 text-xs">Carregando subcamadas…</p>}

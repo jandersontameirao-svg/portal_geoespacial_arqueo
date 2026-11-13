@@ -113,7 +113,7 @@ function saveAnalysis(projectId: number, name: string, vector: Row) {
 
 const iphanConnection = {
   id: -1, name: "IPHAN · Sítios arqueológicos (SICG)", type: "WMS",
-  address: "https://geoserver.iphan.gov.br/geoserver/SICG/wms",
+  address: "https://geoserver.iphan.gov.br/geoserver/wms",
   layer: "SICG:sitios,SICG:sitios_pol", enabled: true, official: true,
 };
 
@@ -132,6 +132,7 @@ function listConnections() {
     ...connection,
     enabled: Boolean(connection.layer) && (custom.find(item => item.id === connection.id)?.enabled ?? connection.enabled),
     selectedLayers: custom.find(item => item.id === connection.id)?.selectedLayers,
+    availableLayers: connection.id === -1 ? ["DBGEO:Empreendimentos", "fca:fca"] : undefined,
   })), ...custom.filter(item => !officialConnections.some(connection => connection.id === item.id))];
 }
 

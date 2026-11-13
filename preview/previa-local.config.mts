@@ -551,7 +551,7 @@ const demoApi = {
   configureServer(server: { middlewares: { use: (path: string, handler: any) => void } }) {
     server.middlewares.use("/previa/catalogo-wms", async (req: any, res: any) => {
       const endpoints: Record<string, string> = {
-        "-1": "https://geoserver.iphan.gov.br/geoserver/SICG/wms",
+        "-1": "https://geoserver.iphan.gov.br/geoserver/wms",
         "-3": "https://cmr.funai.gov.br/geoserver/ows",
       };
       const id = new URL(req.url, "http://127.0.0.1").searchParams.get("id") ?? "";
