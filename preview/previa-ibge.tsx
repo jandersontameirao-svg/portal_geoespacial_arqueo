@@ -77,9 +77,14 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] 
   </>;
 }
 
-type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[] };
+type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[]; group?: string };
 
 const childNames: Record<string, string> = {
+  "IDE:ide_2017_mg_tombamento_iepha_pto": "Bens culturais tombados",
+  "IDE:ide_2017_mg_ai_patrimonio_cultural_iepha_pol": "Áreas de influência do patrimônio cultural",
+  "IDE:ide_2017_mg_celebracoes_formas_expressao_iepha_pto": "Celebrações e formas de expressão",
+  "IDE:ide_2017_mg_lugares_iepha_pto": "Lugares de referência cultural",
+  "IDE:ide_2017_mg_saberes_iepha_pol": "Saberes",
   "SICG:sitios": "Sítios arqueológicos · pontos",
   "SICG:sitios_pol": "Sítios arqueológicos · polígonos",
   "DBGEO:Empreendimentos": "Empreendimentos · FCA (grupo oficial)",
@@ -248,10 +253,11 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
       </button>
     </div>
     {error && <p role="alert" className="px-2 text-xs text-red-700">{error}</p>}
-    {connections.filter(source => source.layer && (source.official || source.type === "WMS")).map(source => {
+    {(() => {
+    const renderSource = (source: MapSource) => {
       const key = source.id + ":" + source.address;
       const catalog = catalogs[key];
-      const remote = source.type === "WMS" || source.type === "ArcGIS REST";
+      const remote = !source.group && (source.type === "WMS" || source.type === "ArcGIS REST");
       const children = [...new Map([
         ...(Array.isArray(catalog) ? catalog : []),
         ...childrenFor(source),
@@ -269,7 +275,7 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
             ref={input => { if (input) input.indeterminate = groupOn && selected.length < children.length; }}
             onChange={() => void saveVisibility(source, !groupOn, !groupOn && !selected.length
               ? childrenFor(source).filter(child => !source.availableLayers?.includes(child.id)).map(child => child.id) : selected)} />
-          <span>{source.name.split(" · ")[0]}</span>
+          <span>{source.group ? source.name : source.name.split(" · ")[0]}</span>
         </summary>
         {catalog === "loading" && <p role="status" className="ml-5 text-xs">Carregando subcamadas…</p>}
         {catalog === "error" && <button type="button" className="ml-5 text-xs underline" onClick={() => void loadCatalog(source, key)}>Catálogo indisponível · tentar novamente</button>}
@@ -284,7 +290,21 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
           {child.label}
         </label>)}
       </details>;
-    })}
+    };
+    const mapped = connections.filter(source => source.layer && (source.official || source.type === "WMS"));
+    return <>
+      {mapped.filter(source => !source.group).map(renderSource)}
+      <details className="border-t py-1 text-sm">
+        <summary className="cursor-pointer px-2 py-1">Patrimônio cultural estadual</summary>
+        <div className="ml-3">
+          {mapped.filter(source => source.group === "patrimonio-estadual").map(renderSource)}
+          <p className="px-2 py-1 text-xs text-slate-600">
+            Geosserviço a confirmar: <a className="underline" target="_blank" rel="noreferrer" href="https://www.cultura.sp.gov.br/sec_cultura/CONDEPHAAT/Bens_Protegidos/Mapa_Interativo">SP · Condephaat</a>
+          </p>
+        </div>
+      </details>
+    </>;
+    })()}
     {ibge && layers.filter(layer => selectedFor(ibge).includes(layer.id)).map(layer =>
       <OfficialLayer key={layer.id} layer={layer} projectBounds={projectBounds} />)}
     </div>

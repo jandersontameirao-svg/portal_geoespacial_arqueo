@@ -119,6 +119,9 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  { id: -7, name: "MG · IEPHA-MG", type: "WMS", address: "https://geoserver.meioambiente.mg.gov.br/ows",
+    layer: "IDE:ide_2017_mg_tombamento_iepha_pto,IDE:ide_2017_mg_ai_patrimonio_cultural_iepha_pol,IDE:ide_2017_mg_celebracoes_formas_expressao_iepha_pto,IDE:ide_2017_mg_lugares_iepha_pto,IDE:ide_2017_mg_saberes_iepha_pol",
+    enabled: false, group: "patrimonio-estadual" },
   { id: -2, name: "IBGE · Estados, municípios e localidades", type: "GeoJSON", address: "https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html", layer: "ibge", enabled: true },
   { id: -3, name: "FUNAI/CMR · Terras indígenas", type: "WMS", address: "https://cmr.funai.gov.br/geoserver/ows", layer: "CMR-PUBLICO:lim_terra_indigena_a", enabled: false },
   { id: -4, name: "INCRA · Territórios quilombolas (via Ibama)", type: "ArcGIS REST", address: "https://pamgia.ibama.gov.br/server/rest/services/BasesSincronizadas/lim_quilombos_incra_a/MapServer", layer: "0", enabled: false },
