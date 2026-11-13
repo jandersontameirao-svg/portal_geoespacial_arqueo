@@ -1,0 +1,98 @@
+
+function buildArqueoA2(input: PrintDocumentInput): PrintScene {
+  const { snapshot, layout } = input;
+  const slot = { x: 18, y: 34, width: 461.82, height: 369 };
+  const geo = getPrintGeometry(snapshot, slot.width, slot.height);
+  const mapRect = { x: slot.x + geo.image.xMm, y: slot.y + geo.image.yMm,
+    width: geo.image.widthMm, height: geo.image.heightMm };
+  const primitives: Primitive[] = [];
+  const warnings = [...snapshot.warnings, ...geo.warnings];
+  const ink = "#202020";
+  const box = (x: number, y: number, width: number, height: number, fill = "none", stroke = ink) =>
+    primitives.push({ kind: "rect", x, y, width, height, fill, stroke });
+  const line = (x: number, y: number, x2: number, y2: number, color = ink, width = .22) =>
+    primitives.push({ kind: "line", x, y, x2, y2, color, width });
+  const label = (x: number, y: number, value: string, size = 3.5, bold = false) =>
+    primitives.push({ kind: "text", x, y, text: cleanText(value), size, color: ink, bold });
+  box(0, 0, 594, 420, "#ffffff", "#ffffff");
+  box(10, 14, 574, 396);
+  line(10, 28, 584, 28);
+  line(487, 14, 487, 410);
+  const title = wrap(input.title || input.projectName, 465, 6).slice(0, 1)[0];
+  label(Math.max(14, 248 - title.length * 1.55), 23, title, 6, true);
+  label(490, 20, "LOCALIZAÇÃO GEOGRÁFICA", 3.6, true);
+  label(490, 25, "E PLANTA DE SITUAÇÃO", 3.6, true);
+  primitives.push({ kind: "image", ...mapRect, src: snapshot.imageDataUrl });
+  if (layout.elements.frame) box(slot.x, slot.y, slot.width, slot.height);
+  if (layout.elements.grid) {
+    for (const grid of getGeographicGrid(snapshot.bounds)) {
+      const value = grid.value.toFixed(5) + "°";
+      if (grid.axis === "longitude") {
+        const x = mapRect.x + grid.position * mapRect.width;
+        line(x, mapRect.y, x, mapRect.y + mapRect.height, "#818181", .12);
+        label(Math.min(x + 1, slot.x + slot.width - 18), 32, value, 2.6);
+      } else {
+        const y = mapRect.y + grid.position * mapRect.height;
+        line(mapRect.x, y, mapRect.x + mapRect.width, y, "#818181", .12);
+        label(slot.x + 1, y - 1, value, 2.6);
+      }
+    }
+  }
+  if (layout.elements.north) {
+    box(mapRect.x + 4, mapRect.y + 4, 10, 18, "#ffffff");
+    label(mapRect.x + 7.5, mapRect.y + 10, "N", 3.5, true);
+    line(mapRect.x + 9, mapRect.y + 12, mapRect.x + 9, mapRect.y + 19);
+    line(mapRect.x + 9, mapRect.y + 12, mapRect.x + 7, mapRect.y + 15);
+    line(mapRect.x + 9, mapRect.y + 12, mapRect.x + 11, mapRect.y + 15);
+  }
+  const detail = String(layout.signature) === "arqueo-a2-detalhe";
+  const factors = detail ? [16, 6, 2] : [8, 2];
+  const contextHeight = 174 / factors.length;
+  factors.forEach((factor, index) => {
+    const top = 32 + index * contextHeight;
+    const height = contextHeight - 10;
+    box(492, top, 87, height, "#f6f8f5");
+    for (const fraction of [.25, .5, .75]) {
+      line(492 + 87*fraction, top, 492 + 87*fraction, top + height, "#c2ccbf");
+      line(492, top + height*fraction, 579, top + height*fraction, "#c2ccbf");
+    }
+    box(535.5 - 43.5/factor, top + height/2 - height/(2*factor), 87/factor, height/factor, "none", "#b44c16");
+    label(492, top + height + 4, ["Situação geral", "Enquadramento regional", "Entorno da vista"][index] + " · esquema", 2.8);
+  });
+  warnings.push("Os quadros de situação são esquemas da extensão capturada. A cartografia de contexto será refinada na revisão do layout.");
+  for (const y of [213, 274, 301, 325, 339, 372, 391]) line(487, y, 584, y);
+  if (layout.elements.legend) {
+    label(491, 219, "Legenda", 4, true);
+    const items = snapshot.legend.length ? snapshot.legend : [{ label: "Sem camadas temáticas visíveis", color: "#627568" }];
+    items.slice(0, 10).forEach((item, i) => {
+      const y = 226 + i * 4.7;
+      const color = item.color && /^#[\da-f]{6}$/i.test(item.color) ? item.color : "#627568";
+      box(492, y-3, 5, 3, color, color);
+      label(500, y, wrap(item.label, 78, 2.9)[0], 2.9);
+    });
+    if (items.length > 10) warnings.push("A legenda da folha mostra os primeiros dez itens. A lista completa está nos metadados.");
+  }
+  label(491, 280, "Sistema de coordenadas", 3.6, true);
+  label(491, 286, "WGS 84 / Web Mercator · EPSG:3857", 3.2);
+  label(491, 292, "Grade em latitude e longitude", 3.2);
+  if (layout.elements.scale) {
+    const max = geo.scaleDenominatorApprox * .072;
+    const power = 10 ** Math.floor(Math.log10(max));
+    const metres = [5, 2, 1].map(value => value * power).find(value => value <= max) ?? power / 2;
+    const bar = metres * 1000 / geo.scaleDenominatorApprox;
+    for (let i = 0; i < 4; i++) box(492 + i*bar/4, 309, bar/4, 2, i % 2 ? "#ffffff" : ink);
+    label(492, 315, "0", 2.8);
+    label(492 + bar - 4, 315, metres >= 1000 ? metres/1000 + " km" : metres + " m", 2.8);
+    label(492, 321, "1:" + Math.round(geo.scaleDenominatorApprox).toLocaleString("pt-BR") + " · aprox. no centro", 3.4);
+  }
+  label(491, 333, "Data: " + new Date(snapshot.capturedAt).toLocaleDateString("pt-BR") + "       Folha A2", 3.3);
+  label(491, 345, "Fontes e créditos", 3.6, true);
+  const credits = wrap(snapshot.attributions.join(" · ") || "Fontes não informadas pelas camadas", 89, 3);
+  credits.slice(0, 5).forEach((item, i) => label(491, 350 + i*4, item, 3));
+  if (credits.length > 5) warnings.push("Os créditos completos estão nos metadados.");
+  label(491, 379, wrap(input.author || input.projectName, 89, 3.2)[0], 3.2);
+  if (input.subtitle) label(491, 385, wrap(input.subtitle, 89, 3)[0], 3);
+  label(491, 402, "Grupo Arqueo", 4.2, true);
+  return { width: 594, height: 420, primitives, warnings: [...new Set(warnings)],
+    effectiveDpi: geo.effectiveDpi, scaleDenominator: geo.scaleDenominatorApprox, mapRect };
+}
