@@ -135,6 +135,12 @@ function listConnections() {
   })), ...custom.filter(item => !officialConnections.some(connection => connection.id === item.id))];
 }
 
+function validRemoteSelection(values: unknown[], type: string) {
+  const pattern = type === "WMS" ? /^[\w.:-]{1,150}$/ : /^\d{1,8}$/;
+  return [...new Set(values.filter((value): value is string =>
+    typeof value === "string" && pattern.test(value)))].slice(0, 40);
+}
+
 export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
   if (method === "previewConnections.list" && !write) return listConnections();
   if (method === "previewConnections.save" && write) {
@@ -145,7 +151,9 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       if (!official.layer) throw Error("Fonte disponível para consulta.");
       const allowed = official.layer === "ibge" ? ["estados", "municipios", "localidades"] : official.layer.split(",");
       const selectedLayers = Array.isArray(input.selectedLayers)
-        ? allowed.filter(layer => input.selectedLayers.includes(layer))
+        ? official.type === "WMS" || official.type === "ArcGIS REST"
+          ? validRemoteSelection(input.selectedLayers, official.type)
+          : allowed.filter(layer => input.selectedLayers.includes(layer))
         : (state.connections ?? []).find(item => item.id === id)?.selectedLayers;
       const connection = { ...official, enabled: Boolean(input.enabled), selectedLayers };
       save({ ...state, connections: [...(state.connections ?? []).filter(item => item.id !== id), connection] });
@@ -167,9 +175,12 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     if (id != null && !connections.some(item => item.id === id)) throw Error("Fonte não encontrada.");
     const layer = type === "WMS" ? String(input.layer ?? "").trim() : "";
     if (layer && !/^[\w.:-]{1,150}$/.test(layer)) throw Error("Informe o identificador da camada WMS.");
+    const selectedLayers = type === "WMS" && Array.isArray(input.selectedLayers)
+      ? validRemoteSelection(input.selectedLayers, type) : undefined;
     const enabled = Boolean(input.enabled);
     if (enabled && (type !== "WMS" || !layer)) throw Error("Para exibir no mapa, informe a camada de uma fonte WMS.");
-    const connection = { id: id ?? state.nextId, name, type, address, layer, enabled, status: enabled ? "Ligada no mapa" : "Desligada" };
+    const connection = { id: id ?? state.nextId, name, type, address, layer, enabled,
+      selectedLayers, status: enabled ? "Ligada no mapa" : "Desligada" };
     if (validateOnly) return connection;
     save({ ...state, nextId: id == null ? state.nextId+1 : state.nextId,
       connections: [...connections.filter(item => item.id !== id), connection] });

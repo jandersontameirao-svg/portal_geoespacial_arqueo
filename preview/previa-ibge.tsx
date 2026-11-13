@@ -97,6 +97,34 @@ function selectedFor(source: MapSource) {
   return source.selectedLayers ?? (source.id === -2 ? ["municipios"] : childrenFor(source).map(child => child.id));
 }
 
+type CatalogLayer = { id: string; label: string };
+
+async function discoverLayers(source: MapSource): Promise<CatalogLayer[]> {
+  const url = new URL(source.address);
+  const options = { signal: AbortSignal.timeout(12000), credentials: "omit" as const };
+  if (source.type === "ArcGIS REST") {
+    url.searchParams.set("f", "json");
+    const response = await fetch(url, options);
+    if (!response.ok) throw Error();
+    const data = await response.json();
+    if (!Array.isArray(data.layers)) throw Error();
+    return data.layers.filter((layer: any) => Number.isInteger(layer.id) && !layer.subLayerIds?.length)
+      .map((layer: any) => ({ id: String(layer.id), label: String(layer.name) }));
+  }
+  url.search = new URLSearchParams({ service: "WMS", request: "GetCapabilities", version: "1.1.1" }).toString();
+  const response = await fetch(source.id === -1 || source.id === -3
+    ? "/previa/catalogo-wms?id=" + source.id : url.href, options);
+  if (!response.ok) throw Error();
+  const xml = new DOMParser().parseFromString(await response.text(), "application/xml");
+  if (!["WMT_MS_Capabilities", "WMS_Capabilities"].includes(xml.documentElement.localName)) throw Error();
+  return [...xml.getElementsByTagNameNS("*", "Layer")].flatMap(layer => {
+    const fields = [...layer.children];
+    const id = fields.find(field => field.localName === "Name")?.textContent?.trim();
+    const label = fields.find(field => field.localName === "Title")?.textContent?.trim();
+    return id && /^[\w.:-]{1,150}$/.test(id) ? [{ id, label: label || id }] : [];
+  });
+}
+
 function ArcGisTiles({ source }: { source: MapSource }) {
   const map = useMap();
   useEffect(() => {
@@ -126,6 +154,8 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
   const [connections, setConnections] = useState<MapSource[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [catalogs, setCatalogs] = useState<Record<string, CatalogLayer[] | "loading" | "error">>({});
+  const loadingCatalogs = useRef(new Set<string>());
   useEffect(() => {
     const controller = new AbortController();
     const refresh = () => fetch("/api/trpc/previewConnections.list", { signal: controller.signal, cache: "no-store" })
@@ -175,6 +205,20 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     }
   }
 
+  async function loadCatalog(source: MapSource, key: string) {
+    if (loadingCatalogs.current.has(key) || Array.isArray(catalogs[key])) return;
+    loadingCatalogs.current.add(key);
+    setCatalogs(current => ({ ...current, [key]: "loading" }));
+    try {
+      const items = await discoverLayers(source);
+      setCatalogs(current => ({ ...current, [key]: items }));
+    } catch {
+      setCatalogs(current => ({ ...current, [key]: "error" }));
+    } finally {
+      loadingCatalogs.current.delete(key);
+    }
+  }
+
   const active = connections.filter(source => source.enabled);
   const ibge = active.find(source => source.id === -2);
   const sources = active.filter(source => source.type === "WMS" || (source.official && source.type === "ArcGIS REST"))
@@ -203,22 +247,34 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     </div>
     {error && <p role="alert" className="px-2 text-xs text-red-700">{error}</p>}
     {connections.filter(source => source.layer && (source.official || source.type === "WMS")).map(source => {
-      const children = childrenFor(source);
+      const key = source.id + ":" + source.address;
+      const catalog = catalogs[key];
+      const remote = source.type === "WMS" || source.type === "ArcGIS REST";
+      const children = [...new Map([
+        ...(Array.isArray(catalog) ? catalog : []),
+        ...childrenFor(source),
+      ].map(child => [child.id, child])).values()];
       const selected = selectedFor(source);
+      for (const id of selected) if (!children.some(child => child.id === id)) children.push({ id, label: id });
       const groupOn = source.enabled && selected.length > 0;
-      return <details key={source.id} className="border-t py-1 text-sm">
+      return <details key={key} className="border-t py-1 text-sm" onToggle={event => {
+        if (event.currentTarget.open && remote) void loadCatalog(source, key);
+      }}>
         <summary className="cursor-pointer px-2 py-1">
           <input type="checkbox" aria-label={source.name} disabled={busy} checked={groupOn}
             className="ml-1 mr-2" onClick={event => event.stopPropagation()}
             ref={input => { if (input) input.indeterminate = groupOn && selected.length < children.length; }}
-            onChange={() => void saveVisibility(source, !groupOn, !groupOn && !selected.length ? children.map(child => child.id) : selected)} />
+            onChange={() => void saveVisibility(source, !groupOn, !groupOn && !selected.length ? childrenFor(source).map(child => child.id) : selected)} />
           <span>{source.name.split(" · ")[0]}</span>
         </summary>
+        {catalog === "loading" && <p role="status" className="ml-5 text-xs">Carregando subcamadas…</p>}
+        {catalog === "error" && <button type="button" className="ml-5 text-xs underline" onClick={() => void loadCatalog(source, key)}>Catálogo indisponível · tentar novamente</button>}
         {children.map(child => <label key={child.id} className="ml-5 flex cursor-pointer items-center gap-2 px-2 py-1 text-xs">
           <input type="checkbox" disabled={busy} checked={source.enabled && selected.includes(child.id)}
             onChange={event => {
               const selection = source.enabled ? selected : [];
               const next = event.target.checked ? [...selection, child.id] : selection.filter(id => id !== child.id);
+              if (next.length > 40) { setError("Selecione até 40 subcamadas por fonte."); return; }
               void saveVisibility(source, next.length > 0, next);
             }} />
           {child.label}

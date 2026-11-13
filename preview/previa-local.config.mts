@@ -549,6 +549,36 @@ const demoApi = {
     }];
   },
   configureServer(server: { middlewares: { use: (path: string, handler: any) => void } }) {
+    server.middlewares.use("/previa/catalogo-wms", async (req: any, res: any) => {
+      const endpoints: Record<string, string> = {
+        "-1": "https://geoserver.iphan.gov.br/geoserver/SICG/wms",
+        "-3": "https://cmr.funai.gov.br/geoserver/ows",
+      };
+      const id = new URL(req.url, "http://127.0.0.1").searchParams.get("id") ?? "";
+      // Only fixed institutional endpoints use the preview server. Custom URLs stay in the browser.
+      if (req.method !== "GET" || !Object.hasOwn(endpoints, id)) { res.statusCode = 404; res.end(); return; }
+      try {
+        const response = await fetch(endpoints[id] + "?service=WMS&request=GetCapabilities&version=1.1.1",
+          { signal: AbortSignal.timeout(10000), redirect: "error" });
+        if (!response.ok || !response.body) throw Error();
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > 4_000_000) { await reader.cancel(); throw Error(); }
+          chunks.push(value);
+        }
+        res.setHeader("Content-Type", "application/xml; charset=utf-8");
+        res.setHeader("Cache-Control", "private, max-age=300");
+        res.end(Buffer.concat(chunks));
+      } catch {
+        res.statusCode = 502;
+        res.end();
+      }
+    });
     server.middlewares.use("/previa/busca", (req: any, res: any) => {
       const url = new URL(req.url, "http://127.0.0.1");
       const query = normalizeSearch((url.searchParams.get("q") ?? "").slice(0, 120));
