@@ -131,6 +131,7 @@ function listConnections() {
   return [...officialConnections.map(connection => ({
     ...connection,
     enabled: Boolean(connection.layer) && (custom.find(item => item.id === connection.id)?.enabled ?? connection.enabled),
+    selectedLayers: custom.find(item => item.id === connection.id)?.selectedLayers,
   })), ...custom.filter(item => !officialConnections.some(connection => connection.id === item.id))];
 }
 
@@ -142,7 +143,11 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     if (official) {
       // Only visibility is configurable for the published official sources.
       if (!official.layer) throw Error("Fonte disponível para consulta.");
-      const connection = { ...official, enabled: Boolean(input.enabled) };
+      const allowed = official.layer === "ibge" ? ["estados", "municipios", "localidades"] : official.layer.split(",");
+      const selectedLayers = Array.isArray(input.selectedLayers)
+        ? allowed.filter(layer => input.selectedLayers.includes(layer))
+        : (state.connections ?? []).find(item => item.id === id)?.selectedLayers;
+      const connection = { ...official, enabled: Boolean(input.enabled), selectedLayers };
       save({ ...state, connections: [...(state.connections ?? []).filter(item => item.id !== id), connection] });
       return connection;
     }

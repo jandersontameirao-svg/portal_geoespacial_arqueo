@@ -518,6 +518,8 @@ const demoApi = {
           color: #171717;
         }
         .preview-home-layout .preview-ibge-control { top: 9.25rem; }
+        .preview-home-layout:has(.preview-ibge-control) #map-panel-trigger-layers { display: none; }
+        .preview-home-layout:has(.preview-ibge-control) .preview-ibge-control { top: 6.5rem; }
         .preview-ibge-control > summary {
           display: grid;
           place-items: center;
@@ -536,7 +538,9 @@ const demoApi = {
           position: absolute;
           top: 0;
           right: calc(100% + .5rem);
-          width: min(12.5rem, 55vw);
+          width: min(20rem, calc(100vw - 8rem));
+          max-height: min(55vh, 24rem);
+          overflow: auto;
         }
         div:has(> button[title="Aproximar"]):has(> button[title="Afastar"]) { top: 9.25rem; }
         .preview-home-layout:has(.preview-ibge-control) div:has(> button[title="Aproximar"]):has(> button[title="Afastar"]) { top: 12rem; }
