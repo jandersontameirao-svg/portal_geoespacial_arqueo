@@ -71,20 +71,46 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number];
   </>;
 }
 
+type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean };
+
+function ArcGisTiles({ source }: { source: MapSource }) {
+  const map = useMap();
+  useEffect(() => {
+    // ArcGIS export renders each Leaflet tile using the same Web Mercator extent.
+    const tileSize = 256;
+    const tiles = L.tileLayer(source.address + "/export", { tileSize, attribution: source.name });
+    tiles.getTileUrl = ({ x, y, z }: L.Coords) => {
+      const northwest = L.CRS.EPSG3857.project(map.unproject(L.point(x * tileSize, y * tileSize), z));
+      const southeast = L.CRS.EPSG3857.project(map.unproject(L.point((x + 1) * tileSize, (y + 1) * tileSize), z));
+      const url = new URL(source.address + "/export");
+      url.search = new URLSearchParams({
+        bbox: [northwest.x, southeast.y, southeast.x, northwest.y].join(","),
+        bboxSR: "3857", imageSR: "3857", size: "256,256", format: "png32",
+        transparent: "true", layers: "show:" + source.layer, f: "image",
+      }).toString();
+      return url.href;
+    };
+    tiles.addTo(map);
+    return () => { tiles.remove(); };
+  }, [map, source]);
+  return null;
+}
+
 export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: string }) {
   const map = useMap();
   const controlRef = useRef<HTMLDetailsElement>(null);
   const [enabled, setEnabled] = useState<Record<string, boolean>>({ municipios: true });
   const [ibgeEnabled, setIbgeEnabled] = useState(true);
-  const [sources, setSources] = useState<{ id: number; address: string; layer: string }[]>([]);
+  const [sources, setSources] = useState<MapSource[]>([]);
   useEffect(() => {
     const controller = new AbortController();
     const refresh = () => fetch("/api/trpc/previewConnections.list", { signal: controller.signal, cache: "no-store" })
       .then(r => r.json()).then(data => {
         if (controller.signal.aborted) return;
-        const connections = data.result?.data?.json ?? [];
-        setIbgeEnabled(connections.find((source: any) => source.id === -2)?.enabled ?? true);
-        setSources(connections.filter((source: any) => source.type === "WMS" && source.enabled && source.layer));
+        const connections: MapSource[] = data.result?.data?.json ?? [];
+        setIbgeEnabled(connections.find(source => source.id === -2)?.enabled ?? true);
+        setSources(connections.filter(source => source.enabled && source.layer &&
+          (source.type === "WMS" || (source.official && source.type === "ArcGIS REST"))));
       }).catch(() => {});
     void refresh();
     window.addEventListener("focus", refresh);
@@ -106,7 +132,9 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     control.querySelector("summary")?.focus();
   }
 
-  return <>{sources.map(source => <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
+  return <>{sources.map(source => source.type === "ArcGIS REST"
+    ? <ArcGisTiles key={source.id} source={source} />
+    : <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
   <details ref={controlRef} className="preview-ibge-control" onKeyDown={event => {
     if (event.key === "Escape" && event.currentTarget.open) {
       event.stopPropagation();
