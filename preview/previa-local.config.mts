@@ -62,6 +62,8 @@ const demoApi = {
     }
     if (path.endsWith("/pages/BaseLayers.tsx")) {
       return source.concat('\nimport PreviewConnections from "./PreviewConnections.tsx";')
+        .replace('import InstitutionalSourcesCard from "@/components/InstitutionalSourcesCard";', '')
+        .replace('<div className="mb-6"><InstitutionalSourcesCard /></div>', '')
         .replace(">Camadas Base</h1>", ">Gestão e Conexões</h1>")
         .replace("Gerencie camadas de dados geoespaciais de fontes oficiais brasileiras", "Gerencie fontes de dados geoespaciais e consulte as bases oficiais.")
         .replace('<div className="mb-6"><IbgeSourceCard />', '<PreviewConnections /><h2 className="mb-4 text-xl font-semibold">Bases oficiais</h2><div className="mb-6"><IbgeSourceCard />');
