@@ -75,12 +75,16 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
   const map = useMap();
   const controlRef = useRef<HTMLDetailsElement>(null);
   const [enabled, setEnabled] = useState<Record<string, boolean>>({ municipios: true });
+  const [ibgeEnabled, setIbgeEnabled] = useState(true);
   const [sources, setSources] = useState<{ id: number; address: string; layer: string }[]>([]);
   useEffect(() => {
     const controller = new AbortController();
     const refresh = () => fetch("/api/trpc/previewConnections.list", { signal: controller.signal, cache: "no-store" })
       .then(r => r.json()).then(data => {
-        if (!controller.signal.aborted) setSources((data.result?.data?.json ?? []).filter((source: any) => source.type === "WMS" && source.enabled && source.layer));
+        if (controller.signal.aborted) return;
+        const connections = data.result?.data?.json ?? [];
+        setIbgeEnabled(connections.find((source: any) => source.id === -2)?.enabled ?? true);
+        setSources(connections.filter((source: any) => source.type === "WMS" && source.enabled && source.layer));
       }).catch(() => {});
     void refresh();
     window.addEventListener("focus", refresh);
@@ -122,14 +126,14 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     </div>
     {layers.map(layer => <div key={layer.id} className="rounded px-2 py-1.5 text-xs hover:bg-slate-50">
       <label className="flex cursor-pointer items-center gap-2">
-        <input type="checkbox" checked={!!enabled[layer.id]} onChange={event => {
+        <input type="checkbox" disabled={!ibgeEnabled} checked={ibgeEnabled && !!enabled[layer.id]} onChange={event => {
           const checked = event.target.checked;
           setEnabled(current => ({ ...current, [layer.id]: checked }));
         }} />
         <span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: layer.color }} />
         {layer.label}
       </label>
-      {enabled[layer.id] && <OfficialLayer layer={layer} projectBounds={projectBounds} />}
+      {ibgeEnabled && enabled[layer.id] && <OfficialLayer layer={layer} projectBounds={projectBounds} />}
     </div>)}
     </div>
   </details></>;

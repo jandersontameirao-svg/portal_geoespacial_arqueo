@@ -117,20 +117,32 @@ const iphanConnection = {
   layer: "SICG:sitios,SICG:sitios_pol", enabled: true, official: true,
 };
 
+const officialConnections = [
+  iphanConnection,
+  { id: -2, name: "IBGE · Estados, municípios e localidades", type: "GeoJSON", address: "https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html", layer: "ibge", enabled: true },
+  { id: -3, name: "FUNAI/CMR · Terras indígenas", type: "WMS", address: "https://cmr.funai.gov.br/geoserver/ows", layer: "CMR-PUBLICO:lim_terra_indigena_a", enabled: false },
+  { id: -4, name: "INCRA · Territórios quilombolas", type: "Consulta oficial", address: "https://www.gov.br/incra/pt-br/assuntos/governanca-fundiaria/quilombolas", layer: "", enabled: false, status: "Serviço cartográfico indisponível na verificação." },
+  { id: -5, name: "Palmares · Comunidades quilombolas certificadas", type: "Cadastro oficial", address: "https://www.gov.br/palmares/pt-br/departamentos/protecao-preservacao-e-articulacao/certificacao-quilombola", layer: "", enabled: false, status: "Cadastro tabular, sem geometria para exibir no mapa." },
+  { id: -6, name: "ANEEL · Sistema de Informações de Geração (SIGA)", type: "Dados abertos", address: "https://dadosabertos.aneel.gov.br/dataset/siga-sistema-de-informacoes-de-geracao-da-aneel", layer: "", enabled: false, status: "SIGA disponível para consulta. Serviço cartográfico SIGEL indisponível na verificação." },
+].map(connection => ({ ...connection, official: true }));
+
 function listConnections() {
   const custom = state.connections ?? [];
-  const savedIphan = custom.find(item => item.id === iphanConnection.id);
-  return [{ ...iphanConnection, enabled: savedIphan?.enabled ?? iphanConnection.enabled },
-    ...custom.filter(item => item.id !== iphanConnection.id)];
+  return [...officialConnections.map(connection => ({
+    ...connection,
+    enabled: Boolean(connection.layer) && (custom.find(item => item.id === connection.id)?.enabled ?? connection.enabled),
+  })), ...custom.filter(item => !officialConnections.some(connection => connection.id === item.id))];
 }
 
 export async function workflow(method: string, input: Row = {}, write = false) {
   if (method === "previewConnections.list" && !write) return listConnections();
   if (method === "previewConnections.save" && write) {
     const { id, type } = input;
-    if (id === iphanConnection.id) {
-      // The official WMS address and layer names stay fixed when visibility changes.
-      const connection = { ...iphanConnection, enabled: Boolean(input.enabled) };
+    const official = officialConnections.find(connection => connection.id === id);
+    if (official) {
+      // Only visibility is configurable for the published official sources.
+      if (!official.layer) throw Error("Fonte disponível para consulta.");
+      const connection = { ...official, enabled: Boolean(input.enabled) };
       save({ ...state, connections: [...(state.connections ?? []).filter(item => item.id !== id), connection] });
       return connection;
     }
