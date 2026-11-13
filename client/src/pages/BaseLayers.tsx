@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import IbgeSourceCard from "@/components/IbgeSourceCard";
+import MapConnectionsPanel from "@/components/MapConnectionsPanel";
 import InstitutionalSourcesCard from "@/components/InstitutionalSourcesCard";
 import AneelSigaCard from "@/components/AneelSigaCard";
 import FunaiOnlineSourceCard from "@/components/FunaiOnlineSourceCard";
@@ -206,9 +207,9 @@ export default function BaseLayers() {
     <div className="container py-8">
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Camadas Base</h1>
+          <h1 className="text-3xl font-bold mb-2">Gestão e Conexões</h1>
           <p className="text-muted-foreground">
-            Gerencie camadas de dados geoespaciais de fontes oficiais brasileiras
+            Gerencie fontes de dados geoespaciais e consulte as bases oficiais.
           </p>
         </div>
         <Link href="/base-layers/viewer">
@@ -219,6 +220,8 @@ export default function BaseLayers() {
         </Link>
       </div>
 
+      <MapConnectionsPanel />
+      <h2 className="mb-4 text-xl font-semibold">Bases oficiais</h2>
       <div className="mb-6"><IbgeSourceCard /></div>
       <div className="mb-6"><InstitutionalSourcesCard /></div>
       <div className="mb-6"><AneelSigaCard /></div>

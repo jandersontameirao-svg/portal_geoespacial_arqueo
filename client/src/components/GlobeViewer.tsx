@@ -57,6 +57,7 @@ import { DEFAULT_BASEMAP, SELECTABLE_BASEMAPS } from "@/lib/basemaps";
 import LeafletDrawControl from "./LeafletDrawControl";
 import GlobalMapPanels from "./GlobalMapPanels";
 import { BaseLayerMapOverlays } from "./BaseLayersPanel";
+import ConnectionWmsLayers from "./ConnectionWmsLayers";
 import InstitutionalMapLayers, { InstitutionalLayersProvider } from "./InstitutionalMapLayers";
 import IndeGlobeLayers from "./IndeGlobeLayers";
 import {
@@ -633,6 +634,7 @@ export default function GlobeViewer({
             maxNativeZoom={activeBasemap.maxZoom}
           />
           <BaseLayerMapOverlays />
+          <ConnectionWmsLayers />
           <InstitutionalMapLayers />
           {enabledIds.map(id => (
             <ProjectLayerDataOverlays key={id} projectId={id} />
@@ -1120,13 +1122,13 @@ export default function GlobeViewer({
         {/* Busca por Coordenadas */}
         {viewMode === "2d" && (
           <CoordinateSearch
-            onNavigate={(lat, lng) => {
+            onNavigate={(lat, lng, zoom = 14) => {
               setCurrentPosition({
                 latitude: lat,
                 longitude: lng,
                 altitude: 0.5,
               });
-              setMapZoom(14);
+              setMapZoom(zoom);
             }}
           />
         )}

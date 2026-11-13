@@ -120,6 +120,13 @@
       "when": 1793813649208,
       "tag": "0016_whole_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1794600035437,
+      "tag": "0017_map_connections",
+      "breakpoints": true
     }
   ]
 }

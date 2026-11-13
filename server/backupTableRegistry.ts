@@ -32,6 +32,7 @@ export const backupTableRegistry = [
   { name: "atena_memories", primaryKey: "id" },
   { name: "atena_chat_messages", primaryKey: "id" },
   { name: "observacoes", primaryKey: "id" },
+  { name: "map_connections", primaryKey: "id" },
 ] as const;
 
 export type BackupTableName = (typeof backupTableRegistry)[number]["name"];

@@ -771,3 +771,27 @@ export const atenaChatMessages = mysqlTable("atena_chat_messages", {
 
 export type AtenaChatMessage = typeof atenaChatMessages.$inferSelect;
 export type InsertAtenaChatMessage = typeof atenaChatMessages.$inferInsert;
+
+// ============================================================================
+// Conexões de mapa — fontes externas cadastradas pelo usuário (WMS/WFS/etc.)
+// ============================================================================
+
+export const mapConnections = mysqlTable("map_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  type: mysqlEnum("type", ["WMS", "WFS", "ArcGIS REST", "GeoJSON", "PostGIS"]).notNull(),
+  address: varchar("address", { length: 500 }).notNull(),
+  // Identificador da camada WMS (workspace:camada); vazio para os demais tipos.
+  layer: varchar("layer", { length: 150 }).default("").notNull(),
+  // Só WMS com camada pode ficar ligada e aparecer no mapa.
+  enabled: boolean("enabled").default(false).notNull(),
+  createdById: int("createdById"),
+  createdByName: varchar("createdByName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  enabledIdx: index("map_connections_enabled_idx").on(table.enabled),
+}));
+
+export type MapConnection = typeof mapConnections.$inferSelect;
+export type InsertMapConnection = typeof mapConnections.$inferInsert;

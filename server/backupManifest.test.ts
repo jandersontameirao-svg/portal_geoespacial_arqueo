@@ -24,7 +24,7 @@ function fixture() {
 describe("manifesto de backup recuperável", () => {
   it("cobre todas as tabelas e inventaria os objetos referenciados", () => {
     const artifact = buildBackupArtifact(fixture(), { backupId: "fixture", createdAt: "2026-01-01T00:00:00.000Z" });
-    expect(artifact.manifest.tables).toHaveLength(28);
+    expect(artifact.manifest.tables).toHaveLength(29);
     expect(artifact.manifest.tables.find((table) => table.name === "audit_logs")?.rowCount).toBe(1);
     expect(artifact.manifest.objectReferences.map((reference) => reference.logicalKey)).toEqual([
       "synthetic/atlas/1.pdf",
