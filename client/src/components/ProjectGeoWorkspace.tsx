@@ -410,6 +410,19 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
     },
     onError: (error) => toast.error(error.message),
   });
+  const exportVectorFile = trpc.gisAnalysis.exportVectorLayerFile.useMutation({
+    onSuccess: ({ base64, filename, mimeType }) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+      const link = Object.assign(document.createElement("a"), { href: url, download: filename });
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Camada exportada: " + filename);
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const importWfsLayer = trpc.ogcCatalog.importWfsToProject.useMutation({
     onSuccess: async (result) => {
       await invalidate();
@@ -595,7 +608,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
         </Card>
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Árvore temática e legenda</CardTitle><CardDescription>Olho controla visualização; “usar na análise” é independente e só se aplica a vetores próprios.</CardDescription></CardHeader>
-          <CardContent className="space-y-3">{geometriesLoading || layersLoading || rastersLoading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : <ThematicLayerTree items={thematicItems} order={thematicOrder} disabled={!canEdit} onVisibilityChange={toggleThematicVisibility} onAnalysisSelectionChange={toggleThematicAnalysis} onMove={moveThematicLayer} />}{selectedVectorLayerIds.length > 0 && <Button variant="outline" className="w-full" disabled={exportVectorLayer.isPending} onClick={() => exportVectorLayer.mutate({ projectId, layerId: selectedVectorLayerIds[0] })}><Download className="mr-2 h-4 w-4" />Exportar primeiro vetor selecionado</Button>}<p className="text-xs text-muted-foreground">A ordem é visual nesta sessão; visibilidade de camadas próprias é persistida e auditada. WFS exige importação controlada antes de análise.</p></CardContent>
+          <CardContent className="space-y-3">{geometriesLoading || layersLoading || rastersLoading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : <ThematicLayerTree items={thematicItems} order={thematicOrder} disabled={!canEdit} onVisibilityChange={toggleThematicVisibility} onAnalysisSelectionChange={toggleThematicAnalysis} onMove={moveThematicLayer} />}{selectedVectorLayerIds.length > 0 && <div className="space-y-1"><p className="text-xs font-medium">Exportar primeiro vetor selecionado</p><div className="grid grid-cols-2 gap-1.5">{([["geojson", "GeoJSON"], ["shp", "Shapefile"], ["kml", "KML"], ["gpx", "GPX"]] as const).map(([format, label]) => <Button key={format} size="sm" variant="outline" disabled={exportVectorFile.isPending} onClick={() => exportVectorFile.mutate({ projectId, layerId: selectedVectorLayerIds[0], format })}><Download className="mr-1.5 h-3.5 w-3.5" />{label}</Button>)}</div></div>}<p className="text-xs text-muted-foreground">A ordem é visual nesta sessão; visibilidade de camadas próprias é persistida e auditada. WFS exige importação controlada antes de análise.</p></CardContent>
         </Card>
 
         {hasIbgeWfs && <Card><CardHeader className="pb-3"><CardTitle className="text-base">IBGE WFS · consulta temporária</CardTitle></CardHeader><CardContent><p className="text-xs text-muted-foreground">Use o painel GeoServer do globo em 2D e clique em Consultar recorte. As feições ficam apenas em memória; importação persistente e análise de IBGE não estão disponíveis neste workspace.</p></CardContent></Card>}

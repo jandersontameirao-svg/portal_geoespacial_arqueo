@@ -70,7 +70,7 @@ describe("map print layout versioned namespace", () => {
       null,
       [],
       {},
-      { ...config(), paper: "A2" },
+      { ...config(), paper: "A5" },
       { ...config(), orientation: "diagonal" },
       { ...config(), signature: "future" },
       { ...config(), elements: { legend: "yes" } },

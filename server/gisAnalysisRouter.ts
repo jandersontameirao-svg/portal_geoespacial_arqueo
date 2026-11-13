@@ -5,6 +5,7 @@ import * as db from "./db";
 import { executeAnalysis, type AnalysisOperation } from "./gisAnalysis";
 import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
 import { isPromotableVectorLayer, vectorFeaturesFromLayer } from "./vectorLayerPromotion";
+import { exportVector, isVectorExportFormat, VectorExportError } from "./vectorExportService";
 
 const operationSchema = z.enum(["buffer", "intersection", "union", "clip", "overlay", "grid", "area"]);
 
@@ -170,6 +171,46 @@ export const gisAnalysisRouter = router({
         data: JSON.stringify(layer.layerData, null, 2),
         filename: `${layer.name.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 100) || "camada"}.geojson`,
       };
+    }),
+
+  exportVectorLayerFile: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      layerId: z.number(),
+      format: z.enum(["geojson", "shp", "kml", "gpx"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireProjectAccess(input.projectId, ctx.user);
+      const layer = await db.getLayerById(input.layerId);
+      if (!layer || layer.projectId !== input.projectId || layer.layerType !== "vector" || !isPromotableVectorLayer(layer.layerData)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Camada vetorial do projeto não encontrada" });
+      }
+      if (!isVectorExportFormat(input.format)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Formato de exportação não suportado." });
+      }
+      const vector = { features: vectorFeaturesFromLayer(layer.layerData) };
+      let file;
+      try {
+        file = await exportVector(layer.name, vector, input.format);
+      } catch (error) {
+        throw new TRPCError({
+          code: error instanceof VectorExportError ? "BAD_REQUEST" : "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Falha ao exportar a camada.",
+        });
+      }
+      await db.createAuditLog({
+        userId: ctx.user.id,
+        userEmail: ctx.user.email || null,
+        userName: ctx.user.name || null,
+        action: "gis.vector_layer.export_file",
+        entityType: "layer",
+        entityId: input.layerId,
+        projectId: input.projectId,
+        details: { format: input.format, featureCount: vector.features.length },
+        ipAddress: ctx.req.ip || null,
+        userAgent: ctx.req.headers?.["user-agent"] || null,
+      });
+      return { filename: file.name, mimeType: file.type, base64: file.body.toString("base64") };
     }),
 
   execute: protectedProcedure
