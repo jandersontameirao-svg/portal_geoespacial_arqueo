@@ -84,7 +84,12 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
       }).catch(() => {});
     void refresh();
     window.addEventListener("focus", refresh);
-    return () => { controller.abort(); window.removeEventListener("focus", refresh); };
+    window.addEventListener("preview-connections-changed", refresh);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("preview-connections-changed", refresh);
+    };
   }, []);
   useEffect(() => {
     const control = controlRef.current;

@@ -111,10 +111,29 @@ function saveAnalysis(projectId: number, name: string, vector: Row) {
   return { id: file.id, name, result: { output: vector } };
 }
 
+const iphanConnection = {
+  id: -1, name: "IPHAN · Sítios arqueológicos (SICG)", type: "WMS",
+  address: "https://geoserver.iphan.gov.br/geoserver/SICG/wms",
+  layer: "SICG:sitios,SICG:sitios_pol", enabled: true, official: true,
+};
+
+function listConnections() {
+  const custom = state.connections ?? [];
+  const savedIphan = custom.find(item => item.id === iphanConnection.id);
+  return [{ ...iphanConnection, enabled: savedIphan?.enabled ?? iphanConnection.enabled },
+    ...custom.filter(item => item.id !== iphanConnection.id)];
+}
+
 export async function workflow(method: string, input: Row = {}, write = false) {
-  if (method === "previewConnections.list" && !write) return state.connections ?? [];
+  if (method === "previewConnections.list" && !write) return listConnections();
   if (method === "previewConnections.save" && write) {
     const { id, type } = input;
+    if (id === iphanConnection.id) {
+      // The official WMS address and layer names stay fixed when visibility changes.
+      const connection = { ...iphanConnection, enabled: Boolean(input.enabled) };
+      save({ ...state, connections: [...(state.connections ?? []).filter(item => item.id !== id), connection] });
+      return connection;
+    }
     const name = String(input.name ?? "").trim(), address = String(input.address ?? "").trim();
     if (!name || name.length > 100 || !address || address.length > 500 ||
         !["WMS", "WFS", "ArcGIS REST", "GeoJSON", "PostGIS"].includes(type)) throw Error("Confira o nome, o tipo e o endereço da fonte.");
