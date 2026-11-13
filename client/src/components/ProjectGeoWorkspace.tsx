@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import IbgeLocalLayers from "./IbgeLocalLayers";
-import { FeatureGroup, GeoJSON, MapContainer, Marker, Pane as MapPane, Polygon, Polyline, Popup, TileLayer, useMap, WMSTileLayer } from "react-leaflet";
+import { FeatureGroup, GeoJSON, MapContainer, Marker, Pane as MapPane, Polygon, Polyline, Popup, TileLayer, Tooltip, useMap, WMSTileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -568,6 +568,17 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
                 onEachFeature={(feature, leafletLayer) => leafletLayer.bindPopup(`<strong>${escapePopupText(layer.name)}</strong><br/>${escapePopupText(feature.properties?.name || "Feição importada")}`)}
               />
             ))}
+            {projectVectorLayers.filter((layer) => layer.isVisible).flatMap((layer) =>
+              layer.layerData.features.flatMap((feature) => {
+                const props = feature.properties as (Record<string, unknown> | null);
+                const anchor = props?.rotulo_ibge as number[] | undefined;
+                if (!Array.isArray(anchor) || !props?.nome || props.fonte !== "IBGE 2024") return [];
+                return [<Marker key={String(props.codigo_ibge)} position={[anchor[1], anchor[0]]} interactive={false}
+                  icon={L.divIcon({ className: "municipio-anchor", iconSize: [0, 0] })}>
+                  <Tooltip permanent direction="center" className="municipio-ibge-label">{String(props.nome)}</Tooltip>
+                </Marker>];
+              })
+            )}
             <FeatureGroup ref={setEditableLayers}>
               {canEdit && editableLayers && <LeafletDrawControl
                 featureGroup={editableLayers}

@@ -46,6 +46,16 @@ export default function ProjectDetail() {
     { enabled: isAuthenticated && projectId > 0 }
   );
 
+  // Registra o projeto aberto na lista de recentes (ordena "Meus Projetos" na home).
+  useEffect(() => {
+    if (!project || project.id !== projectId || !user?.id) return;
+    try {
+      const key = "preview-recent-projects:" + user.id;
+      const recent = JSON.parse(localStorage.getItem(key) || "[]") as number[];
+      localStorage.setItem(key, JSON.stringify([projectId, ...recent.filter((id) => id !== projectId)].slice(0, 100)));
+    } catch { /* navegação funciona sem armazenamento */ }
+  }, [project?.id, projectId, user?.id]);
+
   const { data: members, isLoading: membersLoading, refetch: refetchMembers } = trpc.projects.listMembers.useQuery(
     { projectId },
     { enabled: isAuthenticated && projectId > 0 }

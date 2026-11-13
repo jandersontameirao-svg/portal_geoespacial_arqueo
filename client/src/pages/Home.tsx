@@ -377,7 +377,11 @@ export default function Home() {
                         </div>
                       ) : projects && projects.length > 0 ? (
                         <div className="space-y-1.5">
-                          {projects.slice(0, 4).map(project => (
+                          {[...projects].sort((a, b) => {
+                            const recent = previewRecentProjects(user?.id);
+                            const rank = (id: number) => recent.indexOf(id) === -1 ? Infinity : recent.indexOf(id);
+                            return rank(a.id) - rank(b.id);
+                          }).slice(0, 4).map(project => (
                             <Link
                               key={project.id}
                               href={`/projects/${project.id}`}
@@ -456,10 +460,20 @@ export default function Home() {
                 : "left-0"
             }`}
           >
-            <GlobeViewer projectId={contextualProjectId} />
+            <GlobeViewer key={contextualProjectId ?? "global"} projectId={contextualProjectId} />
+            {contextualProjectId && new URLSearchParams(search).has("voltar") && (
+              <a className="absolute bottom-10 left-4 z-[600] rounded-md border bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow hover:bg-slate-50" href={"/projects/" + contextualProjectId + "?tab=" + (["members", "files", "history", "map"].find((tab) => tab === new URLSearchParams(search).get("voltar")) ?? "map")}>
+                ← Voltar ao projeto
+              </a>
+            )}
           </div>
         </div>
       </div>
     </TooltipProvider>
   );
+}
+
+function previewRecentProjects(userId?: number): number[] {
+  try { return JSON.parse(localStorage.getItem("preview-recent-projects:" + userId) || "[]"); }
+  catch { return []; }
 }
