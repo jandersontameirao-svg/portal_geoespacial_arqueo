@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock,
 type Box = { x: number; y: number; w: number; h: number };
 const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
 type ElementId = keyof typeof names;
-type View = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number }> };
+type View = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number; east?: number; north?: number }> };
 const papers = ["A4", "A3", "A2", "A1", "A0"] as const;
 type Product = {
   paper: Paper;
@@ -12,7 +12,7 @@ type Product = {
   id: string; title: string; columns: number; rows: number; overlap: number; grid: number;
   scale?: number; locks?: ElementId[]; layerIds: number[]; layout: Record<ElementId, Box>; view: View;
 };
-type Review = { scale: number; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
+type Review = { scale: number; insetScales: Record<"brasil" | "regional", number>; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
 type Layer = { id: number; name: string };
 const elements = Object.keys(names) as ElementId[];
 const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -189,7 +189,7 @@ export default function PreviewMapProducts() {
     if (!draft || saving || event.button !== 0 || (kind !== 'pan' && draft.locks?.includes(id))) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     selectElement(id);
-    drag.current = { x:event.clientX, y:event.clientY, kind, id, initial:draft, scale:(review?.scale ?? 0)*factor };
+    drag.current = { x:event.clientX, y:event.clientY, kind, id, initial:draft, scale:(scaleFor(id) ?? 0)*factor };
   }
   function move(event: PointerEvent<HTMLButtonElement>) {
     const action = drag.current, bounds = sheet.current?.getBoundingClientRect();
@@ -208,10 +208,12 @@ export default function PreviewMapProducts() {
       if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
       else dx = 0;
     }
+    const origin = action.id === "brasil" || action.id === "regional" ? action.initial.view.insets[action.id] : action.initial.view;
+    const limit = action.id === "principal" ? 500000 : 10000000;
     let next: NonNullable<typeof gesture> = action.kind === "pan" ? {
       offset: {
-        east: Math.max(-500000,Math.min(500000,Math.round(action.initial.view.east-dx*action.scale/1000))),
-        north: Math.max(-500000,Math.min(500000,Math.round(action.initial.view.north+dy*action.scale/1000))),
+        east: Math.max(-limit,Math.min(limit,Math.round((origin.east ?? 0)-dx*action.scale/1000))),
+        north: Math.max(-limit,Math.min(limit,Math.round((origin.north ?? 0)+dy*action.scale/1000))),
       },
     } : action.kind === "resize" ? { box: fitBox({ ...box, w:box.w+dx, h:box.h+dy },format) } :
       { box: fitBox({ ...box, x:Math.min(format.width-box.w,box.x+dx), y:Math.min(format.height-box.h,box.y+dy) },format) };
@@ -235,7 +237,7 @@ export default function PreviewMapProducts() {
     latestGesture.current = undefined;
     setGesture(undefined);
     if (!commit || !action || !pending) return;
-    if (pending.offset) change({ ...action.initial, view: { ...action.initial.view, ...pending.offset } });
+    if (pending.offset) updateMap(action.initial,action.id,pending.offset);
     if (pending.box) change({ ...action.initial, layout: { ...action.initial.layout, [action.id]:pending.box } });
   }
 
@@ -342,10 +344,27 @@ export default function PreviewMapProducts() {
   const order = [...layers].filter(layer => layer.id !== -21 || (active === "uso-solo" && !inset))
     .sort((a,b) => (layerIds?.indexOf(b.id) ?? -1) - (layerIds?.indexOf(a.id) ?? -1));
   const selection = draft?.layout[element];
-  const viewScale = review?.scale;
-  const canPan = active === "mapa" && !!viewScale;
+  function scaleFor(id: ElementId) {
+    if (id === "brasil" || id === "regional") return draft?.view.insets[id].scale ?? review?.insetScales?.[id];
+    return draft?.scale ?? review?.scale;
+  }
+  function updateMap(product: Product, id: ElementId, offset?: {east:number; north:number}, scale?: number) {
+    if (id === "brasil" || id === "regional") {
+      const current = product.view.insets[id];
+      change({ ...product, view:{ ...product.view, insets:{ ...product.view.insets,
+        [id]:{ ...current, ...offset, scale:scale ?? current.scale },
+      } } });
+    } else {
+      change({ ...product, scale:scale ?? product.scale, view:{ ...product.view, ...offset } });
+    }
+  }
+  const mapElement = inset ?? "principal";
+  const viewScale = scaleFor(mapElement);
+  const canPan = !atlas || !!inset;
+  const mapBox = draft?.layout[mapElement];
+  const mapOffset = draft ? inset ? draft.view.insets[inset] : draft.view : undefined;
   const delta = gesture?.offset && draft && viewScale
-    ? { x:(draft.view.east-gesture.offset.east)*1000/(viewScale*factor), y:(gesture.offset.north-draft.view.north)*1000/(viewScale*factor) }
+    ? { x:((mapOffset?.east ?? 0)-gesture.offset.east)*1000/(viewScale*factor), y:(gesture.offset.north-(mapOffset?.north ?? 0))*1000/(viewScale*factor) }
     : undefined;
 
   return <section onKeyDown={keyboard} aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
@@ -417,7 +436,7 @@ export default function PreviewMapProducts() {
         <div className="min-w-0 bg-slate-100 dark:bg-slate-800">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
             {(["layout","view","proof"] as const).map(tab => <button key={tab} type="button" className={button + (mode === tab ? " bg-emerald-100 text-emerald-950 dark:text-white dark:bg-emerald-900" : "")}
-              aria-pressed={mode === tab} disabled={tab === "view" && !canPan} onClick={() => { setMode(tab); if (tab === "view") selectElement("principal"); }}>
+              aria-pressed={mode === tab} disabled={tab === "view" && active === "atlas" && currentPage === 0} onClick={() => { setMode(tab); if (tab === "view" && !inset) selectElement("principal"); }}>
               {{ layout:"Layout", view:"Enquadrar", proof:"Prova" }[tab]}
             </button>)}
             <button type="button" className={button} aria-label="Desfazer" disabled={!entries.past.length} onClick={() => undo()}><Undo2 size={15} /></button>
@@ -430,6 +449,17 @@ export default function PreviewMapProducts() {
               <button type="button" className={button} aria-label="Ajustar folha à tela" onClick={() => setZoom(100)}><Maximize size={14}/></button>
             </div>
           </div>
+          {mode === "view" && <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-xs">
+            <label>Quadro <select className="rounded border px-2 py-1 dark:bg-slate-900" value={mapElement} onChange={event => selectElement(event.target.value as ElementId)}>
+              {(["principal","brasil","regional"] as const).map(id => <option key={id} value={id}>{names[id]}</option>)}
+            </select></label>
+            <button type="button" className={button} aria-label="Aproximar mapa" disabled={!viewScale || viewScale <= 1000}
+              onClick={() => updateMap(draft,mapElement,undefined,Math.max(1000,Math.round(viewScale! / 1.25)))}><Plus size={14}/></button>
+            <button type="button" className={button} aria-label="Afastar mapa" disabled={!viewScale || viewScale >= (inset ? 500000000 : 10000000)}
+              onClick={() => updateMap(draft,mapElement,undefined,Math.min(inset ? 500000000 : 10000000,Math.round(viewScale! * 1.25)))}><Minus size={14}/></button>
+            {viewScale && <span>1:{number(viewScale)}</span>}
+            {atlas && !inset && <span>O enquadramento segue as folhas do atlas.</span>}
+          </div>}
           <div className="arqueo-studio-canvas min-h-56 overflow-auto p-5" style={{ maxHeight: "70vh" }}>
             <div className="mx-auto" style={{ width: zoom + "%" }}>
               {mode !== "proof" && draft.paper === "A2" && <div aria-hidden="true" className="relative mb-1 h-4 border-b border-slate-400 font-mono text-[9px]">{
@@ -454,10 +484,10 @@ export default function PreviewMapProducts() {
                 })}
                 {gesture?.guideX !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-10 border-l border-dashed border-fuchsia-600" style={{ left:gesture.guideX/format.width*100+"%" }} />}
                 {gesture?.guideY !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-fuchsia-600" style={{ top:gesture.guideY/format.height*100+"%" }} />}
-                {mode === "view" && canPan && <button type="button" aria-label="Arrastar enquadramento do mapa principal"
+                {mode === "view" && canPan && mapBox && !!viewScale && <button type="button" aria-label={"Arrastar enquadramento: " + names[mapElement]}
                   className="absolute cursor-grab touch-none border border-dashed border-emerald-600 active:cursor-grabbing"
-                  style={{ left: (draft.layout.principal.x+(delta?.x ?? 0))/format.width*100+"%", top: (draft.layout.principal.y+(delta?.y ?? 0))/format.height*100+"%", width: draft.layout.principal.w/format.width*100+"%", height:draft.layout.principal.h/format.height*100+"%" }}
-                  onPointerDown={event => start(event,"principal","pan")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} />}
+                  style={{ left: (mapBox.x+(delta?.x ?? 0))/format.width*100+"%", top: (mapBox.y+(delta?.y ?? 0))/format.height*100+"%", width: mapBox.w/format.width*100+"%", height:mapBox.h/format.height*100+"%" }}
+                  onPointerDown={event => start(event,mapElement,"pan")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} />}
               </div>
             </div>
           </div>
@@ -535,7 +565,7 @@ export default function PreviewMapProducts() {
                   onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>)}
             </div>
             </details>
-            {inset === "regional" && <label className="mt-3 block text-xs">Escala do quadro 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"
+            {inset && <label className="mt-3 block text-xs">Escala do quadro 1:<input className={input} type="number" min={1000} max={500000000} placeholder="Automática"
               value={draft.view.insets[inset].scale ?? ""} onChange={event => change({ ...draft, view:{ ...draft.view, insets:{
                 ...draft.view.insets, [inset]:{ ...draft.view.insets[inset], scale:event.target.value ? event.target.valueAsNumber : undefined },
               } } })} /></label>}
@@ -554,8 +584,8 @@ export default function PreviewMapProducts() {
             </details>}
             {mode === "layout" && <p className="mt-2 text-xs text-slate-500">Setas movem 1 mm. Shift + setas movem 5 mm. Shift no arraste restringe o eixo ou mantém a proporção.</p>}
             </>}
-            {canPan && element === "principal" && <button type="button" className="mt-3 text-xs underline" disabled={!draft.view.east && !draft.view.north}
-              onClick={() => change({ ...draft, view:{ ...draft.view, east:0, north:0 } })}>Restaurar enquadramento</button>}
+            {canPan && (element === "principal" || inset) && <button type="button" className="mt-3 text-xs underline" disabled={!mapOffset?.east && !mapOffset?.north}
+              onClick={() => updateMap(draft,mapElement,{east:0,north:0})}>Restaurar enquadramento</button>}
           </div>
           <div className="rounded-md bg-slate-100 p-3 text-xs dark:bg-slate-800">
             <div className="mb-1 font-semibold">Revisão técnica</div>

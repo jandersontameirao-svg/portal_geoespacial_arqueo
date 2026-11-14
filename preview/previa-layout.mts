@@ -36,13 +36,13 @@ export function readLayout(value: unknown, orientation: Orientation = "landscape
   }
   return result;
 }
-export function readScale(value: unknown): number | undefined {
+export function readScale(value: unknown, maximum = 10000000): number | undefined {
   if (value == null || value === "") return;
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1000 || value > 10000000) throw Error("Use uma escala entre 1:1.000 e 1:10.000.000.");
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1000 || value > maximum) throw Error("Use uma escala entre 1:1.000 e 1:" + maximum.toLocaleString("pt-BR") + ".");
   return value;
 }
 
-export type StudioView = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number }> };
+export type StudioView = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number; east?: number; north?: number }> };
 export function readStudioView(value: unknown): StudioView {
   if (value === undefined) return { east: 0, north: 0, labels: true, insets: { brasil: {}, regional: {} } };
   const view = value as StudioView;
@@ -53,7 +53,8 @@ export function readStudioView(value: unknown): StudioView {
     const inset = view.insets[key];
     if (!inset || (inset.layers !== undefined && (!Array.isArray(inset.layers) || inset.layers.length > 40 || !inset.layers.every(Number.isInteger))))
       throw Error("Camadas do mapa de situação inválidas.");
-    insets[key] = { layers: inset.layers, scale: readScale(inset.scale) };
+    if (![inset.east ?? 0, inset.north ?? 0].every(n => Number.isFinite(n) && Math.abs(n) <= 10000000)) throw Error("Enquadramento do quadro inválido.");
+    insets[key] = { layers: inset.layers, scale: readScale(inset.scale, 500000000), east:inset.east, north:inset.north };
   }
   return { east: view.east, north: view.north, labels: view.labels, insets };
 }

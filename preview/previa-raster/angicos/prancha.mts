@@ -46,6 +46,24 @@ function extent(layers: Layer[]) {
   return { left, right, bottom, top };
 }
 
+const brazilProjection = proj4("EPSG:4326", "+proj=lcc +lat_1=-5 +lat_2=-25 +lat_0=-14 +lon_0=-54 +ellps=GRS80 +units=m +no_defs");
+const overviewExtents = { brasil: [-74,-34,-34,6], regional: [-41.8,-8.5,-34.6,-2.2] } as const;
+
+function overviewView(key: "brasil" | "regional", options: Options) {
+  const layout = options.layout ?? defaultLayout;
+  const box = layout[key];
+  const [west,south,east,north] = overviewExtents[key];
+  const projection = key === "brasil" ? brazilProjection : utm;
+  const corners: Point[] = [[west,south],[west,north],[east,south],[east,north]];
+  const points = corners.map(point => projection.forward(point) as Point);
+  const xs = points.map(point => point[0]), ys = points.map(point => point[1]);
+  const left = Math.min(...xs), right = Math.max(...xs), bottom = Math.min(...ys), top = Math.max(...ys);
+  const inset = options.view?.insets[key];
+  const heading = Math.min(7,box.h*.2), height = box.h-heading;
+  const scale = inset?.scale ?? Math.ceil(Math.max((right-left)/box.w,(top-bottom)/height)*1080/paperFactor(options.paper ?? "A2"));
+  return { projection, scale, heading, height, center: [(left+right)/2+(inset?.east ?? 0),(top+bottom)/2+(inset?.north ?? 0)] };
+}
+
 function mapView(layers: Layer[], options: Options) {
   const frame = options.layout?.principal ?? defaultFrame;
   const focus = options.model === "detalhe" || options.model === "uso-solo"
@@ -56,7 +74,10 @@ function mapView(layers: Layer[], options: Options) {
   if (options.model === "detalhe") {
     const axis = focus[0]?.layerData.features.find(feature => feature.geometry.type === "LineString");
     const points: Point[] = axis?.geometry.coordinates ?? [];
-    if (points.length) return { center: utm.forward(points[Math.floor(points.length / 2)]) as Point, scale };
+    if (points.length) {
+      const [x,y] = utm.forward(points[Math.floor(points.length / 2)]);
+      return { center: [x+(options.view?.east ?? 0),y+(options.view?.north ?? 0)] as Point, scale };
+    }
   }
   return { center, scale };
 }
@@ -211,20 +232,18 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   const tip: Point = [nx+Math.sin(direction)*northH*.5, ny-Math.cos(direction)*northH*.5];
   path([[[nx-northW*.15,ny],tip,[nx+northW*.15,ny],[nx,ny-northH*.1]]],true,ink,ink,.2);
   label(tip[0],tip[1]-1,"N",Math.min(northH*.22,northW*.4),true,true);
-  const overview = (title: string, box: Layout["brasil"], extent: [number,number,number,number], national: boolean) => {
-    const [west,south,east,north] = extent;
+  const overview = (title: string, box: Layout["brasil"], national: boolean) => {
     const { x, y, w: width } = box;
-    const heading = Math.min(7,box.h*.2), height = box.h-heading, top = y+heading;
-    const overviewFactor = Math.min(width/(east-west),height/(north-south));
-    const inset = options.view?.insets[national ? "brasil" : "regional"];
-    const insetCenter = utm.forward(national ? [-54,-14] : [lon,lat]);
+    const key = national ? "brasil" : "regional";
+    const { heading,height,scale,center:insetCenter,projection } = overviewView(key,options);
+    const top = y+heading;
+    const inset = options.view?.insets[key];
     const project = ([lo,la]: Point): Point => {
-      if (!inset?.scale || national) return [x+width/2+(lo-(east+west)/2)*overviewFactor,top+height/2-(la-(south+north)/2)*overviewFactor];
-      const [e,n] = utm.forward([lo,la]);
-      return [x+width/2+(e-insetCenter[0])*1000/(inset.scale*factor), top+height/2-(n-insetCenter[1])*1000/(inset.scale*factor)];
+      const [e,n] = projection.forward([lo,la]);
+      return [x+width/2+(e-insetCenter[0])*1000/(scale*factor), top+height/2-(n-insetCenter[1])*1000/(scale*factor)];
     };
     rect(x,y,width,box.h,"#ffffff");
-    label(x+1,y+heading*.72,inset?.scale && !national ? title + ' · 1:' + inset.scale.toLocaleString('pt-BR') : title,Math.min(3.5,width/Math.max(8,title.length*.58),heading*.7),true);
+    label(x+1,y+heading*.72,title + ' · 1:' + scale.toLocaleString('pt-BR'),Math.min(3.5,width/Math.max(8,title.length*.58),heading*.7),true);
     rect(x,top,width,height,"#e8f0f2");
     clip(x,top,width,height,() => {
       drawFeatures(states,project,"#909b91","#efeee6",.13);
@@ -243,8 +262,8 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     rect(x,top,width,height);
   };
   if (!portrait) for (const y of [200,269,296,325,372]) line(474,y,584,y);
-  overview("Brasil",layout.brasil,[-74,-34,-34,6],true);
-  overview("Região do empreendimento",layout.regional,[-41.8,-8.5,-34.6,-2.2],false);
+  overview("Brasil",layout.brasil,true);
+  overview("Região do empreendimento",layout.regional,false);
   const legend = layout.legenda, rowHeight = legend.h / (layers.length+1+(options.raster?.legend.length ?? 0));
   const lx = legend.x + legend.w*.025, symbol = legend.w*.07;
   rect(legend.x,legend.y,legend.w,legend.h,"#ffffff");
@@ -417,5 +436,5 @@ export function studioReview(layers: Layer[], sheets: Sheet[] | undefined, optio
       warnings.push("O quadro principal corta parte da área de referência.");
   }
   if (options.model === "uso-solo") warnings.push("O detalhe do MapBiomas depende da resolução dos blocos publicados.");
-  return { scale, sheets: sheets?.length ?? 0, warnings, widthKm: frame.w*scale*factor/1e6, heightKm: frame.h*scale*factor/1e6 };
+  return { scale, insetScales: { brasil:overviewView("brasil",options).scale, regional:overviewView("regional",options).scale }, sheets: sheets?.length ?? 0, warnings, widthKm: frame.w*scale*factor/1e6, heightKm: frame.h*scale*factor/1e6 };
 }
