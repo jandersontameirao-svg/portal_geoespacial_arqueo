@@ -81,6 +81,7 @@ type MapSource = { id: number; name: string; address: string; layer: string; typ
 
 const childNames: Record<string, string> = {
   canie_052026_p: "Cavidades naturais subterrâneas",
+  mapbiomas2024: "Cobertura e uso da terra · Brasil (2024)",
   worldcover: "Classes de cobertura do solo · recorte da LT",
   sombreado: "Relevo sombreado",
   elevacao: "Elevação (m)",
@@ -201,6 +202,45 @@ function ArcGisTiles({ source }: { source: MapSource }) {
   return null;
 }
 
+function MapBiomasTiles({ url }: { url: string }) {
+  const map = useMap();
+  useEffect(() => {
+    const grid = L.gridLayer({ opacity: 0.72, noWrap: true, minNativeZoom: 4, maxNativeZoom: 9,
+      bounds: L.latLngBounds([-36.06, -79.12], [6.84, -32.39]),
+      attribution: "MapBiomas Brasil 2024 · Imagem/ArcGIS · CC BY 4.0" });
+    grid.createTile = ({ x, y, z }: L.Coords, done: L.DoneCallback) => {
+      const tile = document.createElement("canvas");
+      tile.width = tile.height = 256;
+      tile.className = "preview-mapbiomas";
+      const ctx = tile.getContext("2d")!;
+      ctx.imageSmoothingEnabled = false;
+      const rows = new Map<number, [number, number][]>();
+      // The geographic cache starts at (-180, 180). Longitude already aligns
+      // with Leaflet; sample latitude per pixel to reproject to Web Mercator.
+      for (let py = 0; py < 256; py++) {
+        const { lat } = map.unproject(L.point(x * 256, y * 256 + py + 0.5), z);
+        const sy = (180 - lat) * 2 ** z / 360;
+        const row = Math.floor(sy);
+        if (!rows.has(row)) rows.set(row, []);
+        rows.get(row)!.push([py, Math.floor((sy - row) * 256)]);
+      }
+      void Promise.all([...rows].map(([row, pixels]) => new Promise<boolean>(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          for (const [py, sy] of pixels) ctx.drawImage(img, 0, sy, 256, 1, 0, py, 256, 1);
+          resolve(true);
+        };
+        img.onerror = () => resolve(false);
+        img.src = url + "/tile/" + z + "/" + row + "/" + x;
+      }))).then(results => done(results.some(Boolean) ? undefined : new Error("MapBiomas: tile indisponível"), tile));
+      return tile;
+    };
+    grid.addTo(map);
+    return () => { grid.remove(); };
+  }, [map, url]);
+  return null;
+}
+
 export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: string }) {
   const map = useMap();
   const controlRef = useRef<HTMLDetailsElement>(null);
@@ -281,6 +321,8 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
   {sources.map(source => source.type === "ArcGIS REST"
     ? <ArcGisTiles key={source.id} source={source} />
     : <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
+  {active.filter(source => source.type === "ArcGIS cache SIRGAS 2000" && selectedFor(source).includes("mapbiomas2024")).map(source =>
+    <MapBiomasTiles key={source.id} url={source.address} />)}
   <details ref={controlRef} className="preview-ibge-control" onKeyDown={event => {
     if (event.key === "Escape" && event.currentTarget.open) {
       event.stopPropagation();

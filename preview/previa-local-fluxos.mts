@@ -119,6 +119,11 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  { id: -21, name: "MapBiomas Brasil · 2024", type: "ArcGIS cache SIRGAS 2000",
+    address: "https://tiles.arcgis.com/tiles/qFQYQQeTXZSPY7Fs/arcgis/rest/services/MapBiomas_Mapas_de_Cobertura_do_Solo/MapServer",
+    layer: "mapbiomas2024", enabled: false, group: "uso-solo",
+    status: "Cobertura nacional de 2024 · serviço público da Imagem/ArcGIS (beta, CC BY 4.0).",
+  },
   { id: -20, name: "ESA WorldCover · Cobertura do solo (2021)", type: "Raster local",
     address: "https://esa-worldcover.org/en/data-access", layer: "worldcover",
     enabled: false, group: "uso-solo", status: "Recorte da LT Angicos–Jaguaruana II." },
