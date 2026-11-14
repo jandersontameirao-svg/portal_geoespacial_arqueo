@@ -14,6 +14,8 @@ type Product = {
 };
 type Review = { scale: number; insetScales: Record<"brasil" | "regional", number>; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
 type Layer = { id: number; name: string };
+const mapFrames = ["principal","brasil","regional"] as const;
+type MapFrame = typeof mapFrames[number];
 const elements = Object.keys(names) as ElementId[];
 const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const input = "mt-1 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white";
@@ -361,8 +363,45 @@ export default function PreviewMapProducts() {
   const mapElement = inset ?? "principal";
   const viewScale = scaleFor(mapElement);
   const canPan = !atlas || !!inset;
-  const mapBox = draft?.layout[mapElement];
   const mapOffset = draft ? inset ? draft.view.insets[inset] : draft.view : undefined;
+  function zoomFeatures(id: MapFrame, zoomIn: boolean, anchor?: {x:number; y:number}) {
+    if (!draft || saving || drag.current) return;
+    const before = scaleFor(id);
+    if (!before) return;
+    const maximum = id === "principal" ? 10000000 : 500000000;
+    const after = Math.max(1000,Math.min(maximum,Math.round(before*(zoomIn ? .8 : 1.25))));
+    if (after === before) return;
+    const offset = id === "principal" ? draft.view : draft.view.insets[id];
+    const limit = id === "principal" ? 500000 : 10000000;
+    const clamp = (value:number) => Math.max(-limit,Math.min(limit,Math.round(value)));
+    const shift = anchor && (id !== "principal" || !atlas)
+      ? { east:clamp((offset.east ?? 0)+anchor.x*(before-after)*factor/1000),
+          north:clamp((offset.north ?? 0)-anchor.y*(before-after)*factor/1000) } : undefined;
+    updateMap(draft,id,shift,after);
+  }
+  const wheelZoom = useRef<(event: WheelEvent) => void>(() => {});
+  wheelZoom.current = event => {
+    if (mode !== "view" || !draft || !event.deltaY || !(event.target instanceof Element)) return;
+    const target = event.target.closest<HTMLElement>("[data-map-frame]");
+    const id = target?.dataset.mapFrame as MapFrame | undefined;
+    if (!target || !id) return;
+    event.preventDefault();
+    const bounds = target.getBoundingClientRect(), box = draft.layout[id];
+    const heading = id === "principal" ? 0 : Math.min(7,box.h*.2);
+    selectElement(id);
+    zoomFeatures(id,event.deltaY < 0,{
+      x:(event.clientX-bounds.left)/bounds.width*box.w-box.w/2,
+      y:(event.clientY-bounds.top)/bounds.height*box.h-(box.h+heading)/2,
+    });
+  };
+  const hasSheet = Boolean(draft);
+  useEffect(() => {
+    const node = sheet.current;
+    if (!hasSheet || !node) return;
+    const handler = (event: WheelEvent) => wheelZoom.current(event);
+    node.addEventListener("wheel",handler,{ passive:false });
+    return () => node.removeEventListener("wheel",handler);
+  },[hasSheet]);
   const delta = gesture?.offset && draft && viewScale
     ? { x:((mapOffset?.east ?? 0)-gesture.offset.east)*1000/(viewScale*factor), y:(gesture.offset.north-(mapOffset?.north ?? 0))*1000/(viewScale*factor) }
     : undefined;
@@ -454,10 +493,11 @@ export default function PreviewMapProducts() {
               {(["principal","brasil","regional"] as const).map(id => <option key={id} value={id}>{names[id]}</option>)}
             </select></label>
             <button type="button" className={button} aria-label="Aproximar mapa" disabled={!viewScale || viewScale <= 1000}
-              onClick={() => updateMap(draft,mapElement,undefined,Math.max(1000,Math.round(viewScale! / 1.25)))}><Plus size={14}/></button>
+              onClick={() => zoomFeatures(mapElement,true)}><Plus size={14}/></button>
             <button type="button" className={button} aria-label="Afastar mapa" disabled={!viewScale || viewScale >= (inset ? 500000000 : 10000000)}
-              onClick={() => updateMap(draft,mapElement,undefined,Math.min(inset ? 500000000 : 10000000,Math.round(viewScale! * 1.25)))}><Minus size={14}/></button>
+              onClick={() => zoomFeatures(mapElement,false)}><Minus size={14}/></button>
             {viewScale && <span>1:{number(viewScale)}</span>}
+            <span>Role sobre as feições para aproximar ou afastar.</span>
             {atlas && !inset && <span>O enquadramento segue as folhas do atlas.</span>}
           </div>}
           <div className="arqueo-studio-canvas min-h-56 overflow-auto p-5" style={{ maxHeight: "70vh" }}>
@@ -484,10 +524,15 @@ export default function PreviewMapProducts() {
                 })}
                 {gesture?.guideX !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-10 border-l border-dashed border-fuchsia-600" style={{ left:gesture.guideX/format.width*100+"%" }} />}
                 {gesture?.guideY !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-fuchsia-600" style={{ top:gesture.guideY/format.height*100+"%" }} />}
-                {mode === "view" && canPan && mapBox && !!viewScale && <button type="button" aria-label={"Arrastar enquadramento: " + names[mapElement]}
-                  className="absolute cursor-grab touch-none border border-dashed border-emerald-600 active:cursor-grabbing"
-                  style={{ left: (mapBox.x+(delta?.x ?? 0))/format.width*100+"%", top: (mapBox.y+(delta?.y ?? 0))/format.height*100+"%", width: mapBox.w/format.width*100+"%", height:mapBox.h/format.height*100+"%" }}
-                  onPointerDown={event => start(event,mapElement,"pan")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} />}
+                {mode === "view" && !(active === "atlas" && currentPage === 0) && mapFrames.map(id => {
+                  const box = draft.layout[id], selected = mapElement === id;
+                  const draggable = (id !== "principal" || !atlas) && !!scaleFor(id);
+                  return <button key={id} type="button" data-map-frame={id} aria-label={"Enquadrar feições: " + names[id]}
+                    aria-pressed={selected} className={"absolute touch-none " + (draggable ? "cursor-grab active:cursor-grabbing " : "") + (selected ? "border border-dashed border-emerald-600" : "")}
+                    style={{ left:(box.x+(selected ? delta?.x ?? 0 : 0))/format.width*100+"%", top:(box.y+(selected ? delta?.y ?? 0 : 0))/format.height*100+"%", width:box.w/format.width*100+"%", height:box.h/format.height*100+"%" }}
+                    onClick={() => selectElement(id)} onPointerDown={event => { if (draggable) start(event,id,"pan"); }}
+                    onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} />;
+                })}
               </div>
             </div>
           </div>
