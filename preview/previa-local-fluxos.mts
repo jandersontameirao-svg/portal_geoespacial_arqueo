@@ -356,12 +356,28 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       const request = String(input.text ?? "").trim();
       if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra um projeto para executar o comando.");
       if (input.projectId === 11 && text.startsWith("montar modelo ")) {
-        const name = text.slice("montar modelo ".length).trim();
+        const command = text.match(/^montar modelo (.+?)(?: em (a[0-4]) (paisagem|horizontal|retrato|vertical))?(?: com (.+?) e (.+?))?[.!]?$/);
+        if (!command) throw Error("Informe o modelo e, se desejar, o papel, a orientação e as duas marcas.");
+        const [, name, paper, direction, company, client] = command;
         const normalize = (value:string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
         const model = studioModels.find(item => item.id === name || normalize(item.title) === name);
         if (!model) throw Error("Informe o nome ou identificador de um modelo da biblioteca.");
         const { products } = await workflow("previewProducts.list", {projectId:11});
         const product = products.find((item:Row) => item.id === model.id);
+        if (paper && company && client) {
+          const brandId = (kind:string, label:string) => {
+            const matches = (state.studioBrands ?? []).filter(item => item.kind === kind && normalize(item.name) === label);
+            if (matches.length !== 1) throw Error("Escolha uma marca cadastrada e inequívoca: "+label+".");
+            return matches[0].id;
+          };
+          const marks = {empresa:brandId("empresa",company),cliente:brandId("cliente",client)};
+          const orientation = direction === "retrato" || direction === "vertical" ? "portrait" : "landscape";
+          if (!product.layerIds.length) throw Error("Indique no Estúdio as camadas necessárias: "+model.needs+".");
+          if (method === "atena.previewPlan") return {summary:`Preparar ${model.title} em ${paper.toUpperCase()} ${direction}, com ${company} e ${client}, para revisão no Estúdio.`};
+          const query = new URLSearchParams({modelo:model.id,papel:paper.toUpperCase(),orientacao:orientation,empresa:String(marks.empresa),cliente:String(marks.cliente)});
+          return {studioUrl:"/projects/11?tab=products&"+query, message:"Prancha preparada para revisão."};
+        }
+        if (paper || company || client) throw Error("Informe papel, orientação, empresa e cliente no mesmo pedido.");
         if (method === "atena.previewPlan") return { summary: model.title + ". Dados necessários: " + model.needs + ". Abrir para revisão no Estúdio." };
         return { studioUrl:"/projects/11?tab=products&modelo="+model.id, message:product.layerIds.length ? "Modelo pronto para revisar no Estúdio." : "Indique no Estúdio as camadas necessárias: "+model.needs+"." };
       }

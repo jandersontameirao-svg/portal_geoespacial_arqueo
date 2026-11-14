@@ -76,7 +76,8 @@ export default function PreviewMapProducts() {
   const [layers, setLayers] = useState<Layer[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Product>>({});
   const [history, setHistory] = useState<Record<string, { past: Product[]; future: Product[] }>>({});
-  const [active, setActive] = useState(() => new URLSearchParams(location.search).get("modelo") ?? "mapa");
+  const [initialParams] = useState(() => new URLSearchParams(location.search));
+  const [active, setActive] = useState(() => initialParams.get("modelo") ?? "mapa");
   const [library,setLibrary] = useState(false);
   const [brands,setBrands] = useState<Brand[]>([]);
   const [element, setElement] = useState<ElementId>("principal");
@@ -101,6 +102,15 @@ export default function PreviewMapProducts() {
   useEffect(() => {
     request("list").then(data => {
       setProducts(data.products); setBrands(data.brands ?? []);
+      const params = initialParams;
+      const product = data.products.find((item:Product) => item.id === params.get("modelo"));
+      const paper = params.get("papel"), orientation = params.get("orientacao");
+      if (product && papers.includes(paper as Paper) && (orientation === "landscape" || orientation === "portrait")) {
+        setDrafts(current => ({ ...current,[product.id]:{ ...product,paper:paper as Paper,orientation,
+          layout:product.orientation === orientation ? product.layout : orientation === "portrait" ? portraitLayout : defaultLayout,
+          marks:{empresa:Number(params.get("empresa")),cliente:Number(params.get("cliente"))},
+        } }));
+      }
       setActive(current => data.products.some((product:Product) => product.id === current) ? current : "mapa"); setLayers(data.layers); setAtlasDefault(data.linearAtlasScale);
     }).catch(error => setNotice(error.message));
   }, []);
@@ -350,6 +360,11 @@ export default function PreviewMapProducts() {
       const product: Product = await request("save", draft);
       setProducts(current => current.map(item => item.id === product.id ? product : item));
       setDrafts(current => ({ ...current, [product.id]: product }));
+      const params = new URLSearchParams(location.search);
+      if (params.has("empresa") && params.get("modelo") === product.id) {
+        for (const key of ["papel","orientacao","empresa","cliente"]) params.delete(key);
+        window.history.replaceState(window.history.state,"",location.pathname+"?"+params);
+      }
       setNotice("Produto salvo.");
     } catch (error) { setNotice((error as Error).message); }
     finally { setSaving(false); }

@@ -110,7 +110,7 @@ const demoApi = {
   const interpret = trpc.atena.interpret.useMutation();`)
         .replace('const invalidateContext = () => { revision.current++;', 'const invalidateContext = () => { setPreviewPlan(null); setPreviewDownload(null); revision.current++;')
         .replace('setDraft(""); setPending(null); const token', 'setDraft(""); setPending(null); setPreviewPlan(null); const token')
-        .replace('      const command = classifyAtenaChatCommand(text);', `      if (/^(criar camada|cadastrar fonte|ligar fonte|desligar fonte)\\b/i.test(text.trim()) ||
+        .replace('      const command = classifyAtenaChatCommand(text);', `      if (/^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo)\\b/i.test(text.trim()) ||
         (/\\b(buffer|malha|a2|atlas)\\b/i.test(text) && !/^abrir atlas[.!]?$/i.test(text))) {
         if (!projectId) { await showProjects(); return; }
         const result = await localAtena("previewPlan", projectId, text);
