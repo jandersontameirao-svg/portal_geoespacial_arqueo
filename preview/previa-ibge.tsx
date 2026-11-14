@@ -98,7 +98,7 @@ const childNames: Record<string, string> = {
 function childrenFor(source: MapSource) {
   if (source.id === -2) return layers.map(layer => ({ id: layer.id, label: layer.label }));
   return [...(source.availableLayers ?? []), ...(source.layer || "").split(",").filter(Boolean)].map(id => ({
-    id, label: childNames[id] ?? (id === "0" ? source.name.split(" · ")[1] ?? id : id),
+    id, label: childNames[id] ?? (id === "0" ? source.name.split(" · ").slice(-1)[0] ?? id : id),
   }));
 }
 

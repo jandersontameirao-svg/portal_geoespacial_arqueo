@@ -119,6 +119,16 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  // Public services used by the IPHAE map at https://www.iphae.rs.gov.br/mapa.
+  ...[
+    { id: -10, title: "Bens tombados", service: "bens_tombados" },
+    { id: -11, title: "Entorno dos bens tombados", service: "entornos_bens_tombados" },
+    { id: -12, title: "Centros históricos", service: "centro_historico" },
+  ].map(({ id, title, service }) => ({
+    id, name: "RS · IPHAE · " + title, type: "ArcGIS REST",
+    address: "https://iede.rs.gov.br/server/rest/services/CULTURA/" + service + "/MapServer",
+    layer: "0", enabled: false, group: "patrimonio-estadual",
+  })),
   { id: -9, name: "SP · Condephaat estadual", type: "WMS", address: "https://www.idesp.sp.gov.br/geoserver/idesp_acervo/wms",
     layer: "idesp_acervo:bem_tomb_a_2025_01_v0", enabled: false, group: "patrimonio-estadual",
     status: "Bens tombados mapeados pela IDE-SP em todo o estado · edição 2025.01." },
