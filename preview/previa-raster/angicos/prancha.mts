@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import { defaultLayout, linearAtlasScale, paperFactor, paperSize, portraitLayout, type Orientation, type Paper, type Layout, type StudioBackground, type StudioView } from "../../previa-layout.mts";
+import { studioSymbolPoints, type StudioVectorStyle, defaultLayout, linearAtlasScale, paperFactor, paperSize, portraitLayout, type Orientation, type Paper, type Layout, type StudioBackground, type StudioView } from "../../previa-layout.mts";
 
 import { mapBiomasRaster, type ThematicRaster } from "./mapbiomas.mts";
 
@@ -149,16 +149,30 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     draw();
     if (pdf) pdf.restoreGraphicsState(); else svg.push("</g>");
   };
-  const drawFeatures = (features: Feature[], project: (p: Point) => Point, stroke: string, fill = "none", width = .25, opacity = 1) => {
+  const marker = (x:number,y:number,color:string,radius:number,style?:StudioVectorStyle) => {
+    if (!style?.symbol || style.symbol === "circulo") {
+      if (pdf) pdf.setFillColor(color).circle(x*factor,y*factor,radius*factor,"F");
+      else svg.push(`<circle cx="${x}" cy="${y}" r="${radius}" fill="${color}"/>`);
+    } else {
+      const points=studioSymbolPoints(style.symbol).map(([dx,dy]) => [x+dx*radius,y+dy*radius]);
+      if (pdf) {
+        pdf.setFillColor(color).path([
+          ...points.map(([px,py],i) => ({op:i?"l":"m",c:[px*factor,py*factor]})),{op:"h",c:[]},
+        ]).fill();
+      } else svg.push(`<polygon fill="${color}" points="${points.map(p => p.join(",")).join(" ")}"/>`);
+    }
+  };
+  const drawFeatures = (features: Feature[], project: (p: Point) => Point, stroke: string, fill = "none", width = .25, opacity = 1, style?:StudioVectorStyle) => {
     for (const feature of features) {
       for (const part of paths(feature.geometry)) {
         const projected = part.rings.map(ring => ring.map(project));
         if (!part.closed && projected[0].length === 1) {
           const [x, y] = projected[0][0];
-          const radius = .55;
-          if (pdf) pdf.setFillColor(stroke).circle(x*factor, y*factor, radius*factor, "F");
-          else svg.push(`<circle cx="${x}" cy="${y}" r="${radius}" fill="${stroke}"/>`);
-        } else path(projected, part.closed, stroke, part.closed ? fill : "none", width,part.closed ? opacity : 1);
+          marker(x,y,style?.color ?? stroke,style?.sizeMm === undefined ? .55 : style.sizeMm/(2*factor),style);
+        } else if (projected[0].length > 1) {
+          path(projected,part.closed,part.closed ? stroke : style?.color ?? stroke,part.closed ? fill : "none",
+            !part.closed && style?.widthMm !== undefined ? style.widthMm/factor : width,part.closed ? opacity : 1);
+        }
       }
     }
   };
@@ -168,6 +182,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   const grid = ([e,n]: Point): Point => [frame.x + frame.w/2 + (e-midX)/step, frame.y + frame.h/2 - (n-midY)/step];
   const main = (p: Point): Point => grid(utm.forward(p));
   const colors: Record<string,string> = { AII: "#d8e8ce", AID: "#f6ce64", ADA: "#e98d8c" };
+  const vectorStyle = (layer:Layer) => options.view?.vectorStyles?.[String(layer.id)];
   const areaStyle = (layer:Layer) => options.view?.areaStyles?.[String(layer.id)];
   const layerFill = (layer: Layer, name: string) => {
     const custom = areaStyle(layer);
@@ -206,7 +221,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     }
     for (const layer of layers) {
       const name = layer.name.replace(/\.geojson$/i,"");
-      drawFeatures(layer.layerData.features, main, (areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color) ?? layer.defaultStyle?.color ?? "#58278d", layerFill(layer,name), (areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : name === "Eixo" ? .58 : .32),areaStyle(layer)?.opacity || 1);
+      drawFeatures(layer.layerData.features, main, (areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color) ?? layer.defaultStyle?.color ?? "#58278d", layerFill(layer,name), (areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : name === "Eixo" ? .58 : .32),areaStyle(layer)?.opacity || 1,vectorStyle(layer));
     }
   });
   const requestedGrid = sheet?.grid ?? options.grid ?? 25000;
@@ -273,7 +288,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
       if (inset?.layers) {
         for (const id of inset.layers) {
           const layer = (options.available ?? layers).find(item => item.id === id);
-          if (layer) drawFeatures(layer.layerData.features,project,areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? '#a52932',areaStyle(layer) ? layerFill(layer,layer.name) : 'none',areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : .35,areaStyle(layer)?.opacity || 1);
+          if (layer) drawFeatures(layer.layerData.features,project,areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? '#a52932',areaStyle(layer) ? layerFill(layer,layer.name) : 'none',areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : .35,areaStyle(layer)?.opacity || 1,vectorStyle(layer));
         }
       } else if (national) {
         const [cx,cy] = project([lon,lat]);
@@ -292,10 +307,17 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   layers.slice().reverse().forEach((layer,i) => {
     const name = layer.name.replace(/\.geojson$/i,""), y = legend.y + (i+1.75)*rowHeight;
     const color = areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? ink;
+    const vector=vectorStyle(layer);
     if (layer.layerData.features.every(feature => /Point$/.test(feature.geometry.type))) {
-      if (pdf) pdf.setFillColor(color).circle((lx+symbol/2)*factor, (y-1)*factor, Math.min(.8,rowHeight*.15)*factor, "F");
-      else svg.push(`<circle cx="${lx+symbol/2}" cy="${y-1}" r="${Math.min(.8,rowHeight*.15)}" fill="${color}"/>`);
-    } else if (name === "Eixo") line(lx,y-1,lx+symbol,y-1,color,.6);
+      const radius=vector?.sizeMm === undefined ? Math.min(.8,rowHeight*.15) : Math.min(vector.sizeMm/(2*factor),rowHeight*.35,symbol*.45);
+      const markerColor=vector?.color ?? color;
+      // Símbolos claros precisam de contraste também na legenda sobre papel branco.
+      if (/^#[0-9a-f]{6}$/i.test(markerColor) && [1,3,5].every(i => parseInt(markerColor.slice(i,i+2),16)>200))
+        rect(lx+symbol/2-radius*1.3,y-rowHeight*.22-radius*1.3,radius*2.6,radius*2.6,"#475569","#475569");
+      marker(lx+symbol/2,y-rowHeight*.22,markerColor,radius,vector);
+    } else if (layer.layerData.features.every(feature => /LineString$/.test(feature.geometry.type))) {
+      line(lx,y-1,lx+symbol,y-1,vector?.color ?? color,vector?.widthMm === undefined ? .6 : vector.widthMm/factor);
+    }
     else {
       const top=y-rowHeight*.35, bottom=top+rowHeight*.38;
       path([[[lx,top],[lx+symbol,top],[lx+symbol,bottom],[lx,bottom]]],true,color,layerFill(layer,name),areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : .24,areaStyle(layer)?.opacity || 1);

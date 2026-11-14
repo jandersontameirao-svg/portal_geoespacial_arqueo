@@ -273,7 +273,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       models:studioModels,
       brands:(state.studioBrands ?? []).map(({id,name,kind}) => ({id,name,kind})),
       products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper ?? defaultStudioPaper), orientation: readOrientation(product.orientation), layout: product.paper ? readLayout(product.layout, readOrientation(product.orientation)) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
-      layers: [...layers.map(({ id, name, vector, defaultStyle }) => ({ id, name, area:vector.features.some((feature:Row) => /Polygon$/.test(feature.geometry.type)), color:defaultStyle?.color })), mapBiomas, ...studioTerrain],
+      layers: [...layers.map(({ id, name, vector, defaultStyle }) => ({ id, name, area:vector.features.some((feature:Row) => /Polygon$/.test(feature.geometry.type)), line:vector.features.some((feature:Row) => /LineString$/.test(feature.geometry.type)), point:vector.features.some((feature:Row) => /Point$/.test(feature.geometry.type)), color:defaultStyle?.color })), mapBiomas, ...studioTerrain],
     };
     if (!write || method !== "previewProducts.save") return undefined;
     const { id, title, columns, rows, overlap, grid } = input.product ?? {};

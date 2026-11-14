@@ -50,7 +50,27 @@ export function readStudioBackground(value: unknown): StudioBackground {
   throw Error("Fundo de mapa inválido.");
 }
 export type StudioAreaStyle = { color:string; opacity:number; strokeColor?:string; strokeMm?:number };
-export type StudioView = { areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
+export const studioSymbols = {
+  circulo:"Círculo", quadrado:"Quadrado", triangulo:"Triângulo", losango:"Losango",
+  pentagono:"Pentágono", hexagono:"Hexágono", estrela:"Estrela", cruz:"Cruz", xis:"X",
+} as const;
+export type StudioSymbol = keyof typeof studioSymbols;
+export type StudioVectorStyle = { color:string; widthMm?:number; sizeMm?:number; symbol?:StudioSymbol };
+// A mesma silhueta normalizada alimenta o seletor, o SVG e o PDF vetorial.
+export function studioSymbolPoints(symbol:StudioSymbol): [number,number][] {
+  if (symbol === "cruz" || symbol === "xis") {
+    const cross: [number,number][] = [[-.28,-1],[.28,-1],[.28,-.28],[1,-.28],[1,.28],[.28,.28],
+      [.28,1],[-.28,1],[-.28,.28],[-1,.28],[-1,-.28],[-.28,-.28]];
+    return symbol === "cruz" ? cross : cross.map(([x,y]) => [(x-y)/1.28,(x+y)/1.28]);
+  }
+  const count = {circulo:32,quadrado:4,triangulo:3,losango:4,pentagono:5,hexagono:6,estrela:10}[symbol];
+  return Array.from({length:count},(_,i) => {
+    const a=i*2*Math.PI/count-Math.PI/2+(symbol==="quadrado" ? Math.PI/4 : 0);
+    const r=symbol==="estrela" && i%2 ? .42 : symbol==="quadrado" ? Math.SQRT2 : 1;
+    return [Math.cos(a)*r,Math.sin(a)*r];
+  });
+}
+export type StudioView = { vectorStyles?: Record<string,StudioVectorStyle>; areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
 export function readStudioView(value: unknown): StudioView {
   if (value === undefined) return { east: 0, north: 0, labels: true, insets: { brasil: {}, regional: {} } };
   const view = value as StudioView;
@@ -73,7 +93,17 @@ export function readStudioView(value: unknown): StudioView {
       throw Error("Use uma espessura de contorno entre 0,1 e 3 mm.");
     areaStyles[id] = style;
   }
-  return { areaStyles, background:readStudioBackground(view.background), east: view.east, north: view.north, labels: view.labels, insets };
+  const vectorStyles: Record<string,StudioVectorStyle> = {};
+  for (const [id,style] of Object.entries(view.vectorStyles ?? {})) {
+    if (!/^\d+$/.test(id) || !style || typeof style.color !== "string" || !/^#[0-9a-f]{6}$/i.test(style.color) ||
+        (style.widthMm !== undefined && (!Number.isFinite(style.widthMm) || style.widthMm < .1 || style.widthMm > 3)) ||
+        (style.sizeMm !== undefined && (!Number.isFinite(style.sizeMm) || style.sizeMm < .5 || style.sizeMm > 8)) ||
+        (style.symbol !== undefined && (typeof style.symbol !== "string" || !Object.hasOwn(studioSymbols,style.symbol))))
+      throw Error("Estilo de linha ou ponto inválido.");
+    const {color,widthMm,sizeMm,symbol}=style;
+    vectorStyles[id]={color,widthMm,sizeMm,symbol};
+  }
+  return { areaStyles, vectorStyles, background:readStudioBackground(view.background), east: view.east, north: view.north, labels: view.labels, insets };
 }
 
 export const paperSizes = { A4: [297,210], A3: [420,297], A2: [594,420], A1: [841,594], A0: [1189,841] } as const;

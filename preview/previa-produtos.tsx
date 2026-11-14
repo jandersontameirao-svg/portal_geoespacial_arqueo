@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock,
 type Box = { x: number; y: number; w: number; h: number };
 const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
 type ElementId = keyof typeof names;
-type View = { areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
+type View = { vectorStyles?: Record<string,StudioVectorStyle>; areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
 const papers = ["A4", "A3", "A2", "A1", "A0"] as const;
 type Product = {
   marks?: {empresa:number; cliente:number};
@@ -15,7 +15,7 @@ type Product = {
 };
 type Review = { scale: number; insetScales: Record<"brasil" | "regional", number>; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
 type Brand = { id:number; name:string; kind:"empresa"|"cliente" };
-type Layer = { id: number; name: string; area?: boolean; color?: string };
+type Layer = { id: number; name: string; area?: boolean; line?:boolean; point?:boolean; color?: string };
 const mapFrames = ["principal","brasil","regional"] as const;
 type MapFrame = typeof mapFrames[number];
 const elements = Object.keys(names) as ElementId[];
@@ -540,6 +540,23 @@ export default function PreviewMapProducts() {
               const setAreaStyle = (next: StudioAreaStyle) => change({ ...draft, view:{ ...draft.view,
                 areaStyles:{ ...draft.view.areaStyles,[layer.id]:{ strokeColor:style?.strokeColor ?? style?.color ?? layer.color ?? "#5b7655", ...style,...next } },
               } });
+              const vector = draft.view.vectorStyles?.[layer.id];
+              const vectorColor = vector?.color ?? layer.color ?? "#58278d";
+              const setVector = (next: Partial<StudioVectorStyle>) => change({...draft,view:{...draft.view,
+                vectorStyles:{...draft.view.vectorStyles,[layer.id]:{color:vectorColor,...vector,...next}},
+              }});
+              const dimension = (field:"widthMm"|"sizeMm", caption:string, min:number, max:number) =>
+                <label className="mt-2 block">{caption}
+                  <input className={input} key={vector?.[field] ?? "original"} type="number" min={min} max={max} step={.1}
+                    placeholder="Original" defaultValue={vector?.[field] ?? ""}
+                    onKeyDown={event => { if(event.key==="Enter") event.currentTarget.blur(); }}
+                    onBlur={event => {
+                      const node=event.currentTarget;
+                      if (!node.value && !node.validity.badInput) setVector({[field]:undefined});
+                      else if (node.validity.valid && Number.isFinite(node.valueAsNumber)) setVector({[field]:node.valueAsNumber});
+                      else node.value=String(vector?.[field] ?? "");
+                    }}/>
+                </label>;
               return <div key={layer.id} className="rounded-md bg-slate-50 px-1.5 py-1 dark:bg-slate-800"><div className="flex items-center gap-1">
                 <label className="flex min-w-0 grow items-start gap-2 text-xs">
                   <input type="checkbox" checked={index >= 0} disabled={required || layerIds === undefined}
@@ -551,6 +568,31 @@ export default function PreviewMapProducts() {
                   <button type="button" aria-label={"Descer " + name} disabled={index === 0} onClick={() => moveLayer(layer.id, -1)} className="p-1 disabled:opacity-30"><ArrowDown size={12}/></button>
                 </div>}
               </div>
+              {(layer.line || layer.point) && index >= 0 && <details className="px-1 py-1 text-xs">
+                <summary className="cursor-pointer">Símbolos de {name}</summary>
+                <label className="mt-2 flex items-center gap-2">{layer.point ? "Cor dos pontos" : "Cor da linha"}
+                  <input type="color" value={vectorColor} onInput={event => setVector({color:event.currentTarget.value})}/>
+                </label>
+                {layer.line && dimension("widthMm","Espessura da linha (mm)",.1,3)}
+                {layer.point && <>
+                  {dimension("sizeMm","Tamanho dos pontos (mm)",.5,8)}
+                  <fieldset className="mt-2 grid grid-cols-3 gap-1">
+                    <legend className="mb-1">Galeria de símbolos</legend>
+                    {(Object.entries(studioSymbols) as [StudioSymbol,string][]).map(([id,label]) =>
+                      <button key={id} type="button" title={label} aria-label={label} aria-pressed={(vector?.symbol ?? "circulo")===id}
+                        onClick={() => setVector({symbol:id})} className="grid place-items-center rounded border p-1.5 aria-pressed:border-blue-600 aria-pressed:bg-blue-100">
+                        <svg viewBox="-1.25 -1.25 2.5 2.5" className="h-5 w-5" aria-hidden="true">
+                          <polygon fill={vectorColor} points={studioSymbolPoints(id).map(p => p.join(",")).join(" ")}/>
+                        </svg>
+                      </button>)}
+                  </fieldset>
+                </>}
+                {vector && <button type="button" className="mt-2 underline" onClick={() => {
+                  const vectorStyles={...draft.view.vectorStyles};
+                  delete vectorStyles[layer.id];
+                  change({...draft,view:{...draft.view,vectorStyles}});
+                }}>Restaurar símbolo original</button>}
+              </details>}
               {layer.area && index >= 0 && <details className="px-1 py-1 text-xs">
                 <summary className="cursor-pointer">Estilo de {name}</summary>
                 <label className="block">Preenchimento
