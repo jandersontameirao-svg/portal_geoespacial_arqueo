@@ -538,7 +538,7 @@ export default function PreviewMapProducts() {
               const color = style?.color ?? layer.color ?? "#5b7655";
               const opacity = style?.opacity ?? .35;
               const setAreaStyle = (next: StudioAreaStyle) => change({ ...draft, view:{ ...draft.view,
-                areaStyles:{ ...draft.view.areaStyles,[layer.id]:next },
+                areaStyles:{ ...draft.view.areaStyles,[layer.id]:{ strokeColor:style?.strokeColor ?? style?.color ?? layer.color ?? "#5b7655", ...style,...next } },
               } });
               return <div key={layer.id} className="rounded-md bg-slate-50 px-1.5 py-1 dark:bg-slate-800"><div className="flex items-center gap-1">
                 <label className="flex min-w-0 grow items-start gap-2 text-xs">
@@ -567,8 +567,22 @@ export default function PreviewMapProducts() {
                     <option value="chapa">Chapa</option><option value="transparencia">Com transparência</option>
                   </select>
                 </label>
-                <label className="mt-2 flex items-center gap-2">Cor <input type="color" value={color}
-                  onChange={event => setAreaStyle({color:event.target.value,opacity})}/></label>
+                <label className="mt-2 flex items-center gap-2">Cor do preenchimento <input type="color" value={color}
+                  onInput={event => setAreaStyle({color:event.currentTarget.value,opacity})}/></label>
+                <label className="mt-2 flex items-center gap-2">Cor do contorno
+                  <input type="color" value={style?.strokeColor ?? style?.color ?? layer.color ?? "#5b7655"}
+                    onInput={event => setAreaStyle({color,opacity,strokeColor:event.currentTarget.value})}/>
+                </label>
+                <label className="mt-2 block">Espessura do contorno (mm)
+                  <input className={input} key={style?.strokeMm ?? "default"} defaultValue={style?.strokeMm ?? ""}
+                    placeholder="Original" type="number" min={.1} max={3} step={.1}
+                    onBlur={event => {
+                      const value=event.target.valueAsNumber;
+                      if (Number.isFinite(value) && event.target.validity.valid) setAreaStyle({color,opacity,strokeMm:value});
+                      else if (!event.target.value) setAreaStyle({color,opacity,strokeMm:undefined});
+                      else event.target.value=String(style?.strokeMm ?? "");
+                    }} onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }}/>
+                </label>
                 <label className="mt-2 block">Transparência {Math.round((1-opacity)*100)}%
                   <input className="block w-full" aria-label="Transparência" type="range" min={0} max={100} value={Math.round((1-opacity)*100)}
                     onChange={event => setAreaStyle({color,opacity:1-Number(event.target.value)/100})}/>

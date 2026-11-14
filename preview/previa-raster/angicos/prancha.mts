@@ -206,7 +206,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     }
     for (const layer of layers) {
       const name = layer.name.replace(/\.geojson$/i,"");
-      drawFeatures(layer.layerData.features, main, areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? "#58278d", layerFill(layer,name), layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : name === "Eixo" ? .58 : .32,areaStyle(layer)?.opacity || 1);
+      drawFeatures(layer.layerData.features, main, (areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color) ?? layer.defaultStyle?.color ?? "#58278d", layerFill(layer,name), (areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : name === "Eixo" ? .58 : .32),areaStyle(layer)?.opacity || 1);
     }
   });
   const requestedGrid = sheet?.grid ?? options.grid ?? 25000;
@@ -273,7 +273,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
       if (inset?.layers) {
         for (const id of inset.layers) {
           const layer = (options.available ?? layers).find(item => item.id === id);
-          if (layer) drawFeatures(layer.layerData.features,project,areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? '#a52932',areaStyle(layer) ? layerFill(layer,layer.name) : 'none',.35,areaStyle(layer)?.opacity || 1);
+          if (layer) drawFeatures(layer.layerData.features,project,areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? '#a52932',areaStyle(layer) ? layerFill(layer,layer.name) : 'none',areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : .35,areaStyle(layer)?.opacity || 1);
         }
       } else if (national) {
         const [cx,cy] = project([lon,lat]);
@@ -291,14 +291,14 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   label(lx,legend.y+rowHeight*.75,"Legenda cartográfica",Math.min(4,rowHeight*.65,legend.w/12),true);
   layers.slice().reverse().forEach((layer,i) => {
     const name = layer.name.replace(/\.geojson$/i,""), y = legend.y + (i+1.75)*rowHeight;
-    const color = areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? ink;
+    const color = areaStyle(layer)?.strokeColor ?? areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? ink;
     if (layer.layerData.features.every(feature => /Point$/.test(feature.geometry.type))) {
       if (pdf) pdf.setFillColor(color).circle((lx+symbol/2)*factor, (y-1)*factor, Math.min(.8,rowHeight*.15)*factor, "F");
       else svg.push(`<circle cx="${lx+symbol/2}" cy="${y-1}" r="${Math.min(.8,rowHeight*.15)}" fill="${color}"/>`);
     } else if (name === "Eixo") line(lx,y-1,lx+symbol,y-1,color,.6);
     else {
       const top=y-rowHeight*.35, bottom=top+rowHeight*.38;
-      path([[[lx,top],[lx+symbol,top],[lx+symbol,bottom],[lx,bottom]]],true,color,layerFill(layer,name),.24,areaStyle(layer)?.opacity || 1);
+      path([[[lx,top],[lx+symbol,top],[lx+symbol,bottom],[lx,bottom]]],true,color,layerFill(layer,name),areaStyle(layer)?.strokeMm !== undefined ? areaStyle(layer)!.strokeMm!/factor : .24,areaStyle(layer)?.opacity || 1);
     }
     const caption = ({ Eixo:"Eixo da linha de transmissão", ADA:"ADA · faixa de 30 m por lado", AID:"AID · faixa de 250 m por lado", AII:"AII · municípios interceptados" } as Record<string,string>)[name] || name;
     label(lx+symbol+legend.w*.03,y,caption,Math.min(3.5,rowHeight*.65,legend.w*.84/(caption.length*.62)));

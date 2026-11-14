@@ -49,7 +49,7 @@ export function readStudioBackground(value: unknown): StudioBackground {
   if (typeof value === "string" && Object.hasOwn(studioBackgrounds,value)) return value as StudioBackground;
   throw Error("Fundo de mapa inválido.");
 }
-export type StudioAreaStyle = { color:string; opacity:number };
+export type StudioAreaStyle = { color:string; opacity:number; strokeColor?:string; strokeMm?:number };
 export type StudioView = { areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
 export function readStudioView(value: unknown): StudioView {
   if (value === undefined) return { east: 0, north: 0, labels: true, insets: { brasil: {}, regional: {} } };
@@ -68,6 +68,9 @@ export function readStudioView(value: unknown): StudioView {
   for (const [id,style] of Object.entries(view.areaStyles ?? {})) {
     if (!/^\d+$/.test(id) || !style || !/^#[0-9a-f]{6}$/i.test(style.color) ||
       !Number.isFinite(style.opacity) || style.opacity < 0 || style.opacity > 1) throw Error("Estilo de área inválido.");
+    if (style.strokeColor !== undefined && !/^#[0-9a-f]{6}$/i.test(style.strokeColor)) throw Error("Cor de contorno inválida.");
+    if (style.strokeMm !== undefined && (!Number.isFinite(style.strokeMm) || style.strokeMm < .1 || style.strokeMm > 3))
+      throw Error("Use uma espessura de contorno entre 0,1 e 3 mm.");
     areaStyles[id] = style;
   }
   return { areaStyles, background:readStudioBackground(view.background), east: view.east, north: view.north, labels: view.labels, insets };
