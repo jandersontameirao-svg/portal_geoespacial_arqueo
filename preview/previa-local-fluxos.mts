@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { ingestCog, renderCog } from "./previa-local-raster.mts";
 import { exportVector } from "./previa-exportar-vetor.mts";
-import { defaultLayout, readLayout, readScale } from "./previa-layout.mts";
+import { defaultLayout, linearAtlasScale, readLayout, readScale } from "./previa-layout.mts";
 
 const require = createRequire(new URL("../package.json", import.meta.url));
 const { jsPDF } = require("jspdf");
@@ -239,24 +239,33 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     if (input.projectId !== 11 || !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
     const defaults = [
       { id: "mapa", title: "Mapa de localização A2", columns: 1, rows: 1, overlap: 0, grid: 25000 },
+      { id: "influencia", title: "Áreas de influência — ADA, AID e AII", columns: 1, rows: 1, overlap: 0, grid: 25000, layerIds: [12, 13, 14, 15] },
+      { id: "detalhe", title: "Detalhe de trecho da LT", columns: 1, rows: 1, overlap: 0, grid: 2000, scale: 25000, layerIds: [13, 14, 15] },
+      { id: "prospeccao", title: "Planejamento da prospecção", columns: 1, rows: 1, overlap: 0, grid: 10000, layerIds: [13, 15, 17] },
+      { id: "uso-solo", title: "Uso e cobertura do solo — MapBiomas 2024", columns: 1, rows: 1, overlap: 0, grid: 25000, layerIds: [-21, 15] },
+      { id: "corredor", title: "Atlas por corredor", columns: 1, rows: 1, overlap: 15, grid: 500, scale: linearAtlasScale, layerIds: [13, 14, 15] },
       { id: "atlas", title: "Atlas A2", columns: 3, rows: 2, overlap: 10, grid: 10000 },
     ];
-    const products = state.products?.[11] ?? defaults;
+    const products = defaults.map(model => ({ ...model, ...state.products?.[11]?.find(item => item.id === model.id) }));
     const layers = state.files.filter(file => file.projectId === 11 && file.vector);
+    const mapBiomas = { id: -21, name: "MapBiomas Brasil · 2024" };
     if (!write && method === "previewProducts.list") return {
+      linearAtlasScale,
       products: products.map(product => ({ layout: defaultLayout, layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product })),
-      layers: layers.map(({ id, name }) => ({ id, name })),
+      layers: [...layers.map(({ id, name }) => ({ id, name })), mapBiomas],
     };
     if (!write || method !== "previewProducts.save") return undefined;
     const { id, title, columns, rows, overlap, grid } = input.product ?? {};
     if (!products.some(product => product.id === id) || typeof title !== "string" || !title.trim() || title.length > 85 ||
         ![columns, rows].every(n => Number.isInteger(n) && n >= 1 && n <= 8) || columns*rows > 24 ||
         !Number.isFinite(overlap) || overlap < 0 || overlap > 30 ||
-        !Number.isInteger(grid) || grid < 1000 || grid > 50000) throw Error("Confira o título e os parâmetros da grade.");
+        !Number.isInteger(grid) || grid < (id === "corredor" ? 100 : 1000) || grid > 50000) throw Error("Confira o título e os parâmetros da grade.");
     const { layerIds } = input.product;
-    if (!Array.isArray(layerIds) || !layerIds.length || !layerIds.every(layerId => layers.some(layer => layer.id === layerId))) throw Error("Selecione pelo menos uma camada do projeto.");
+    if (!Array.isArray(layerIds) || !layerIds.length || !layerIds.every(layerId => (id === "uso-solo" && layerId === mapBiomas.id) || layers.some(layer => layer.id === layerId))) throw Error("Selecione pelo menos uma camada do projeto.");
+    if (id === "corredor" && !layerIds.includes(15)) throw Error("O atlas por corredor precisa do eixo da LT.");
+    if (id === "uso-solo" && (!layerIds.includes(-21) || !layerIds.includes(15))) throw Error("O mapa de uso do solo precisa do MapBiomas e do eixo.");
     const product = { id, title: title.trim(), columns, rows, overlap, grid,
-      layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout), scale: readScale(input.product.scale) };
+      layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout), scale: readScale(input.product.scale) ?? (id === "corredor" ? linearAtlasScale : undefined) };
     save({ ...state, products: { ...state.products, 11: products.map(item => item.id === id ? product : item) } });
     return product;
   }

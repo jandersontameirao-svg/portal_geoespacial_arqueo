@@ -1,3 +1,6 @@
+// Approximate 1:4,500 from the approved Leaflet view (zoom 17 at the LT).
+export const linearAtlasScale = 4500;
+
 export const defaultLayout = {
   legenda: { x: 478, y: 202, w: 104, h: 65 },
   norte: { x: 33, y: 36, w: 14, h: 20 },

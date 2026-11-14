@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 type Box = { x: number; y: number; w: number; h: number };
 const names = { legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
 type ElementId = keyof typeof names;
-type Product = { id: "mapa" | "atlas"; title: string; columns: number; rows: number; overlap: number; grid: number; scale?: number; layerIds: number[]; layout: Record<ElementId, Box> };
+type Product = { id: string; title: string; columns: number; rows: number; overlap: number; grid: number; scale?: number; layerIds: number[]; layout: Record<ElementId, Box> };
 
 async function request(method: "list" | "save", product?: Product) {
   const input = { json: { projectId: 11, product } };
@@ -26,17 +26,22 @@ export default function PreviewMapProducts() {
   const sheet = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: ElementId; box: Box; x: number; y: number; resize: boolean } | null>(null);
   const [moving, setMoving] = useState<{id: ElementId; box: Box}>();
-  useEffect(() => { request("list").then(data => { setProducts(data.products); setLayers(data.layers); }).catch(error => setNotice(error.message)); }, []);
+  useEffect(() => { request("list").then(data => { setProducts(data.products); setLayers(data.layers); setLinearAtlasScale(data.linearAtlasScale); }).catch(error => setNotice(error.message)); }, []);
   const saved = products.find(product => product.id === draft?.id);
-  const atlas = draft?.id === "atlas";
+  const corridor = draft?.id === "corredor";
+  const atlas = corridor || draft?.id === "atlas";
+  const [pageCount, setPageCount] = useState(0);
+  const [linearAtlasScale, setLinearAtlasScale] = useState<number>();
   const queryFor = (product?: Product) => {
     const query = new URLSearchParams();
     if (!product) return query;
+    query.set("modelo", product.id);
+    query.set("grade", String(product.grid));
     query.set("titulo", product.title);
     query.set("camadas", product.layerIds.join(","));
     query.set("layout", JSON.stringify(product.layout));
     if (product.scale) query.set("escala", String(product.scale));
-    if (product.id === "atlas") query.set("atlas", [product.columns, product.rows, product.overlap, product.grid].join(","));
+    if (product.id === "atlas" || product.id === "corredor") query.set("atlas", [product.columns, product.rows, product.overlap, product.grid].join(","));
     return query;
   };
   const download = "/previa/prancha/11.pdf?" + queryFor(saved);
@@ -45,6 +50,17 @@ export default function PreviewMapProducts() {
   const query = queryFor(draft && saved ? { ...saved, layout: draft.layout } : saved);
   query.set("folha", String(page));
   const preview = "/previa/prancha/11.svg?" + query;
+  const countUrl = "/previa/prancha/11.json?" + queryFor(saved);
+  useEffect(() => {
+    if (!corridor) return;
+    const controller = new AbortController();
+    setPageCount(0);
+    fetch(countUrl, { signal: controller.signal }).then(async response => {
+      if (!response.ok) throw Error(await response.text());
+      setPageCount((await response.json()).sheets);
+    }).catch(error => { if (!controller.signal.aborted) setNotice(error.message); });
+    return () => controller.abort();
+  }, [corridor, countUrl]);
   function start(event: PointerEvent<HTMLButtonElement>, id: ElementId, resize: boolean) {
     if (!draft || event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -68,9 +84,14 @@ export default function PreviewMapProducts() {
   const controls = "w-full rounded-md border bg-background px-3 py-2 text-sm";
   return <section className="space-y-5">
     <div><h2 className="text-xl font-semibold">Mapas e Atlas</h2><p className="text-sm text-muted-foreground">Abra um produto salvo para editar a composição e exportar em A2.</p></div>
-    <div className="flex flex-wrap gap-2">{products.map(product =>
-      <button key={product.id} type="button" className="rounded-lg border bg-card px-4 py-2 text-sm font-medium" aria-pressed={draft?.id === product.id}
-        disabled={saving} onClick={() => { setDraft({ ...product }); setPage(0); setNotice(""); }}>{product.title}</button>)}</div>
+    <label className="block max-w-md space-y-1 text-sm">Modelo de mapa ou atlas
+      <select className={controls} value={draft?.id ?? ""} disabled={saving} onChange={event => {
+        setDraft(products.find(product => product.id === event.target.value)); setPage(0); setNotice("");
+      }}>
+        <option value="">Selecione um modelo</option>
+        {products.map(product => <option key={product.id} value={product.id}>{product.title}</option>)}
+      </select>
+    </label>
     {notice && <p role="status" className="text-sm">{notice}</p>}
     {draft && saved && <div className="grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
       <form className="space-y-3 rounded-xl border bg-card p-4" onSubmit={async event => {
@@ -84,19 +105,20 @@ export default function PreviewMapProducts() {
         finally { setSaving(false); }
       }}>
         <label className="block text-sm">Título da folha<input className={controls} required maxLength={85} value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })} /></label>
-        <label className="block text-sm">Escala 1:<input className={controls} type="number" min="1000" max="10000000" placeholder="Automática"
+        <label className="block text-sm">Escala 1:<input className={controls} type="number" min="1000" max="10000000" placeholder={corridor ? "Escala inicial do corredor" : "Automática"}
           value={draft.scale ?? ""} onChange={event => setDraft({ ...draft, scale: event.target.value ? event.target.valueAsNumber : undefined })} /></label>
+        {corridor && linearAtlasScale && <button type="button" className="text-xs underline" onClick={() => setDraft({ ...draft, scale: linearAtlasScale })}>Usar escala padrão 1:{linearAtlasScale.toLocaleString("pt-BR")}</button>}
         <fieldset className="space-y-1"><legend className="text-sm font-medium">Camadas do produto</legend>
-          {layers.map(layer => <label key={layer.id} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={draft.layerIds.includes(layer.id)} onChange={event => {
+          {layers.filter(layer => layer.id !== -21 || draft.id === "uso-solo").map(layer => <label key={layer.id} className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={draft.layerIds.includes(layer.id)} disabled={(corridor && layer.id === 15) || (draft.id === "uso-solo" && [-21, 15].includes(layer.id))} onChange={event => {
               setDraft({ ...draft, layerIds: event.target.checked ? [...draft.layerIds, layer.id] : draft.layerIds.filter(id => id !== layer.id) });
             }} />{layer.name}
           </label>)}
         </fieldset>
         {atlas && <>{([
           ["columns", "Colunas", 1, 8], ["rows", "Linhas", 1, 8],
-          ["overlap", "Sobreposição (%)", 0, 30], ["grid", "Grade UTM (m)", 1000, 50000],
-        ] as const).map(([key, label, min, max]) => <label key={key} className="block text-sm">{label}
+          ["overlap", "Sobreposição (%)", 0, 30], ["grid", "Grade UTM (m)", corridor ? 100 : 1000, 50000],
+        ] as const).filter(([key]) => !corridor || key === "overlap" || key === "grid").map(([key, label, min, max]) => <label key={key} className="block text-sm">{label}
           <input className={controls} type="number" min={min} max={max} required value={draft[key]}
             onChange={event => setDraft({ ...draft, [key]: event.target.valueAsNumber })} />
         </label>)}</>}
@@ -107,13 +129,13 @@ export default function PreviewMapProducts() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           {atlas ? <label className="text-sm">Visualização <select className="rounded-md border bg-background px-2 py-1" value={page} onChange={event => setPage(Number(event.target.value))}>
             <option value={0}>Mapa índice</option>
-            {Array.from({ length: saved.rows * saved.columns }, (_, i) => <option key={i+1} value={i+1}>Folha {i+1}</option>)}
+            {Array.from({ length: corridor ? pageCount : saved.rows * saved.columns }, (_, i) => <option key={i+1} value={i+1}>Folha {i+(corridor ? 2 : 1)}</option>)}
           </select></label> : <span className="text-sm">A2 horizontal</span>}
           <a className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground" href={download} download>Exportar PDF</a>
         </div>
         {(!atlas || page > 0) && <p className="text-xs text-muted-foreground">Arraste pelo nome. Puxe a alça no canto inferior direito para redimensionar.</p>}
         <div ref={sheet} className="relative">
-          <img className="block w-full rounded bg-white" style={atlas && page === 0 ? undefined : {aspectRatio:"594 / 420"}} src={preview} alt={atlas && page === 0 ? "Mapa índice com as folhas numeradas" : "Prévia da folha A2"} />
+          <img className="block w-full rounded bg-white" style={atlas && !corridor && page === 0 ? undefined : {aspectRatio:"594 / 420"}} src={preview} alt={atlas && page === 0 ? "Mapa índice com as folhas numeradas" : "Prévia da folha A2"} />
           {(!atlas || page > 0) && (Object.keys(names) as ElementId[]).map(id => {
             const box = moving?.id === id ? moving.box : draft.layout[id];
             return <div key={id} className="pointer-events-none absolute border border-blue-600" style={{

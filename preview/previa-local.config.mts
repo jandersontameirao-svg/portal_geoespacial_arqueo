@@ -4,7 +4,7 @@ import { rasterArtifact } from "./previa-local-raster.mts";
 import { readFileSync } from "node:fs";
 import { readLayout, readScale } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
-import { atlasAngicos, atlasView, pranchaAngicos } from "./previa-raster/angicos/prancha.mts";
+import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, pranchaAngicos, printMapBiomas } from "./previa-raster/angicos/prancha.mts";
 
 const arqueoA2Renderer = readFileSync(new URL("./previa-raster/composicao-a2.ts.txt", import.meta.url), "utf8");
 const arqueoA2Seeds = [
@@ -698,7 +698,7 @@ const demoApi = {
     });
     server.middlewares.use("/previa/prancha", async (req: any, res: any) => {
       const url = new URL(req.url, "http://127.0.0.1");
-      if (req.method !== "GET" || !/^\/11\.(svg|pdf)$/.test(url.pathname)) { res.statusCode = 404; res.end(); return; }
+      if (req.method !== "GET" || !/^\/11\.(svg|pdf|json)$/.test(url.pathname)) { res.statusCode = 404; res.end(); return; }
       try {
         const pdf = url.pathname.endsWith(".pdf");
         const requested = url.searchParams.get("camadas");
@@ -711,18 +711,34 @@ const demoApi = {
         const title = url.searchParams.get("titulo")?.slice(0,85);
         const layout = url.searchParams.get("layout");
         const scale = url.searchParams.get("escala");
-        const options = { layout: readLayout(layout ? JSON.parse(layout) : undefined), scale: readScale(scale ? Number(scale) : undefined) };
-        const body = atlas ? (pdf ? atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
+        const model = url.searchParams.get("modelo");
+        const requestedGrid = Number(url.searchParams.get("grade"));
+        const options = {
+          layout: readLayout(layout ? JSON.parse(layout) : undefined),
+          scale: readScale(scale ? Number(scale) : undefined),
+          grid: Number.isInteger(requestedGrid) && requestedGrid >= 1000 && requestedGrid <= 50000 ? requestedGrid : undefined,
+          model: model ?? undefined,
+          raster: undefined as Awaited<ReturnType<typeof printMapBiomas>> | undefined,
+        };
+        const corridor = model === "corredor" ? corridorSheets(layers, overlap, grid, options) : undefined;
+        if (url.pathname.endsWith(".json")) {
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(JSON.stringify({ sheets: corridor?.length ?? 0 }));
+          return;
+        }
+        if (model === "uso-solo") options.raster = await printMapBiomas(layers, options);
+        const body = corridor ? corridorAtlas(layers, corridor, pdf, Number(url.searchParams.get("folha") ?? 0), title, options) : atlas ? (pdf ? atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
           atlasView(layers, columns, rows, overlap, grid, Number(url.searchParams.get("folha") ?? 0), title, options)) :
           pranchaAngicos(layers, pdf, undefined, title, options);
         res.setHeader("Cache-Control", "no-store");
         res.setHeader("Content-Type", pdf ? "application/pdf" : "image/svg+xml; charset=utf-8");
-        if (pdf) res.setHeader("Content-Disposition", `attachment; filename="${atlas ? "Atlas-" : ""}LT-Angicos-Jaguaruana-II-A2.pdf"`);
+        if (pdf) res.setHeader("Content-Disposition", `attachment; filename="${model ?? (atlas ? "Atlas" : "Mapa")}-LT-Angicos-Jaguaruana-II-A2.pdf"`);
         res.end(body);
       } catch (error) {
         console.error(error);
         res.statusCode = 500;
-        res.end("Não foi possível montar a folha A2.");
+        res.end(error instanceof Error ? error.message : "Não foi possível montar a folha A2.");
       }
     });
     server.middlewares.use("/api/trpc", async (req: any, res: any) => {

@@ -1,6 +1,8 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import { defaultLayout, type Layout } from "../../previa-layout.mts";
+import { defaultLayout, linearAtlasScale, type Layout } from "../../previa-layout.mts";
+
+import { mapBiomasRaster, type ThematicRaster } from "./mapbiomas.mts";
 
 const require = createRequire(new URL("../../../package.json", import.meta.url));
 const { jsPDF } = require("jspdf");
@@ -11,7 +13,7 @@ const mm = 1000;
 type Point = [number, number];
 type Shape = { type: string; coordinates: any };
 type Feature = { geometry: Shape; properties?: { SIGLA_UF?: string; nome?: string; rotulo_ibge?: Point } };
-type Layer = { name: string; layerData: { features: Feature[] }; defaultStyle?: { color?: string; weight?: number; fillOpacity?: number } };
+type Layer = { id?: number; name: string; layerData: { features: Feature[] }; defaultStyle?: { color?: string; weight?: number; fillOpacity?: number } };
 const xml = (s: string) => s.replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
 
 function paths(shape: Shape): { rings: Point[][]; closed: boolean }[] {
@@ -30,7 +32,39 @@ const frame = { x: 27, y: 32, w: 440, h: 370 };
 const newPdf = () => new jsPDF({ orientation: "landscape", unit: "mm", format: [594, 420], compress: true, precision: 6 });
 type Sheet = { center: Point; scale: number; number: number; total: number; grid: number; document?: any };
 
-type Options = { layout?: Layout; scale?: number };
+type Options = { layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
+function extent(layers: Layer[]) {
+  let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
+  for (const layer of layers) for (const feature of layer.layerData.features) for (const part of paths(feature.geometry)) {
+    for (const ring of part.rings) for (const point of ring) {
+      const [x,y] = utm.forward(point);
+      left = Math.min(left,x); right = Math.max(right,x);
+      bottom = Math.min(bottom,y); top = Math.max(top,y);
+    }
+  }
+  if (!Number.isFinite(left)) throw Error("Nenhuma coordenada para enquadrar a folha.");
+  return { left, right, bottom, top };
+}
+
+function mapView(layers: Layer[], options: Options) {
+  const focus = options.model === "detalhe" || options.model === "uso-solo"
+    ? layers.filter(layer => layer.id === 15) : layers;
+  const { left, right, bottom, top } = extent(focus.length ? focus : layers);
+  const scale = options.scale ?? Math.max(50000, Math.ceil(Math.max((right-left)/frame.w, (top-bottom)/frame.h) * 1.1 / 50) * 50000);
+  const center: Point = [(left+right)/2, (bottom+top)/2];
+  if (options.model === "detalhe") {
+    const axis = focus[0]?.layerData.features.find(feature => feature.geometry.type === "LineString");
+    const points: Point[] = axis?.geometry.coordinates ?? [];
+    if (points.length) return { center: utm.forward(points[Math.floor(points.length / 2)]) as Point, scale };
+  }
+  return { center, scale };
+}
+
+export async function printMapBiomas(layers: Layer[], options: Options) {
+  const { center: [x,y], scale } = mapView(layers, options);
+  const width = frame.w * scale / 1000, height = frame.h * scale / 1000;
+  return mapBiomasRaster(point => utm.inverse(point), x-width/2, y+height/2, width, height);
+}
 export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, title?: string, options: Options = {}) {
   const layout = options.layout ?? defaultLayout;
   // Shared layout for SVG preview and PDF: project the GeoJSON to UTM 24S,
@@ -91,10 +125,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     }
   };
   const features = layers.flatMap(layer => layer.layerData.features);
-  const coords = features.flatMap(f => paths(f.geometry).flatMap(part => part.rings.flat())).map((p: Point) => utm.forward(p) as Point);
-  const xs = coords.map(p => p[0]), ys = coords.map(p => p[1]);
-  const [midX, midY] = sheet?.center ?? [(Math.min(...xs) + Math.max(...xs))/2, (Math.min(...ys) + Math.max(...ys))/2];
-  const scale = sheet?.scale ?? options.scale ?? Math.max(50000, Math.ceil(Math.max((Math.max(...xs)-Math.min(...xs))/frame.w, (Math.max(...ys)-Math.min(...ys))/frame.h) * 1.1 / 50) * 50000);
+  const { center: [midX, midY], scale } = sheet ?? mapView(layers, options);
   const step = scale / mm;
   const grid = ([e,n]: Point): Point => [frame.x + frame.w/2 + (e-midX)/step, frame.y + frame.h/2 - (n-midY)/step];
   const main = (p: Point): Point => grid(utm.forward(p));
@@ -115,12 +146,23 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   rect(frame.x,frame.y,frame.w,frame.h,"#eef3f4");
   clip(frame.x,frame.y,frame.w,frame.h,() => {
     drawFeatures(states.filter(f => ["CE","RN","PB"].includes(f.properties?.SIGLA_UF || "")), main, "#a5aaa0","#f3f0e7");
+    if (options.raster) {
+      if (pdf) pdf.addImage(options.raster.url, "PNG", frame.x, frame.y, frame.w, frame.h);
+      else svg.push(`<image href="${options.raster.url}" x="${frame.x}" y="${frame.y}" width="${frame.w}" height="${frame.h}"/>`);
+    }
     for (const layer of layers) {
       const name = layer.name.replace(/\.geojson$/i,"");
       drawFeatures(layer.layerData.features, main, layer.defaultStyle?.color || "#58278d", layerFill(layer,name), layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : name === "Eixo" ? .58 : .32);
     }
   });
-  const gridStep = Math.max(sheet?.grid ?? 25000, 1);
+  const requestedGrid = sheet?.grid ?? options.grid ?? 25000;
+  const gridStep = requestedGrid * Math.max(1, Math.ceil(step * 8 / requestedGrid));
+  for (const footprint of options.index ?? []) {
+    const [x,y] = grid(footprint.center), ratio = footprint.scale / scale;
+    rect(x-frame.w*ratio/2, y-frame.h*ratio/2, frame.w*ratio, frame.h*ratio, "none", "#1d4ed8");
+    if (options.index!.length <= 24 || footprint.number === 2 || footprint.number === footprint.total || footprint.number % 10 === 0)
+      label(x, y-2, String(footprint.number), options.index!.length <= 24 ? 4 : 2.8, true, true);
+  }
   for (let e = Math.ceil((midX-frame.w*step/2)/gridStep)*gridStep; e <= midX+frame.w*step/2; e += gridStep) {
     const [x] = grid([e,midY]);
     line(x,frame.y,x,frame.y+frame.h,"#90978f",.1);
@@ -172,7 +214,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   for (const y of [200,269,296,325,372]) line(474,y,584,y);
   overview("Brasil",layout.brasil,[-74,-34,-34,6],true);
   overview("Região do empreendimento",layout.regional,[-41.8,-8.5,-34.6,-2.2],false);
-  const legend = layout.legenda, rowHeight = legend.h / (layers.length+1);
+  const legend = layout.legenda, rowHeight = legend.h / (layers.length+1+(options.raster?.legend.length ?? 0));
   const lx = legend.x + legend.w*.025, symbol = legend.w*.07;
   rect(legend.x,legend.y,legend.w,legend.h,"#ffffff");
   label(lx,legend.y+rowHeight*.75,"Legenda cartográfica",Math.min(4,rowHeight*.65,legend.w/12),true);
@@ -187,6 +229,11 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     const caption = ({ Eixo:"Eixo da linha de transmissão", ADA:"ADA · faixa de 30 m por lado", AID:"AID · faixa de 250 m por lado", AII:"AII · municípios interceptados" } as Record<string,string>)[name] || name;
     label(lx+symbol+legend.w*.03,y,caption,Math.min(3.5,rowHeight*.65,legend.w*.84/(caption.length*.62)));
   });
+  options.raster?.legend.forEach(({ color, name }, i) => {
+    const y = legend.y + (layers.length+i+1.75)*rowHeight;
+    rect(lx,y-rowHeight*.55,symbol,rowHeight*.42,color,color);
+    label(lx+symbol+legend.w*.03,y,name,Math.min(3.5,rowHeight*.68));
+  });
   label(479,277,"Referência geodésica",4,true);
   label(479,285,"SIRGAS2000 / UTM 24S");
   label(479,291,"EPSG:31984 · grade em metros",3);
@@ -200,7 +247,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   label(479,341,"Projeto  LT Angicos–Jaguaruana II");
   label(479,348,`Folha  A2 · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
   label(479,355,"Fontes  Camadas do projeto · IBGE 2024",3.25);
-  label(479,362,"Responsável  __________________",3.25);
+  label(479,362,options.raster ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Responsável  __________________",3.25);
   const logoUrl = "data:image/png;base64," + logo;
   if (pdf) pdf.addImage(logoUrl,"PNG",509,381,40,20);
   else svg.push(`<image href="${logoUrl}" x="509" y="381" width="40" height="20" preserveAspectRatio="none"/>`);
@@ -231,6 +278,50 @@ function planSheets(layers: Layer[], columns: number, rows: number, overlap: num
     ], scale, number, total: rows*columns, grid });
   }
   return sheets;
+}
+
+// Walk the projected axis by cumulative length. Each sheet covers a length
+// equal to its shorter side, so bends remain inside the north-up map frame.
+export function corridorSheets(layers: Layer[], overlap: number, grid: number, options: Options): Sheet[] {
+  if (!Number.isFinite(overlap) || overlap < 0 || overlap > 30 || !Number.isInteger(grid) || grid < 100 || grid > 50000)
+    throw Error("Confira a sobreposição e a grade UTM.");
+  const axis = layers.find(layer => layer.id === 15)?.layerData.features;
+  if (axis?.length !== 1 || axis[0].geometry.type !== "LineString") throw Error("Selecione um eixo contínuo.");
+  const points: Point[] = axis[0].geometry.coordinates.map((point: Point) => utm.forward(point));
+  const distances = [0];
+  for (let i = 1; i < points.length; i++) distances.push(distances[i-1] + Math.hypot(points[i][0]-points[i-1][0], points[i][1]-points[i-1][1]));
+  const length = distances.at(-1) ?? 0;
+  if (!length) throw Error("O eixo precisa ter extensão maior que zero.");
+  const scale = options.scale ?? linearAtlasScale;
+  const coverage = frame.h * scale / 1000;
+  const total = 1 + Math.ceil(Math.max(0,length-coverage) / (coverage*(1-overlap/100)));
+  if (total > 180) throw Error("Aumente o denominador da escala para gerar até 180 folhas.");
+  return Array.from({ length: total }, (_, i) => {
+    const target = total === 1 ? length/2 : coverage/2 + i*(length-coverage)/(total-1);
+    const end = distances.findIndex(distance => distance >= target);
+    const ratio = (target-distances[end-1]) / (distances[end]-distances[end-1]);
+    const center = points[end-1].map((value,k) => value + ratio*(points[end][k]-value)) as Point;
+    return { center, scale, number: i+2, total: total+1, grid };
+  });
+}
+
+export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, page: number, title: string | undefined, options: Options) {
+  const west = Math.min(...sheets.map(sheet => sheet.center[0])), east = Math.max(...sheets.map(sheet => sheet.center[0]));
+  const south = Math.min(...sheets.map(sheet => sheet.center[1])), north = Math.max(...sheets.map(sheet => sheet.center[1]));
+  const detail = sheets[0].scale;
+  const scale = Math.ceil(Math.max((east-west)/frame.w + detail/1000, (north-south)/frame.h + detail/1000)*1.12/25)*25000;
+  const index: Sheet = { center: [(east+west)/2,(north+south)/2], scale, number: 1, total: sheets.length+1, grid: 25000 };
+  const indexTitle = "Mapa índice | LT Angicos–Jaguaruana II";
+  const detailTitle = title ?? "Atlas por corredor | LT Angicos–Jaguaruana II";
+  if (!pdf) return page === 0 ? pranchaAngicos(layers, false, index, indexTitle, { ...options, index: sheets })
+    : pranchaAngicos(layers, false, sheets[page-1], detailTitle, options);
+  const document = newPdf();
+  pranchaAngicos(layers, true, { ...index, document }, indexTitle, { ...options, index: sheets });
+  for (const sheet of sheets) {
+    document.addPage();
+    pranchaAngicos(layers, true, { ...sheet, document }, detailTitle, options);
+  }
+  return Buffer.from(document.output("arraybuffer"));
 }
 
 export function atlasAngicos(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, title?: string, options: Options = {}) {
