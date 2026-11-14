@@ -266,7 +266,8 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     if (id === "uso-solo" && (!layerIds.includes(-21) || !layerIds.includes(15))) throw Error("O mapa de uso do solo precisa do MapBiomas e do eixo.");
     const view = readStudioView(input.product.view);
     if (Object.values(view.insets).some(inset => inset.layers?.some(id => !layers.some(layer => layer.id === id)))) throw Error("Use camadas do projeto nos mapas de situação.");
-    const product = { id, title: title.trim(), columns, rows, overlap, grid, view,
+    const locks = Array.isArray(input.product.locks) ? ["principal", "legenda", "norte", "brasil", "regional"].filter(key => input.product.locks.includes(key)) : [];
+    const product = { id, title: title.trim(), columns, rows, overlap, grid, view, locks,
       layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout), scale: readScale(input.product.scale) ?? (id === "corredor" ? linearAtlasScale : undefined) };
     save({ ...state, products: { ...state.products, 11: products.map(item => item.id === id ? product : item) } });
     return product;

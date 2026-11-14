@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Maximize, Minus, Plus, Redo2, Save, Undo2 } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock, Unlock, Magnet, Maximize, Minus, Plus, Redo2, Save, Undo2 } from "lucide-react";
 
 type Box = { x: number; y: number; w: number; h: number };
 const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
@@ -7,7 +7,7 @@ type ElementId = keyof typeof names;
 type View = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number }> };
 type Product = {
   id: string; title: string; columns: number; rows: number; overlap: number; grid: number;
-  scale?: number; layerIds: number[]; layout: Record<ElementId, Box>; view: View;
+  scale?: number; locks?: ElementId[]; layerIds: number[]; layout: Record<ElementId, Box>; view: View;
 };
 type Review = { scale: number; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
 type Layer = { id: number; name: string };
@@ -48,6 +48,22 @@ function fitBox(box: Box): Box {
   return { x, y, w: clamp(box.w, format.width-x, 10), h: clamp(box.h, format.height-y, 10) };
 }
 
+// Keep the snap tolerance consistent as the user zooms the sheet.
+function alignAxis(origin: number, size: number, targets: number[], tolerance: number, resize: boolean) {
+  let difference = Infinity;
+  let guide: number | undefined;
+  for (const anchor of resize ? [origin+size] : [origin,origin+size/2,origin+size]) {
+    for (const target of targets) {
+      const delta = target-anchor;
+      if (Math.abs(delta) <= tolerance && Math.abs(delta) < Math.abs(difference)) {
+        difference = delta;
+        guide = target;
+      }
+    }
+  }
+  return { delta: guide === undefined ? 0 : difference, guide };
+}
+
 export default function PreviewMapProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
@@ -58,6 +74,8 @@ export default function PreviewMapProducts() {
   const [mode, setMode] = useState<"layout" | "view" | "proof">("layout");
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(100);
+  const [snap, setSnap] = useState(true);
+  const [reference, setReference] = useState<ElementId | "page">("page");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -66,7 +84,7 @@ export default function PreviewMapProducts() {
   const [error, setError] = useState("");
   const [proof, setProof] = useState<{ url: string; for: string }>();
   const sheet = useRef<HTMLDivElement>(null);
-  const [gesture, setGesture] = useState<{ box?: Box; offset?: {east:number; north:number} }>();
+  const [gesture, setGesture] = useState<{ box?: Box; guideX?: number; guideY?: number; offset?: {east:number; north:number} }>();
   const drag = useRef<{ x:number; y:number; kind:"move"|"resize"|"pan"; id:ElementId; initial:Product; scale:number } | null>(null);
   const latestGesture = useRef<typeof gesture>();
   useEffect(() => {
@@ -139,7 +157,7 @@ export default function PreviewMapProducts() {
       : { past: entries.past.slice(0,-1), future: [draft, ...entries.future] } }));
   }
   function boxChange(box: Box) {
-    if (draft) change({ ...draft, layout: { ...draft.layout, [element]: fitBox(box) } });
+    if (draft && !draft.locks?.includes(element)) change({ ...draft, layout: { ...draft.layout, [element]: fitBox(box) } });
   }
   function setLayerIds(ids?: number[]) {
     if (!draft) return;
@@ -158,7 +176,7 @@ export default function PreviewMapProducts() {
   }
 
   function start(event: PointerEvent<HTMLButtonElement>, id: ElementId, kind: "move"|"resize"|"pan") {
-    if (!draft || saving || event.button !== 0) return;
+    if (!draft || saving || event.button !== 0 || (kind !== 'pan' && draft.locks?.includes(id))) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     setElement(id);
     drag.current = { x:event.clientX, y:event.clientY, kind, id, initial:draft, scale:review?.scale ?? 0 };
@@ -166,16 +184,38 @@ export default function PreviewMapProducts() {
   function move(event: PointerEvent<HTMLButtonElement>) {
     const action = drag.current, bounds = sheet.current?.getBoundingClientRect();
     if (!action || !bounds?.width || !bounds.height) return;
-    const dx = (event.clientX-action.x)*format.width/bounds.width;
-    const dy = (event.clientY-action.y)*format.height/bounds.height;
+    let dx = (event.clientX-action.x)*format.width/bounds.width;
+    let dy = (event.clientY-action.y)*format.height/bounds.height;
     const box = action.initial.layout[action.id];
-    const next = action.kind === "pan" ? {
+    if (event.shiftKey && action.kind === "resize") {
+      if (Math.abs(dx/box.w) > Math.abs(dy/box.h)) dy = dx*box.h/box.w;
+      else dx = dy*box.w/box.h;
+      const ratio = Math.min((format.width-box.x)/box.w, (format.height-box.y)/box.h,
+        Math.max(10/box.w, 10/box.h, 1+dx/box.w));
+      dx = box.w*(ratio-1);
+      dy = box.h*(ratio-1);
+    } else if (event.shiftKey && action.kind === "move") {
+      if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+      else dx = 0;
+    }
+    let next: NonNullable<typeof gesture> = action.kind === "pan" ? {
       offset: {
         east: Math.max(-500000,Math.min(500000,Math.round(action.initial.view.east-dx*action.scale/1000))),
         north: Math.max(-500000,Math.min(500000,Math.round(action.initial.view.north+dy*action.scale/1000))),
       },
     } : action.kind === "resize" ? { box: fitBox({ ...box, w:box.w+dx, h:box.h+dy }) } :
       { box: fitBox({ ...box, x:Math.min(format.width-box.w,box.x+dx), y:Math.min(format.height-box.h,box.y+dy) }) };
+    if (next.box && snap && !event.altKey && !event.shiftKey) {
+      const others = elements.filter(id => id !== action.id).map(id => action.initial.layout[id]);
+      const targetX = [20,format.width/2,474,584,...others.flatMap(b => [b.x,b.x+b.w/2,b.x+b.w])];
+      const targetY = [10,format.height/2,410,...others.flatMap(b => [b.y,b.y+b.h/2,b.y+b.h])];
+      const resize = action.kind === "resize", b = next.box;
+      const x = alignAxis(b.x,b.w,targetX,5*format.width/bounds.width,resize);
+      const y = alignAxis(b.y,b.h,targetY,5*format.height/bounds.height,resize);
+      next = { box:fitBox(resize ? { ...b,w:b.w+x.delta,h:b.h+y.delta } : {
+        ...b,x:Math.min(format.width-b.w,b.x+x.delta),y:Math.min(format.height-b.h,b.y+y.delta),
+      }), guideX:x.guide,guideY:y.guide };
+    }
     latestGesture.current = next;
     setGesture(next);
   }
@@ -187,6 +227,36 @@ export default function PreviewMapProducts() {
     if (!commit || !action || !pending) return;
     if (pending.offset) change({ ...action.initial, view: { ...action.initial.view, ...pending.offset } });
     if (pending.box) change({ ...action.initial, layout: { ...action.initial.layout, [action.id]:pending.box } });
+  }
+
+  function align(edge: string) {
+    if (!draft) return;
+    const box = draft.layout[element];
+    const target = reference === "page" || reference === element
+      ? { x:20, y:10, w:564, h:400 } : draft.layout[reference];
+    const x = edge === "left" ? target.x : edge === "right" ? target.x+target.w-box.w :
+      edge === "center" ? target.x+(target.w-box.w)/2 : box.x;
+    const y = edge === "top" ? target.y : edge === "bottom" ? target.y+target.h-box.h :
+      edge === "middle" ? target.y+(target.h-box.h)/2 : box.y;
+    boxChange({ ...box, x:Math.max(0,Math.min(format.width-box.w,x)), y:Math.max(0,Math.min(format.height-box.h,y)) });
+  }
+
+  function keyboard(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape" && drag.current) { finish(false); return; }
+    if (!draft || saving || event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+    if ((event.ctrlKey || event.metaKey) && ["z","y"].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      undo(event.shiftKey || event.key.toLowerCase() === "y");
+      return;
+    }
+    if (mode !== "layout" || event.ctrlKey || event.metaKey || event.altKey ||
+        !["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key) || draft.locks?.includes(element)) return;
+    event.preventDefault();
+    const box = draft.layout[element], step = event.shiftKey ? 5 : 1;
+    const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+    const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+    boxChange({ ...box, x:Math.max(0,Math.min(format.width-box.w,box.x+dx)), y:Math.max(0,Math.min(format.height-box.h,box.y+dy)) });
   }
 
   async function save() {
@@ -227,7 +297,7 @@ export default function PreviewMapProducts() {
     ? { x:(draft.view.east-gesture.offset.east)*1000/viewScale, y:(gesture.offset.north-draft.view.north)*1000/viewScale }
     : undefined;
 
-  return <section aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+  return <section onKeyDown={keyboard} aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
     <style>{`
       .arqueo-studio-workspace { display:grid; }
       .arqueo-studio-canvas { background-image:radial-gradient(#94a3b860 1px, transparent 1px); background-size:14px 14px; }
@@ -301,6 +371,7 @@ export default function PreviewMapProducts() {
             </button>)}
             <button type="button" className={button} aria-label="Desfazer" disabled={!entries.past.length} onClick={() => undo()}><Undo2 size={15} /></button>
             <button type="button" className={button} aria-label="Refazer" disabled={!entries.future.length} onClick={() => undo(true)}><Redo2 size={15} /></button>
+            {mode === "layout" && <button type="button" className={button} aria-pressed={snap} title="Encostar nas bordas e nos centros dos elementos" onClick={() => setSnap(!snap)}><Magnet size={15} /> Guias</button>}
             <div className="ml-auto flex items-center gap-1">
               <button type="button" className={button} aria-label="Reduzir zoom da folha" disabled={zoom <= 60} onClick={() => setZoom(zoom-20)}><Minus size={14}/></button>
               <span className="min-w-9 text-center text-xs">{zoom}%</span>
@@ -316,17 +387,22 @@ export default function PreviewMapProducts() {
               <div ref={sheet} className="relative bg-white shadow-lg" style={{ aspectRatio: "594/420" }}>
                 {proof?.for === previewUrl ? <img src={proof.url} alt={atlas && currentPage === 0 ? "Mapa índice do atlas" : "Prancha cartográfica A2"} className="block size-full object-contain" />
                   : <div className="grid h-full place-items-center text-sm text-slate-700">{error || "Renderizando prancha…"}</div>}
-                {mode === "layout" && !(active === "atlas" && currentPage === 0) && [element].map(id => {
-                  const box = gesture?.box ?? draft.layout[id];
-                  return <div key={id} className="pointer-events-none absolute border border-emerald-600" style={{
+                {mode === "layout" && !(active === "atlas" && currentPage === 0) && [...elements.filter(id => id !== element), element].map(id => {
+                  const selected = id === element;
+                  const locked = draft.locks?.includes(id);
+                  const box = (selected ? gesture?.box : undefined) ?? draft.layout[id];
+                  return <div key={id} className={"pointer-events-none absolute " + (selected ? "border border-emerald-600" : "")} style={{
                     left: box.x/594*100+"%", top: box.y/420*100+"%", width: box.w/594*100+"%", height: box.h/420*100+"%",
                   }}>
-                    <button type="button" aria-label={"Mover " + names[id]} className="pointer-events-auto absolute -top-4 left-0 cursor-move touch-none whitespace-nowrap rounded-sm bg-emerald-800 px-1.5 text-[10px] text-white"
+                    <button type="button" aria-label={"Selecionar " + names[id]} onClick={() => setElement(id)} className="pointer-events-auto absolute inset-0 hover:ring-1 hover:ring-inset hover:ring-emerald-600" />
+                    {selected && !locked && <><button type="button" aria-label={"Mover " + names[id]} className="pointer-events-auto absolute -top-4 left-0 cursor-move touch-none whitespace-nowrap rounded-sm bg-emerald-800 px-1.5 text-[10px] text-white"
                       onPointerDown={event => start(event,id,"move")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)}>{names[id]}</button>
                     <button type="button" aria-label={"Redimensionar " + names[id]} className="pointer-events-auto absolute -bottom-1 -right-1 size-3 cursor-nwse-resize touch-none rounded-sm border border-white bg-emerald-700"
-                      onPointerDown={event => start(event,id,"resize")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} />
+                      onPointerDown={event => start(event,id,"resize")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} /></>}
                   </div>;
                 })}
+                {gesture?.guideX !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-10 border-l border-dashed border-fuchsia-600" style={{ left:gesture.guideX/594*100+"%" }} />}
+                {gesture?.guideY !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-fuchsia-600" style={{ top:gesture.guideY/420*100+"%" }} />}
                 {mode === "view" && canPan && <button type="button" aria-label="Arrastar enquadramento do mapa principal"
                   className="absolute cursor-grab touch-none border border-dashed border-emerald-600 active:cursor-grabbing"
                   style={{ left: (draft.layout.principal.x+(delta?.x ?? 0))/594*100+"%", top: (draft.layout.principal.y+(delta?.y ?? 0))/420*100+"%", width: draft.layout.principal.w/594*100+"%", height:draft.layout.principal.h/420*100+"%" }}
@@ -361,9 +437,13 @@ export default function PreviewMapProducts() {
             <label className="block text-xs font-medium">Elemento da folha<select className={input} value={element} onChange={event => setElement(event.target.value as ElementId)}>
               {elements.map(id => <option value={id} key={id}>{names[id]}</option>)}
             </select></label>
+            <button type="button" className={button + " mt-2"} onClick={() => {
+              const locks = draft.locks ?? [];
+              change({ ...draft, locks: locks.includes(element) ? locks.filter(id => id !== element) : [...locks, element] });
+            }}>{draft.locks?.includes(element) ? <><Unlock size={14} /> Destravar posição</> : <><Lock size={14} /> Travar posição</>}</button>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {([["x","X (mm)"],["y","Y (mm)"],["w","Largura (mm)"],["h","Altura (mm)"]] as const).map(([key,label]) =>
-                <label className="text-xs" key={key}>{label}<input className={input} type="number" step="0.1" key={element + key + selection[key]}
+                <label className="text-xs" key={key}>{label}<input className={input} type="number" step="0.1" disabled={draft.locks?.includes(element)} key={element + key + selection[key]}
                   defaultValue={Math.round(selection[key]*10)/10} onBlur={event => { if (Number.isFinite(event.target.valueAsNumber)) boxChange({ ...selection, [key]:event.target.valueAsNumber }); }}
                   onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>)}
             </div>
@@ -371,6 +451,20 @@ export default function PreviewMapProducts() {
               value={draft.view.insets[inset].scale ?? ""} onChange={event => change({ ...draft, view:{ ...draft.view, insets:{
                 ...draft.view.insets, [inset]:{ ...draft.view.insets[inset], scale:event.target.value ? event.target.valueAsNumber : undefined },
               } } })} /></label>}
+            {mode === "layout" && !draft.locks?.includes(element) && <details className="mt-3 text-xs">
+              <summary className="cursor-pointer font-medium">Alinhar elemento</summary>
+              <label className="mt-2 block">Referência
+                <select className={input} value={reference === element ? "page" : reference} onChange={event => setReference(event.target.value as ElementId | "page")}>
+                  <option value="page">Margens da folha</option>
+                  {elements.filter(id => id !== element).map(id => <option key={id} value={id}>{names[id]}</option>)}
+                </select>
+              </label>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                {([["left","Esquerda"],["center","Centro"],["right","Direita"],["top","Topo"],["middle","Meio"],["bottom","Base"]] as const)
+                  .map(([edge,label]) => <button type="button" key={edge} className={button + " !px-1 !text-xs"} onClick={() => align(edge)}>{label}</button>)}
+              </div>
+            </details>}
+            {mode === "layout" && <p className="mt-2 text-xs text-slate-500">Setas movem 1 mm. Shift + setas movem 5 mm. Shift no arraste restringe o eixo ou mantém a proporção.</p>}
             {canPan && element === "principal" && <button type="button" className="mt-3 text-xs underline" disabled={!draft.view.east && !draft.view.north}
               onClick={() => change({ ...draft, view:{ ...draft.view, east:0, north:0 } })}>Restaurar enquadramento</button>}
           </div>
