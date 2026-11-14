@@ -80,3 +80,34 @@ export function restoreLegend(layout: Layout): Layout {
   if (legend.x >= 474 && legend.x+legend.w <= 584 && legend.y >= 30 && legend.y+legend.h <= 269) return layout;
   return { ...layout, legenda: { ...defaultLayout.legenda } };
 }
+
+export const studioModels = [
+  {id:"mapa", group:"Empreendimento", title:"Mapa de localização", summary:"Traçado e mapas de situação.", needs:"Eixo ou perímetro do projeto"},
+  {id:"influencia", group:"Empreendimento", title:"Áreas de influência", summary:"ADA, AID e AII na mesma prancha.", needs:"ADA, AID e AII"},
+  {id:"detalhe", group:"Empreendimento", title:"Detalhe de trecho", summary:"Recorte de um trecho da LT.", needs:"Eixo do projeto"},
+  {id:"relevo", group:"Meio físico", title:"Relevo e hipsometria", summary:"Elevação por cores e relevo sombreado.", needs:"Modelo de elevação Copernicus"},
+  {id:"topografia", group:"Meio físico", title:"Topografia", summary:"Curvas de nível e grade UTM.", needs:"Curvas de nível de 20 m"},
+  {id:"uso-solo", group:"Meio físico", title:"Uso e cobertura do solo", summary:"Classes do MapBiomas Brasil 2024.", needs:"MapBiomas e eixo"},
+  {id:"sitio", group:"Arqueologia", title:"Delimitação de sítio arqueológico", summary:"Perímetro validado e mapas de situação.", needs:"Polígono do sítio validado"},
+  {id:"prospeccao", group:"Arqueologia", title:"Malha de poços-teste planejada", summary:"Pontos previstos e área de prospecção.", needs:"Malha de pontos planejados"},
+  {id:"pocos", group:"Arqueologia", title:"Poços-teste executados", summary:"Pontos de campo com situação ou resultado.", needs:"Pontos executados com atributos de campo"},
+  {id:"comparativo", group:"Arqueologia", title:"Planejado × executado", summary:"Comparação visual entre malha e execução.", needs:"Camadas planejada e executada"},
+  {id:"corredor", group:"Atlas", title:"Atlas por corredor", summary:"Índice e folhas ao longo do eixo.", needs:"Eixo contínuo do projeto"},
+  {id:"atlas", group:"Atlas", title:"Atlas por grade", summary:"Folhas por linhas e colunas.", needs:"Camadas do projeto"},
+] as const;
+export const studioTerrain = [
+  {id:-22,name:"Copernicus GLO-30 · elevação"},
+  {id:-23,name:"Copernicus GLO-30 · curvas de nível de 20 m"},
+] as const;
+
+export function studioLayerRequirements(id: string, layers: {name:string; layerData:{features:{geometry:{type:string};properties?:Record<string,unknown>}[]}}[]) {
+  const key = (name:string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const planned = layers.some(layer => /malha|planejad/.test(key(layer.name)) && layer.layerData.features.some(f => /Point$/.test(f.geometry.type)));
+  const executed = layers.some(layer => /executad|campo/.test(key(layer.name)) && layer.layerData.features.some(f => /Point$/.test(f.geometry.type) &&
+    Object.keys(f.properties ?? {}).some(field => /situacao|status|resultado/.test(key(field)) && String(f.properties?.[field] ?? "").trim())));
+  const validated = layers.some(layer => layer.layerData.features.some(f => /Polygon$/.test(f.geometry.type) &&
+    (f.properties?.validado === true || key(String(f.properties?.status ?? "")) === "validado")));
+  if (id === "sitio" && !validated) return "Selecione o polígono do sítio com atributo validado ou status validado.";
+  if ((id === "pocos" || id === "comparativo") && !executed) return "Selecione pontos executados com situação, status ou resultado de campo.";
+  if ((id === "prospeccao" || id === "comparativo") && !planned) return "Selecione a malha de pontos planejados.";
+}

@@ -32,7 +32,7 @@ const defaultFrame = defaultLayout.principal;
 const newPdf = (paper: Paper = "A2", orientation: Orientation = "landscape") => new jsPDF({ orientation, unit: "mm", format: paperSize(paper, orientation), compress: true, precision: 6 });
 type Sheet = { center: Point; scale: number; number: number; total: number; grid: number; document?: any };
 
-type Options = { paper?: Paper; orientation?: Orientation; view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
+type Options = { brands?: ({image:string; width:number; height:number} | undefined)[]; paper?: Paper; orientation?: Orientation; view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
 function extent(layers: Layer[]) {
   let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
   for (const layer of layers) for (const feature of layer.layerData.features) for (const part of paths(feature.geometry)) {
@@ -96,7 +96,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   // convert metres to printed millimetres, then clip to the main map frame.
   if (!layers.length) throw new Error("Ative ao menos uma camada do projeto.");
   const states = JSON.parse(readFileSync(new URL("./estados.geojson", import.meta.url), "utf8")).features as Feature[];
-  const logo = readFileSync(new URL("./logo-arqueo.png", import.meta.url)).toString("base64");
+
   const paper = options.paper ?? "A2";
   const factor = paperFactor(paper);
   const portrait = options.orientation === 'portrait';
@@ -300,11 +300,18 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   detailLabel(341,"Projeto  LT Angicos–Jaguaruana II");
   detailLabel(348,`Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
   detailLabel(355,"Fontes  Camadas do projeto · IBGE 2024",3.25);
-  detailLabel(362,options.raster ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Responsável  __________________",3.25);
-  const logoUrl = "data:image/png;base64," + logo;
-  const logoX = portrait ? 350 : 509, logoY = portrait ? 551 : 381;
-  if (pdf) pdf.addImage(logoUrl,"PNG",logoX*factor,logoY*factor,40*factor,20*factor);
-  else svg.push(`<image href="${logoUrl}" x="${logoX}" y="${logoY}" width="40" height="20" preserveAspectRatio="none"/>`);
+  detailLabel(362,options.raster ? (options.model === "uso-solo" ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Copernicus DEM GLO-30 · recorte da LT") : "Responsável  __________________",3.25);
+  const logo = readFileSync(new URL("./logo-arqueo.png", import.meta.url));
+  const defaultBrand = {image:"data:image/png;base64,"+logo.toString("base64"),width:logo.readUInt32BE(16),height:logo.readUInt32BE(20)};
+  const brands = [options.brands?.[0] ?? defaultBrand,options.brands?.[1]].filter(brand => brand !== undefined);
+  brands.forEach((brand,i) => {
+    const ratio = Math.min(40/brand.width,20/brand.height);
+    const w = brand.width*ratio, h = brand.height*ratio;
+    const x = (portrait ? 350 : 509) + (i-(brands.length-1)/2)*48 +(40-w)/2;
+    const y = (portrait ? 551 : 381)+(20-h)/2;
+    if (pdf) pdf.addImage(brand.image,"PNG",x*factor,y*factor,w*factor,h*factor);
+    else svg.push(`<image href="${brand.image}" x="${x}" y="${y}" width="${w}" height="${h}"/>`);
+  });
   return sheet?.document ? null : pdf ? Buffer.from(pdf.output("arraybuffer")) : svg.join("") + "</svg>";
 }
 
@@ -437,4 +444,32 @@ export function studioReview(layers: Layer[], sheets: Sheet[] | undefined, optio
   }
   if (options.model === "uso-solo") warnings.push("O detalhe do MapBiomas depende da resolução dos blocos publicados.");
   return { scale, insetScales: { brasil:overviewView("brasil",options).scale, regional:overviewView("regional",options).scale }, sheets: sheets?.length ?? 0, warnings, widthKm: frame.w*scale*factor/1e6, heightKm: frame.h*scale*factor/1e6 };
+}
+
+export function printTerrain(layers: Layer[], options: Options, contours: boolean): ThematicRaster {
+  const { PNG } = createRequire(require.resolve("qrcode"))("pngjs");
+  const read = (name:string) => PNG.sync.read(readFileSync(new URL("../relevo/"+name+".png",import.meta.url)));
+  const source = read(contours ? "curvas" : "elevacao");
+  const shade = contours ? undefined : read("sombreado");
+  const mercator = proj4("EPSG:4326","EPSG:3857");
+  const [west,south] = mercator.forward([-37.85,-5.75]);
+  const [east,north] = mercator.forward([-36.38,-4.75]);
+  const image = new PNG({width:1000,height:840});
+  const {center,scale} = mapView(layers,options);
+  const frame = options.layout?.principal ?? defaultFrame;
+  const metres = scale*paperFactor(options.paper ?? "A2")/1000;
+  for (let row=0;row<image.height;row++) for (let col=0;col<image.width;col++) {
+    const [x,y] = mercator.forward(utm.inverse([center[0]+((col+.5)/image.width-.5)*frame.w*metres,
+      center[1]-((row+.5)/image.height-.5)*frame.h*metres]));
+    const sx = Math.floor((x-west)/(east-west)*source.width), sy = Math.floor((north-y)/(north-south)*source.height);
+    if (sx<0 || sy<0 || sx>=source.width || sy>=source.height) continue;
+    const from = 4*(sy*source.width+sx), to = 4*(row*image.width+col);
+    const light = shade ? .72+.28*shade.data[from]/255 : 1;
+    for (let channel=0;channel<3;channel++) image.data[to+channel]=Math.round(source.data[from+channel]*light);
+    image.data[to+3]=source.data[from+3];
+  }
+  const legend = contours ? [{color:"#854d0e",name:"Curvas de nível · 20 m"}] :
+    [[0,"#256943"],[100,"#7bb153"],[250,"#f0d782"],[500,"#ac6937"],[800,"#6e4234"],[1200,"#f4f4f4"]]
+      .map(([value,color]) => ({color:String(color),name:String(value)+" m"}));
+  return {url:"data:image/png;base64,"+PNG.sync.write(image).toString("base64"),legend};
 }

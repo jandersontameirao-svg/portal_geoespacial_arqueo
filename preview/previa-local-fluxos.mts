@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { ingestCog, renderCog } from "./previa-local-raster.mts";
 import { exportVector } from "./previa-exportar-vetor.mts";
-import { defaultStudioPaper, linearAtlasScale, readPaper, readOrientation, restoreLegend, readLayout, readScale, readStudioView } from "./previa-layout.mts";
+import { defaultStudioPaper, linearAtlasScale, studioModels, studioTerrain, studioLayerRequirements, readPaper, readOrientation, restoreLegend, readLayout, readScale, readStudioView } from "./previa-layout.mts";
 
 const require = createRequire(new URL("../package.json", import.meta.url));
 const { jsPDF } = require("jspdf");
@@ -12,7 +12,7 @@ const municipalAnchors = JSON.parse(readFileSync(new URL("./previa-raster/angico
 const storePath = fileURLToPath(new URL("./previa-local-dados.json", import.meta.url));
 const seed = { id: 1, name: "Levantamento arqueológico demonstrativo", code: "DEMO-01", description: "Projeto fictício para explorar o Geoportal.", clientName: "Cliente fictício", status: "active", createdAt: "2026-11-12T12:00:00Z" };
 type Row = Record<string, any>;
-type State = { projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; nextId: number };
+type State = { projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
 let state: State;
 try {
   state = JSON.parse(readFileSync(storePath, "utf8"));
@@ -235,6 +235,22 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       connections: [...connections.filter(item => item.id !== id), connection] });
     return connection;
   }
+  if (method === "previewProducts.brand") {
+    if (input.projectId !== 11 || !state.projects.some(project => project.id === 11)) throw Error("Projeto indisponível.");
+    const brands = state.studioBrands ?? [];
+    if (!write) return brands.find(brand => brand.id === input.id);
+    const name = typeof input.name === "string" ? input.name.trim().slice(0,80) : "";
+    const { kind, image } = input;
+    if (!name || !["empresa","cliente"].includes(kind) || typeof image !== "string" || image.length > 300000 ||
+      !/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(image)) throw Error("Informe um nome e uma imagem válida.");
+    const bytes = Buffer.from(image.split(",")[1],"base64");
+    const { PNG } = createRequire(require.resolve("qrcode"))("pngjs");
+    if (bytes.length < 24 || bytes.readUInt32BE(16) > 480 || bytes.readUInt32BE(20) > 240) throw Error("Imagem fora do tamanho permitido.");
+    const { width,height } = PNG.sync.read(bytes);
+    const brand = { id:state.nextId, name, kind, image, width,height };
+    save({ ...state, studioBrands:[...brands,brand], nextId:state.nextId+1 });
+    return { id:brand.id,name,kind };
+  }
   if (method === "previewProducts.list" || method === "previewProducts.save") {
     if (input.projectId !== 11 || !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
     const defaults = [
@@ -243,6 +259,9 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       { id: "detalhe", title: "Detalhe de trecho da LT", columns: 1, rows: 1, overlap: 0, grid: 2000, scale: 25000, layerIds: [13, 14, 15] },
       { id: "prospeccao", title: "Planejamento da prospecção", columns: 1, rows: 1, overlap: 0, grid: 10000, layerIds: [13, 15, 17] },
       { id: "uso-solo", title: "Uso e cobertura do solo — MapBiomas 2024", columns: 1, rows: 1, overlap: 0, grid: 25000, layerIds: [-21, 15] },
+      { id:"relevo", title:"Relevo e hipsometria", columns:1, rows:1, overlap:0, grid:10000, layerIds:[-22,15] },
+      { id:"topografia", title:"Topografia", columns:1, rows:1, overlap:0, grid:10000, layerIds:[-23,15] },
+      ...["sitio","pocos","comparativo"].map(id => ({ id, title:studioModels.find(model => model.id === id)!.title, columns:1, rows:1, overlap:0, grid:1000, layerIds:[] })),
       { id: "corredor", title: "Atlas por corredor", columns: 1, rows: 1, overlap: 15, grid: 500, scale: linearAtlasScale, layerIds: [13, 14, 15] },
       { id: "atlas", title: "Atlas", columns: 3, rows: 2, overlap: 10, grid: 10000 },
     ];
@@ -251,8 +270,10 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     const mapBiomas = { id: -21, name: "MapBiomas Brasil · 2024" };
     if (!write && method === "previewProducts.list") return {
       linearAtlasScale,
+      models:studioModels,
+      brands:(state.studioBrands ?? []).map(({id,name,kind}) => ({id,name,kind})),
       products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper ?? defaultStudioPaper), orientation: readOrientation(product.orientation), layout: product.paper ? readLayout(product.layout, readOrientation(product.orientation)) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
-      layers: [...layers.map(({ id, name }) => ({ id, name })), mapBiomas],
+      layers: [...layers.map(({ id, name }) => ({ id, name })), mapBiomas, ...studioTerrain],
     };
     if (!write || method !== "previewProducts.save") return undefined;
     const { id, title, columns, rows, overlap, grid } = input.product ?? {};
@@ -261,14 +282,19 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         !Number.isFinite(overlap) || overlap < 0 || overlap > 30 ||
         !Number.isInteger(grid) || grid < (id === "corredor" ? 100 : 1000) || grid > 50000) throw Error("Confira o título e os parâmetros da grade.");
     const { layerIds } = input.product;
-    if (!Array.isArray(layerIds) || !layerIds.length || !layerIds.every(layerId => (id === "uso-solo" && layerId === mapBiomas.id) || layers.some(layer => layer.id === layerId))) throw Error("Selecione pelo menos uma camada do projeto.");
+    if (!Array.isArray(layerIds) || !layerIds.length || !layerIds.every(layerId => (id === "uso-solo" && layerId === mapBiomas.id) || (id === "relevo" && layerId === -22) || (id === "topografia" && layerId === -23) || layers.some(layer => layer.id === layerId))) throw Error("Selecione pelo menos uma camada do projeto.");
     if (id === "corredor" && !layerIds.includes(15)) throw Error("O atlas por corredor precisa do eixo da LT.");
     if (id === "uso-solo" && (!layerIds.includes(-21) || !layerIds.includes(15))) throw Error("O mapa de uso do solo precisa do MapBiomas e do eixo.");
+    const missing = studioLayerRequirements(id,layers.filter(layer => layerIds.includes(layer.id)).map(layer => ({name:layer.name,layerData:layer.vector})));
+    if (missing) throw Error(missing);
+    if ((id === "relevo" && !layerIds.includes(-22)) || (id === "topografia" && !layerIds.includes(-23))) throw Error("Selecione a base temática do modelo.");
     const view = readStudioView(input.product.view);
     if (Object.values(view.insets).some(inset => inset.layers?.some(id => !layers.some(layer => layer.id === id)))) throw Error("Use camadas do projeto nos mapas de situação.");
     const locks = Array.isArray(input.product.locks) ? ["principal", "legenda", "norte", "brasil", "regional"].filter(key => input.product.locks.includes(key)) : [];
     const orientation = readOrientation(input.product.orientation);
-    const product = { id, orientation, title: title.trim(), columns, rows, overlap, grid, view, locks, paper: readPaper(input.product.paper ?? defaultStudioPaper),
+    const marks = { empresa:input.product.marks?.empresa ?? 0, cliente:input.product.marks?.cliente ?? 0 };
+    for (const [kind,brandId] of Object.entries(marks)) if (brandId !== 0 && !(state.studioBrands ?? []).some(brand => brand.id === brandId && brand.kind === kind)) throw Error("Marca indisponível para esta posição.");
+    const product = { id, marks, orientation, title: title.trim(), columns, rows, overlap, grid, view, locks, paper: readPaper(input.product.paper ?? defaultStudioPaper),
       layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout, orientation), scale: readScale(input.product.scale) ?? (id === "corredor" ? linearAtlasScale : undefined) };
     save({ ...state, products: { ...state.products, 11: products.map(item => item.id === id ? product : item) } });
     return product;
@@ -329,6 +355,16 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       const text = String(input.text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const request = String(input.text ?? "").trim();
       if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra um projeto para executar o comando.");
+      if (input.projectId === 11 && text.startsWith("montar modelo ")) {
+        const name = text.slice("montar modelo ".length).trim();
+        const normalize = (value:string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+        const model = studioModels.find(item => item.id === name || normalize(item.title) === name);
+        if (!model) throw Error("Informe o nome ou identificador de um modelo da biblioteca.");
+        const { products } = await workflow("previewProducts.list", {projectId:11});
+        const product = products.find((item:Row) => item.id === model.id);
+        if (method === "atena.previewPlan") return { summary: model.title + ". Dados necessários: " + model.needs + ". Abrir para revisão no Estúdio." };
+        return { studioUrl:"/projects/11?tab=products&modelo="+model.id, message:product.layerIds.length ? "Modelo pronto para revisar no Estúdio." : "Indique no Estúdio as camadas necessárias: "+model.needs+"." };
+      }
       const addSource = request.match(/^cadastrar fonte wms "([^"]+)" (https?:\/\/\S+) camada ([\w.:-]+)$/i);
       if (addSource) {
         const [, name, address, layer] = addSource;

@@ -7,12 +7,14 @@ type ElementId = keyof typeof names;
 type View = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number; east?: number; north?: number }> };
 const papers = ["A4", "A3", "A2", "A1", "A0"] as const;
 type Product = {
+  marks?: {empresa:number; cliente:number};
   paper: Paper;
   orientation: Orientation;
   id: string; title: string; columns: number; rows: number; overlap: number; grid: number;
   scale?: number; locks?: ElementId[]; layerIds: number[]; layout: Record<ElementId, Box>; view: View;
 };
 type Review = { scale: number; insetScales: Record<"brasil" | "regional", number>; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
+type Brand = { id:number; name:string; kind:"empresa"|"cliente" };
 type Layer = { id: number; name: string };
 const mapFrames = ["principal","brasil","regional"] as const;
 type MapFrame = typeof mapFrames[number];
@@ -37,7 +39,7 @@ async function request(method: "list" | "save", product?: Product) {
 function sheetUrl(format: "svg" | "pdf" | "json", product: Product, page?: number) {
   const query = new URLSearchParams({
     papel: product.paper, orientacao: product.orientation, modelo: product.id, grade: String(product.grid), titulo: product.title,
-    camadas: product.layerIds.join(","), layout: JSON.stringify(product.layout), vista: JSON.stringify(product.view),
+    empresa:String(product.marks?.empresa ?? 0), cliente:String(product.marks?.cliente ?? 0), camadas: product.layerIds.join(","), layout: JSON.stringify(product.layout), vista: JSON.stringify(product.view),
   });
   if (product.scale) query.set("escala", String(product.scale));
   if (product.id === "atlas" || product.id === "corredor") {
@@ -74,7 +76,9 @@ export default function PreviewMapProducts() {
   const [layers, setLayers] = useState<Layer[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Product>>({});
   const [history, setHistory] = useState<Record<string, { past: Product[]; future: Product[] }>>({});
-  const [active, setActive] = useState("mapa");
+  const [active, setActive] = useState(() => new URLSearchParams(location.search).get("modelo") ?? "mapa");
+  const [library,setLibrary] = useState(false);
+  const [brands,setBrands] = useState<Brand[]>([]);
   const [element, setElement] = useState<ElementId>("principal");
   const [selectedElements, setSelectedElements] = useState<ElementId[]>(["principal"]);
   const multiple = selectedElements.length > 1;
@@ -96,7 +100,8 @@ export default function PreviewMapProducts() {
   const latestGesture = useRef<typeof gesture>();
   useEffect(() => {
     request("list").then(data => {
-      setProducts(data.products); setLayers(data.layers); setAtlasDefault(data.linearAtlasScale);
+      setProducts(data.products); setBrands(data.brands ?? []);
+      setActive(current => data.products.some((product:Product) => product.id === current) ? current : "mapa"); setLayers(data.layers); setAtlasDefault(data.linearAtlasScale);
     }).catch(error => setNotice(error.message));
   }, []);
   const saved = products.find(product => product.id === active);
@@ -314,6 +319,30 @@ export default function PreviewMapProducts() {
     boxChange({ ...box, x:Math.max(0,Math.min(format.width-box.w,box.x+dx)), y:Math.max(0,Math.min(format.height-box.h,box.y+dy)) });
   }
 
+  async function uploadBrand(kind: Brand["kind"], file:File) {
+    if (file.size > 4000000 || !["image/png","image/jpeg","image/webp"].includes(file.type)) {
+      setNotice("Escolha PNG, JPEG ou WebP de até 4 MB.");
+      return;
+    }
+    try {
+      const image = await createImageBitmap(file);
+      const ratio = Math.min(1,480/image.width,240/image.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1,Math.round(image.width*ratio));
+      canvas.height = Math.max(1,Math.round(image.height*ratio));
+      canvas.getContext("2d")!.drawImage(image,0,0,canvas.width,canvas.height);
+      image.close();
+      const response = await fetch("/api/trpc/previewProducts.brand",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({json:{projectId:11,kind,name:file.name.replace(/\.[^.]+$/,""),image:canvas.toDataURL("image/png")}}),
+      });
+      const body = await response.json();
+      if (!response.ok || body.error) throw Error(body.error?.json?.message ?? "Não foi possível cadastrar a marca.");
+      setBrands(current => [...current,body.result.data.json]);
+      setNotice("Marca cadastrada. Escolha-a no seletor da prancha.");
+    } catch (error) { setNotice((error as Error).message); }
+  }
+
   async function save() {
     if (!draft) return;
     setSaving(true); setNotice("");
@@ -343,7 +372,7 @@ export default function PreviewMapProducts() {
     finally { setExporting(false); }
   }
 
-  const order = [...layers].filter(layer => layer.id !== -21 || (active === "uso-solo" && !inset))
+  const order = [...layers].filter(layer => layer.id > 0 || (!inset && ((active === "uso-solo" && layer.id === -21) || (active === "relevo" && layer.id === -22) || (active === "topografia" && layer.id === -23))))
     .sort((a,b) => (layerIds?.indexOf(b.id) ?? -1) - (layerIds?.indexOf(a.id) ?? -1));
   const selection = draft?.layout[element];
   function scaleFor(id: ElementId) {
@@ -406,6 +435,10 @@ export default function PreviewMapProducts() {
     ? { x:((mapOffset?.east ?? 0)-gesture.offset.east)*1000/(viewScale*factor), y:(gesture.offset.north-(mapOffset?.north ?? 0))*1000/(viewScale*factor) }
     : undefined;
 
+  function openModel(id:string) {
+    setActive(id); setLibrary(false); setPage(0); selectElement("principal");
+    setReview(undefined); setError(""); setNotice(""); setMode("layout");
+  }
   return <section onKeyDown={keyboard} aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
     <style>{`
       .arqueo-studio-workspace { display:grid; }
@@ -425,12 +458,13 @@ export default function PreviewMapProducts() {
       <label className="min-w-52 grow text-xs text-emerald-100/80">Modelo de mapa ou atlas
         <select className="mt-1 block w-full rounded-md border border-white/25 px-2 py-1.5 text-sm text-white" style={{ background:"#263735" }}
           value={active} disabled={saving || !products.length} onChange={event => {
-            setActive(event.target.value); setPage(0); selectElement("principal"); setReview(undefined); setError(""); setNotice(""); setMode("layout");
+            openModel(event.target.value);
           }}>
           {products.map(product => <option key={product.id} value={product.id}>{product.title}</option>)}
         </select>
       </label>
       <div className="flex flex-wrap gap-2">
+        <button type="button" aria-expanded={library} className="rounded-md border border-white/30 px-3 py-2 text-sm" onClick={() => setLibrary(!library)}>Biblioteca de modelos</button>
         <button type="button" className="inline-flex items-center gap-2 rounded-md border border-white/30 px-3 py-2 text-sm disabled:opacity-50" disabled={!draft || saving || !dirty || !!error || proof?.for !== previewUrl || !draft.title.trim()} onClick={() => void save()}><Save size={16} /> Salvar produto</button>
         <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-950 disabled:opacity-50"
           disabled={!saved || dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(false)}><Download size={16} /> {exporting ? "Gerando PDF…" : atlas ? "Exportar atlas" : "Exportar PDF"}</button>
@@ -441,6 +475,21 @@ export default function PreviewMapProducts() {
       {notice && <span role="status">{notice}</span>}
       {error && <span role="alert" className="font-medium text-red-700 dark:text-red-300">{error}</span>}
     </div>
+    {library && <div className="space-y-4 border-b p-5">
+      {Array.from(new Set(studioModels.map(model => model.group))).map(group => <div key={group}>
+        <h3 className="mb-2 text-sm font-semibold">{group}</h3>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{studioModels.filter(model => model.group === group).map(model =>
+          <button type="button" key={model.id} className="rounded-lg border p-3 text-left hover:border-emerald-600" onClick={() => openModel(model.id)}>
+            <span aria-hidden="true" className="mb-2 flex h-12 w-20 gap-1 rounded border bg-slate-100 p-1">
+              <span className="flex min-w-0 flex-1 items-center justify-center rounded bg-emerald-100 text-emerald-800"><Layers3 size={16}/></span>
+              <span className="w-4 rounded border bg-white" />
+            </span>
+            <span className="block text-sm font-semibold">{model.title}</span>
+            <span className="block text-xs">{model.summary}</span>
+            <span className="mt-1 block text-xs text-slate-500">Requer {model.needs.toLowerCase()}</span>
+          </button>)}</div>
+      </div>)}
+    </div>}
     {draft && selection && <fieldset disabled={saving} className="min-w-0">
       <div className="arqueo-studio-workspace">
         <aside className={panel + " border-slate-200 xl:border-r dark:border-slate-700"}>
@@ -570,6 +619,24 @@ export default function PreviewMapProducts() {
               layout:portrait ? (saved?.orientation === "landscape" ? saved.layout : defaultLayout) : draft.layout })}>
             Usar padrão A3 paisagem
           </button>
+          <details className="text-xs">
+            <summary className="cursor-pointer font-semibold">Marcas da folha</summary>
+            {(["empresa","cliente"] as const).map(kind => <div key={kind} className="mt-3">
+              <label className="block">{kind === "empresa" ? "Empresa responsável" : "Cliente"}
+                <select className={input} value={draft.marks?.[kind] ?? 0} onChange={event => change({ ...draft, marks:{
+                  empresa:draft.marks?.empresa ?? 0, cliente:draft.marks?.cliente ?? 0,[kind]:Number(event.target.value),
+                } })}>
+                  <option value={0}>{kind === "empresa" ? "Grupo Arqueo" : "Sem marca do cliente"}</option>
+                  {brands.filter(brand => brand.kind === kind).map(brand => <option value={brand.id} key={brand.id}>{brand.name}</option>)}
+                </select>
+              </label>
+              <label className="mt-2 block">Carregar marca {kind === "empresa" ? "da empresa" : "do cliente"}
+                <input className="mt-1 block w-full" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => {
+                  const file = event.target.files?.[0]; event.target.value = ""; if (file) void uploadBrand(kind,file);
+                }}/>
+              </label>
+            </div>)}
+          </details>
           <label className="block text-xs">Título da folha<input className={input} maxLength={85} value={draft.title} onChange={event => change({ ...draft, title:event.target.value })} /></label>
           <label className="block text-xs">Escala do mapa principal 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"
             value={draft.scale ?? ""} onChange={event => change({ ...draft, scale:event.target.value ? event.target.valueAsNumber : undefined })} /></label>
