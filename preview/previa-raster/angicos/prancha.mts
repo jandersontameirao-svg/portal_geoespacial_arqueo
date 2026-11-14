@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import { defaultLayout, linearAtlasScale, type Layout } from "../../previa-layout.mts";
+import { defaultLayout, linearAtlasScale, type Layout, type StudioView } from "../../previa-layout.mts";
 
 import { mapBiomasRaster, type ThematicRaster } from "./mapbiomas.mts";
 
@@ -28,11 +28,11 @@ function paths(shape: Shape): { rings: Point[][]; closed: boolean }[] {
   }
 }
 
-const frame = { x: 27, y: 32, w: 440, h: 370 };
+const defaultFrame = defaultLayout.principal;
 const newPdf = () => new jsPDF({ orientation: "landscape", unit: "mm", format: [594, 420], compress: true, precision: 6 });
 type Sheet = { center: Point; scale: number; number: number; total: number; grid: number; document?: any };
 
-type Options = { layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
+type Options = { view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
 function extent(layers: Layer[]) {
   let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
   for (const layer of layers) for (const feature of layer.layerData.features) for (const part of paths(feature.geometry)) {
@@ -47,11 +47,12 @@ function extent(layers: Layer[]) {
 }
 
 function mapView(layers: Layer[], options: Options) {
+  const frame = options.layout?.principal ?? defaultFrame;
   const focus = options.model === "detalhe" || options.model === "uso-solo"
     ? layers.filter(layer => layer.id === 15) : layers;
   const { left, right, bottom, top } = extent(focus.length ? focus : layers);
   const scale = options.scale ?? Math.max(50000, Math.ceil(Math.max((right-left)/frame.w, (top-bottom)/frame.h) * 1.1 / 50) * 50000);
-  const center: Point = [(left+right)/2, (bottom+top)/2];
+  const center: Point = [(left+right)/2+(options.view?.east ?? 0), (bottom+top)/2+(options.view?.north ?? 0)];
   if (options.model === "detalhe") {
     const axis = focus[0]?.layerData.features.find(feature => feature.geometry.type === "LineString");
     const points: Point[] = axis?.geometry.coordinates ?? [];
@@ -61,12 +62,14 @@ function mapView(layers: Layer[], options: Options) {
 }
 
 export async function printMapBiomas(layers: Layer[], options: Options) {
+  const frame = options.layout?.principal ?? defaultFrame;
   const { center: [x,y], scale } = mapView(layers, options);
   const width = frame.w * scale / 1000, height = frame.h * scale / 1000;
   return mapBiomasRaster(point => utm.inverse(point), x-width/2, y+height/2, width, height);
 }
 export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, title?: string, options: Options = {}) {
   const layout = options.layout ?? defaultLayout;
+  const frame = layout.principal;
   // Shared layout for SVG preview and PDF: project the GeoJSON to UTM 24S,
   // convert metres to printed millimetres, then clip to the main map frame.
   if (!layers.length) throw new Error("Ative ao menos uma camada do projeto.");
@@ -174,12 +177,17 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     label(frame.x+1,y-1,String(n),2.6);
   }
   rect(frame.x,frame.y,frame.w,frame.h);
-  for (const feature of features) {
+  const labelBoxes: { left:number; right:number; top:number; bottom:number }[] = [];
+  const labelFeatures = options.view?.labels === false ? [] : features;
+  for (const feature of labelFeatures) {
     const { nome, rotulo_ibge } = feature.properties ?? {};
     if (!nome || !rotulo_ibge) continue;
     const [x,y] = main(rotulo_ibge);
     const w = nome.length * 1.85 + 3;
     if (x-w/2 < frame.x || x+w/2 > frame.x+frame.w || y-3 < frame.y || y+2 > frame.y+frame.h) continue;
+    const box = { left:x-w/2, right:x+w/2, top:y-2.8, bottom:y+1.7 };
+    if (labelBoxes.some(other => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top)) continue;
+    labelBoxes.push(box);
     rect(x-w/2,y-2.8,w,4.5,"#ffffff","none");
     label(x,y+.5,nome,3.4,true,true);
   }
@@ -196,15 +204,26 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     const { x, y, w: width } = box;
     const heading = Math.min(7,box.h*.2), height = box.h-heading, top = y+heading;
     const factor = Math.min(width/(east-west),height/(north-south));
-    const project = ([lo,la]: Point): Point => [x+width/2+(lo-(east+west)/2)*factor,top+height/2-(la-(south+north)/2)*factor];
+    const inset = options.view?.insets[national ? "brasil" : "regional"];
+    const insetCenter = utm.forward(national ? [-54,-14] : [lon,lat]);
+    const project = ([lo,la]: Point): Point => {
+      if (!inset?.scale || national) return [x+width/2+(lo-(east+west)/2)*factor,top+height/2-(la-(south+north)/2)*factor];
+      const [e,n] = utm.forward([lo,la]);
+      return [x+width/2+(e-insetCenter[0])*1000/inset.scale, top+height/2-(n-insetCenter[1])*1000/inset.scale];
+    };
     rect(x,y,width,box.h,"#ffffff");
-    label(x+1,y+heading*.72,title,Math.min(3.5,width/Math.max(8,title.length*.58),heading*.7),true);
+    label(x+1,y+heading*.72,inset?.scale && !national ? title + ' · 1:' + inset.scale.toLocaleString('pt-BR') : title,Math.min(3.5,width/Math.max(8,title.length*.58),heading*.7),true);
     rect(x,top,width,height,"#e8f0f2");
     clip(x,top,width,height,() => {
       drawFeatures(states,project,"#909b91","#efeee6",.13);
       const focus = states.filter(f => ["CE","RN"].includes(f.properties?.SIGLA_UF || ""));
       drawFeatures(focus,project,"#647861","#d3e1c5",.2);
-      if (national) {
+      if (inset?.layers) {
+        for (const id of inset.layers) {
+          const layer = (options.available ?? layers).find(item => item.id === id);
+          if (layer) drawFeatures(layer.layerData.features,project,layer.defaultStyle?.color ?? '#a52932','none',.35);
+        }
+      } else if (national) {
         const [cx,cy] = project([lon,lat]);
         rect(cx-1,cy-1,2,2,"#a52932","none");
       } else drawFeatures(features,project,"#a52932","none",.4);
@@ -257,6 +276,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
 // Each sheet covers frame size × scale in UTM metres. Rows run north to south.
 // The configured overlap repeats part of the previous sheet without changing scale.
 function planSheets(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, options: Options): Sheet[] {
+  const frame = options.layout?.principal ?? defaultFrame;
   if (![columns, rows].every(n => Number.isInteger(n) && n >= 1 && n <= 8) ||
       columns * rows > 24 || !Number.isFinite(overlap) || overlap < 0 || overlap > 30 ||
       !Number.isInteger(grid) || grid < 1000 || grid > 50000) throw Error("Grade de atlas inválida.");
@@ -293,7 +313,8 @@ export function corridorSheets(layers: Layer[], overlap: number, grid: number, o
   const length = distances.at(-1) ?? 0;
   if (!length) throw Error("O eixo precisa ter extensão maior que zero.");
   const scale = options.scale ?? linearAtlasScale;
-  const coverage = frame.h * scale / 1000;
+  const frame = options.layout?.principal ?? defaultFrame;
+  const coverage = Math.min(frame.w, frame.h) * scale / 1000;
   const total = 1 + Math.ceil(Math.max(0,length-coverage) / (coverage*(1-overlap/100)));
   if (total > 180) throw Error("Aumente o denominador da escala para gerar até 180 folhas.");
   return Array.from({ length: total }, (_, i) => {
@@ -305,7 +326,9 @@ export function corridorSheets(layers: Layer[], overlap: number, grid: number, o
   });
 }
 
-export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, page: number, title: string | undefined, options: Options) {
+export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, page: number, title: string | undefined, options: Options, single = false) {
+  const frame = options.layout?.principal ?? defaultFrame;
+  if (!Number.isInteger(page) || page < 0 || page > sheets.length) throw Error('Folha fora do atlas.');
   const west = Math.min(...sheets.map(sheet => sheet.center[0])), east = Math.max(...sheets.map(sheet => sheet.center[0]));
   const south = Math.min(...sheets.map(sheet => sheet.center[1])), north = Math.max(...sheets.map(sheet => sheet.center[1]));
   const detail = sheets[0].scale;
@@ -313,8 +336,8 @@ export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, pa
   const index: Sheet = { center: [(east+west)/2,(north+south)/2], scale, number: 1, total: sheets.length+1, grid: 25000 };
   const indexTitle = "Mapa índice | LT Angicos–Jaguaruana II";
   const detailTitle = title ?? "Atlas por corredor | LT Angicos–Jaguaruana II";
-  if (!pdf) return page === 0 ? pranchaAngicos(layers, false, index, indexTitle, { ...options, index: sheets })
-    : pranchaAngicos(layers, false, sheets[page-1], detailTitle, options);
+  if (!pdf || single) return page === 0 ? pranchaAngicos(layers, pdf, index, indexTitle, { ...options, index: sheets })
+    : pranchaAngicos(layers, pdf, sheets[page-1], detailTitle, options);
   const document = newPdf();
   pranchaAngicos(layers, true, { ...index, document }, indexTitle, { ...options, index: sheets });
   for (const sheet of sheets) {
@@ -336,6 +359,7 @@ export function atlasAngicos(layers: Layer[], columns: number, rows: number, ove
 export function atlasView(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, page: number, title?: string, options: Options = {}) {
   const sheets = planSheets(layers, columns, rows, overlap, grid, options);
   if (page > 0 && sheets[page-1]) return pranchaAngicos(layers, false, sheets[page-1], title, options);
+  const frame = options.layout?.principal ?? defaultFrame;
   const metres = sheets[0].scale / 1000;
   const west = sheets[0].center[0] - frame.w * metres / 2;
   const north = sheets[0].center[1] + frame.h * metres / 2;
@@ -352,4 +376,26 @@ export function atlasView(layers: Layer[], columns: number, rows: number, overla
     return `<rect x="${x-frame.w/2}" y="${y-frame.h/2}" width="${frame.w}" height="${frame.h}" fill="#60a5fa" fill-opacity=".07" stroke="#1d4ed8" stroke-width="2"/><text x="${x}" y="${y}" font-size="32" text-anchor="middle" fill="#172554">${sheet.number}</text>`;
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 ${width+20} ${height+20}" font-family="sans-serif"><rect width="${width}" height="${height}" fill="#f8fafc"/>${outlines.join("")}${boxes.join("")}</svg>`;
+}
+
+export function studioReview(layers: Layer[], sheets: Sheet[] | undefined, options: Options) {
+  const frame = options.layout?.principal ?? defaultLayout.principal;
+  const { center, scale } = sheets?.[0] ?? mapView(layers, options);
+  const warnings: string[] = [];
+  const layout = options.layout ?? defaultLayout;
+  if (frame.x < 20 || frame.y < 28 || frame.x+frame.w > 474 || frame.y+frame.h > 410)
+    warnings.push("O quadro principal ultrapassa a área útil do modelo.");
+  const insets = [layout.legenda, layout.brasil, layout.regional];
+  if (insets.some((a,i) => insets.slice(i+1).some(b => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y)))
+    warnings.push("A legenda e os mapas de situação têm elementos sobrepostos.");
+  if (!sheets && options.model !== "detalhe") {
+    const axis = layers.filter(layer => layer.id === 15);
+    const bounds = extent(axis.length ? axis : layers);
+    const [x,y] = center;
+    if (bounds.left < x-frame.w*scale/2000 || bounds.right > x+frame.w*scale/2000 ||
+        bounds.bottom < y-frame.h*scale/2000 || bounds.top > y+frame.h*scale/2000)
+      warnings.push("O quadro principal corta parte da área de referência.");
+  }
+  if (options.model === "uso-solo") warnings.push("O detalhe do MapBiomas depende da resolução dos blocos publicados.");
+  return { scale, sheets: sheets?.length ?? 0, warnings, widthKm: frame.w*scale/1e6, heightKm: frame.h*scale/1e6 };
 }

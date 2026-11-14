@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { ingestCog, renderCog } from "./previa-local-raster.mts";
 import { exportVector } from "./previa-exportar-vetor.mts";
-import { defaultLayout, linearAtlasScale, readLayout, readScale } from "./previa-layout.mts";
+import { linearAtlasScale, readLayout, readScale, readStudioView } from "./previa-layout.mts";
 
 const require = createRequire(new URL("../package.json", import.meta.url));
 const { jsPDF } = require("jspdf");
@@ -251,7 +251,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     const mapBiomas = { id: -21, name: "MapBiomas Brasil · 2024" };
     if (!write && method === "previewProducts.list") return {
       linearAtlasScale,
-      products: products.map(product => ({ layout: defaultLayout, layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product })),
+      products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, layout: readLayout(product.layout), view: readStudioView(product.view) })),
       layers: [...layers.map(({ id, name }) => ({ id, name })), mapBiomas],
     };
     if (!write || method !== "previewProducts.save") return undefined;
@@ -264,7 +264,9 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     if (!Array.isArray(layerIds) || !layerIds.length || !layerIds.every(layerId => (id === "uso-solo" && layerId === mapBiomas.id) || layers.some(layer => layer.id === layerId))) throw Error("Selecione pelo menos uma camada do projeto.");
     if (id === "corredor" && !layerIds.includes(15)) throw Error("O atlas por corredor precisa do eixo da LT.");
     if (id === "uso-solo" && (!layerIds.includes(-21) || !layerIds.includes(15))) throw Error("O mapa de uso do solo precisa do MapBiomas e do eixo.");
-    const product = { id, title: title.trim(), columns, rows, overlap, grid,
+    const view = readStudioView(input.product.view);
+    if (Object.values(view.insets).some(inset => inset.layers?.some(id => !layers.some(layer => layer.id === id)))) throw Error("Use camadas do projeto nos mapas de situação.");
+    const product = { id, title: title.trim(), columns, rows, overlap, grid, view,
       layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout), scale: readScale(input.product.scale) ?? (id === "corredor" ? linearAtlasScale : undefined) };
     save({ ...state, products: { ...state.products, 11: products.map(item => item.id === id ? product : item) } });
     return product;

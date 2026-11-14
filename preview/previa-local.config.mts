@@ -2,9 +2,10 @@ import config from "../vite.local-visual.config";
 import { download, downloadVector, projectSearchEntries, workflow } from "./previa-local-fluxos.mts";
 import { rasterArtifact } from "./previa-local-raster.mts";
 import { readFileSync } from "node:fs";
-import { readLayout, readScale } from "./previa-layout.mts";
+import { fileURLToPath } from "node:url";
+import { readLayout, readScale, readStudioView } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
-import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, pranchaAngicos, printMapBiomas } from "./previa-raster/angicos/prancha.mts";
+import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas } from "./previa-raster/angicos/prancha.mts";
 
 const arqueoA2Renderer = readFileSync(new URL("./previa-raster/composicao-a2.ts.txt", import.meta.url), "utf8");
 const arqueoA2Seeds = [
@@ -39,12 +40,14 @@ const responses: Record<string, unknown> = {
 const demoApi = {
   name: "geoportal-local-demo",
   enforce: "pre" as const,
-  load(id: string) {
+  load(this: { addWatchFile(path: string): void }, id: string) {
     if (id.replaceAll("\\", "/").endsWith("/pages/PreviewConnections.tsx")) {
       return readFileSync(new URL("./previa-conexoes.tsx", import.meta.url), "utf8");
     }
     if (id.replaceAll("\\", "/").endsWith("/pages/PreviewMapProducts.tsx")) {
-      return readFileSync(new URL("./previa-produtos.tsx", import.meta.url), "utf8");
+      const source = new URL("./previa-produtos.tsx", import.meta.url);
+      this.addWatchFile(fileURLToPath(source));
+      return readFileSync(source, "utf8");
     }
     if (id.replaceAll("\\", "/").endsWith("/components/PreviewIbgeLayers.tsx")) {
       return readFileSync(new URL("./previa-ibge.tsx", import.meta.url), "utf8");
@@ -702,9 +705,9 @@ const demoApi = {
       try {
         const pdf = url.pathname.endsWith(".pdf");
         const requested = url.searchParams.get("camadas");
-        const ids = requested === null ? null : new Set(requested.split(",").map(Number));
-        const layers = (await workflow("gisAnalysis.list", { projectId: 11 })).filter(layer =>
-          ids ? ids.has(layer.id) : layer.isVisible);
+        const ids = requested === null ? null : [...new Set(requested.split(",").filter(Boolean).map(Number))];
+        const available = await workflow("gisAnalysis.list", { projectId: 11 });
+        const layers = ids ? ids.flatMap(id => available.filter(layer => layer.id === id)) : available.filter(layer => layer.isVisible);
         if (!layers.length) { res.statusCode = 422; res.end("Ative ao menos uma camada do projeto."); return; }
         const atlas = url.searchParams.get("atlas");
         const [columns, rows, overlap, grid] = atlas?.split(",").map(Number) ?? [];
@@ -713,7 +716,10 @@ const demoApi = {
         const scale = url.searchParams.get("escala");
         const model = url.searchParams.get("modelo");
         const requestedGrid = Number(url.searchParams.get("grade"));
+        const view = url.searchParams.get("vista");
         const options = {
+          view: readStudioView(view ? JSON.parse(view) : undefined),
+          available,
           layout: readLayout(layout ? JSON.parse(layout) : undefined),
           scale: readScale(scale ? Number(scale) : undefined),
           grid: Number.isInteger(requestedGrid) && requestedGrid >= 1000 && requestedGrid <= 50000 ? requestedGrid : undefined,
@@ -724,11 +730,11 @@ const demoApi = {
         if (url.pathname.endsWith(".json")) {
           res.setHeader("Content-Type", "application/json");
           res.setHeader("Cache-Control", "no-store");
-          res.end(JSON.stringify({ sheets: corridor?.length ?? 0 }));
+          res.end(JSON.stringify(studioReview(layers, corridor, options)));
           return;
         }
         if (model === "uso-solo") options.raster = await printMapBiomas(layers, options);
-        const body = corridor ? corridorAtlas(layers, corridor, pdf, Number(url.searchParams.get("folha") ?? 0), title, options) : atlas ? (pdf ? atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
+        const body = corridor ? corridorAtlas(layers, corridor, pdf, Number(url.searchParams.get("folha") ?? 0), title, options, url.searchParams.has("folha")) : atlas ? (pdf ? atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
           atlasView(layers, columns, rows, overlap, grid, Number(url.searchParams.get("folha") ?? 0), title, options)) :
           pranchaAngicos(layers, pdf, undefined, title, options);
         res.setHeader("Cache-Control", "no-store");

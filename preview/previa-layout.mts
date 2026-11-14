@@ -2,6 +2,7 @@
 export const linearAtlasScale = 4500;
 
 export const defaultLayout = {
+  principal: { x: 27, y: 32, w: 440, h: 370 },
   legenda: { x: 478, y: 202, w: 104, h: 65 },
   norte: { x: 33, y: 36, w: 14, h: 20 },
   brasil: { x: 479, y: 30, w: 100, h: 79 },
@@ -13,7 +14,7 @@ export function readLayout(value: unknown): Layout {
   if (!value || typeof value !== "object") throw Error("Layout inválido.");
   const result = {} as Layout;
   for (const key of Object.keys(defaultLayout) as (keyof Layout)[]) {
-    const box = (value as Layout)[key];
+    const box = (value as Layout)[key] ?? (key === "principal" ? defaultLayout.principal : undefined);
     if (!box || ![box.x, box.y, box.w, box.h].every(Number.isFinite) ||
         box.x < 0 || box.y < 0 || box.w < 10 || box.h < 10 || box.x+box.w > 594.001 || box.y+box.h > 420.001) throw Error("Elemento fora da folha.");
     result[key] = { x: box.x, y: box.y, w: box.w, h: box.h };
@@ -24,4 +25,20 @@ export function readScale(value: unknown): number | undefined {
   if (value == null || value === "") return;
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1000 || value > 10000000) throw Error("Use uma escala entre 1:1.000 e 1:10.000.000.");
   return value;
+}
+
+export type StudioView = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number }> };
+export function readStudioView(value: unknown): StudioView {
+  if (value === undefined) return { east: 0, north: 0, labels: true, insets: { brasil: {}, regional: {} } };
+  const view = value as StudioView;
+  if (!view || ![view.east, view.north].every(n => Number.isFinite(n) && Math.abs(n) <= 500000) ||
+      typeof view.labels !== "boolean" || !view.insets) throw Error("Enquadramento inválido.");
+  const insets = { brasil: {}, regional: {} } as StudioView["insets"];
+  for (const key of ["brasil", "regional"] as const) {
+    const inset = view.insets[key];
+    if (!inset || (inset.layers !== undefined && (!Array.isArray(inset.layers) || inset.layers.length > 40 || !inset.layers.every(Number.isInteger))))
+      throw Error("Camadas do mapa de situação inválidas.");
+    insets[key] = { layers: inset.layers, scale: readScale(inset.scale) };
+  }
+  return { east: view.east, north: view.north, labels: view.labels, insets };
 }
