@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import { defaultLayout, linearAtlasScale, type Layout, type StudioView } from "../../previa-layout.mts";
+import { defaultLayout, linearAtlasScale, paperFactor, paperSizes, type Paper, type Layout, type StudioView } from "../../previa-layout.mts";
 
 import { mapBiomasRaster, type ThematicRaster } from "./mapbiomas.mts";
 
@@ -29,10 +29,10 @@ function paths(shape: Shape): { rings: Point[][]; closed: boolean }[] {
 }
 
 const defaultFrame = defaultLayout.principal;
-const newPdf = () => new jsPDF({ orientation: "landscape", unit: "mm", format: [594, 420], compress: true, precision: 6 });
+const newPdf = (paper: Paper = "A2") => new jsPDF({ orientation: "landscape", unit: "mm", format: [...paperSizes[paper]], compress: true, precision: 6 });
 type Sheet = { center: Point; scale: number; number: number; total: number; grid: number; document?: any };
 
-type Options = { view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
+type Options = { paper?: Paper; view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
 function extent(layers: Layer[]) {
   let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
   for (const layer of layers) for (const feature of layer.layerData.features) for (const part of paths(feature.geometry)) {
@@ -51,7 +51,7 @@ function mapView(layers: Layer[], options: Options) {
   const focus = options.model === "detalhe" || options.model === "uso-solo"
     ? layers.filter(layer => layer.id === 15) : layers;
   const { left, right, bottom, top } = extent(focus.length ? focus : layers);
-  const scale = options.scale ?? Math.max(50000, Math.ceil(Math.max((right-left)/frame.w, (top-bottom)/frame.h) * 1.1 / 50) * 50000);
+  const scale = options.scale ?? Math.max(50000, Math.ceil(Math.max((right-left)/frame.w, (top-bottom)/frame.h) * 1.1 / (50*paperFactor(options.paper ?? "A2"))) * 50000);
   const center: Point = [(left+right)/2+(options.view?.east ?? 0), (bottom+top)/2+(options.view?.north ?? 0)];
   if (options.model === "detalhe") {
     const axis = focus[0]?.layerData.features.find(feature => feature.geometry.type === "LineString");
@@ -64,7 +64,8 @@ function mapView(layers: Layer[], options: Options) {
 export async function printMapBiomas(layers: Layer[], options: Options) {
   const frame = options.layout?.principal ?? defaultFrame;
   const { center: [x,y], scale } = mapView(layers, options);
-  const width = frame.w * scale / 1000, height = frame.h * scale / 1000;
+  const step = scale * paperFactor(options.paper ?? "A2") / 1000;
+  const width = frame.w * step, height = frame.h * step;
   return mapBiomasRaster(point => utm.inverse(point), x-width/2, y+height/2, width, height);
 }
 export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, title?: string, options: Options = {}) {
@@ -75,26 +76,29 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   if (!layers.length) throw new Error("Ative ao menos uma camada do projeto.");
   const states = JSON.parse(readFileSync(new URL("./estados.geojson", import.meta.url), "utf8")).features as Feature[];
   const logo = readFileSync(new URL("./logo-arqueo.png", import.meta.url)).toString("base64");
-  const pdf = asPdf ? sheet?.document ?? newPdf() : null;
-  const svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 594 420" width="594mm" height="420mm" font-family="Arial, sans-serif">'];
+  const paper = options.paper ?? "A2";
+  const factor = paperFactor(paper);
+  const [paperWidth,paperHeight] = paperSizes[paper];
+  const pdf = asPdf ? sheet?.document ?? newPdf(paper) : null;
+  const svg = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${paperWidth/factor} ${paperHeight/factor}" width="${paperWidth}mm" height="${paperHeight}mm" font-family="Arial, sans-serif">`];
   let clipId = 0;
   const rect = (x: number, y: number, w: number, h: number, fill = "none", stroke = ink) => {
     if (pdf) {
-      pdf.setLineWidth(.24).setDrawColor(stroke === "none" ? fill : stroke);
+      pdf.setLineWidth(.24*factor).setDrawColor(stroke === "none" ? fill : stroke);
       if (fill !== "none") pdf.setFillColor(fill);
-      pdf.rect(x, y, w, h, fill === "none" ? "S" : stroke === "none" ? "F" : "FD");
+      pdf.rect(x*factor, y*factor, w*factor, h*factor, fill === "none" ? "S" : stroke === "none" ? "F" : "FD");
     } else svg.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width=".24"/>`);
   };
   const label = (x: number, y: number, value: string, size = 3.5, bold = false, center = false) => {
-    if (pdf) pdf.setTextColor(ink).setFont("helvetica", bold ? "bold" : "normal").setFontSize(size * 72 / 25.4).text(value, x, y, { align: center ? "center" : "left" });
+    if (pdf) pdf.setTextColor(ink).setFont("helvetica", bold ? "bold" : "normal").setFontSize(size * factor * 72 / 25.4).text(value, x*factor, y*factor, { align: center ? "center" : "left" });
     else svg.push(`<text x="${x}" y="${y}" fill="${ink}" font-size="${size}" font-weight="${bold ? 700 : 400}" text-anchor="${center ? "middle" : "start"}">${xml(value)}</text>`);
   };
   const path = (rings: Point[][], closed: boolean, stroke: string, fill = "none", width = .35) => {
     if (pdf) {
-      pdf.setLineWidth(width).setDrawColor(stroke);
+      pdf.setLineWidth(width*factor).setDrawColor(stroke);
       if (fill !== "none") pdf.setFillColor(fill);
       pdf.path(rings.flatMap(ring => [
-        ...ring.map(([x,y], i) => ({ op: i ? "l" : "m", c: [x,y] })),
+        ...ring.map(([x,y], i) => ({ op: i ? "l" : "m", c: [x*factor,y*factor] })),
         ...(closed ? [{ op: "h", c: [] }] : []),
       ]));
       if (fill === "none") pdf.stroke(); else pdf.fillStrokeEvenOdd();
@@ -106,7 +110,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   const line = (x: number,y: number,x2: number,y2: number,color = ink,width = .24) =>
     path([[[x,y],[x2,y2]]], false, color, "none", width);
   const clip = (x: number, y: number, w: number, h: number, draw: () => void) => {
-    if (pdf) pdf.saveGraphicsState().rect(x,y,w,h,null).clip().discardPath();
+    if (pdf) pdf.saveGraphicsState().rect(x*factor,y*factor,w*factor,h*factor,null).clip().discardPath();
     else {
       const id = "clip" + ++clipId;
       svg.push(`<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath><g clip-path="url(#${id})">`);
@@ -121,7 +125,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
         if (!part.closed && projected[0].length === 1) {
           const [x, y] = projected[0][0];
           const radius = .55;
-          if (pdf) pdf.setFillColor(stroke).circle(x, y, radius, "F");
+          if (pdf) pdf.setFillColor(stroke).circle(x*factor, y*factor, radius*factor, "F");
           else svg.push(`<circle cx="${x}" cy="${y}" r="${radius}" fill="${stroke}"/>`);
         } else path(projected, part.closed, stroke, part.closed ? fill : "none", width);
       }
@@ -129,7 +133,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   };
   const features = layers.flatMap(layer => layer.layerData.features);
   const { center: [midX, midY], scale } = sheet ?? mapView(layers, options);
-  const step = scale / mm;
+  const step = scale * factor / mm;
   const grid = ([e,n]: Point): Point => [frame.x + frame.w/2 + (e-midX)/step, frame.y + frame.h/2 - (n-midY)/step];
   const main = (p: Point): Point => grid(utm.forward(p));
   const colors: Record<string,string> = { AII: "#d8e8ce", AID: "#f6ce64", ADA: "#e98d8c" };
@@ -150,7 +154,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   clip(frame.x,frame.y,frame.w,frame.h,() => {
     drawFeatures(states.filter(f => ["CE","RN","PB"].includes(f.properties?.SIGLA_UF || "")), main, "#a5aaa0","#f3f0e7");
     if (options.raster) {
-      if (pdf) pdf.addImage(options.raster.url, "PNG", frame.x, frame.y, frame.w, frame.h);
+      if (pdf) pdf.addImage(options.raster.url, "PNG", frame.x*factor, frame.y*factor, frame.w*factor, frame.h*factor);
       else svg.push(`<image href="${options.raster.url}" x="${frame.x}" y="${frame.y}" width="${frame.w}" height="${frame.h}"/>`);
     }
     for (const layer of layers) {
@@ -203,13 +207,13 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     const [west,south,east,north] = extent;
     const { x, y, w: width } = box;
     const heading = Math.min(7,box.h*.2), height = box.h-heading, top = y+heading;
-    const factor = Math.min(width/(east-west),height/(north-south));
+    const overviewFactor = Math.min(width/(east-west),height/(north-south));
     const inset = options.view?.insets[national ? "brasil" : "regional"];
     const insetCenter = utm.forward(national ? [-54,-14] : [lon,lat]);
     const project = ([lo,la]: Point): Point => {
-      if (!inset?.scale || national) return [x+width/2+(lo-(east+west)/2)*factor,top+height/2-(la-(south+north)/2)*factor];
+      if (!inset?.scale || national) return [x+width/2+(lo-(east+west)/2)*overviewFactor,top+height/2-(la-(south+north)/2)*overviewFactor];
       const [e,n] = utm.forward([lo,la]);
-      return [x+width/2+(e-insetCenter[0])*1000/inset.scale, top+height/2-(n-insetCenter[1])*1000/inset.scale];
+      return [x+width/2+(e-insetCenter[0])*1000/(inset.scale*factor), top+height/2-(n-insetCenter[1])*1000/(inset.scale*factor)];
     };
     rect(x,y,width,box.h,"#ffffff");
     label(x+1,y+heading*.72,inset?.scale && !national ? title + ' · 1:' + inset.scale.toLocaleString('pt-BR') : title,Math.min(3.5,width/Math.max(8,title.length*.58),heading*.7),true);
@@ -241,7 +245,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     const name = layer.name.replace(/\.geojson$/i,""), y = legend.y + (i+1.75)*rowHeight;
     const color = layer.defaultStyle?.color || ink;
     if (layer.layerData.features.every(feature => /Point$/.test(feature.geometry.type))) {
-      if (pdf) pdf.setFillColor(color).circle(lx+symbol/2, y-1, Math.min(.8,rowHeight*.15), "F");
+      if (pdf) pdf.setFillColor(color).circle((lx+symbol/2)*factor, (y-1)*factor, Math.min(.8,rowHeight*.15)*factor, "F");
       else svg.push(`<circle cx="${lx+symbol/2}" cy="${y-1}" r="${Math.min(.8,rowHeight*.15)}" fill="${color}"/>`);
     } else if (name === "Eixo") line(lx,y-1,lx+symbol,y-1,color,.6);
     else rect(lx,y-rowHeight*.35,symbol,rowHeight*.38,layerFill(layer,name),color);
@@ -264,11 +268,11 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   label(479,321,"1:" + scale.toLocaleString("pt-BR"),3.5,true);
   label(479,333,"Identificação da folha",4,true);
   label(479,341,"Projeto  LT Angicos–Jaguaruana II");
-  label(479,348,`Folha  A2 · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
+  label(479,348,`Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
   label(479,355,"Fontes  Camadas do projeto · IBGE 2024",3.25);
   label(479,362,options.raster ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Responsável  __________________",3.25);
   const logoUrl = "data:image/png;base64," + logo;
-  if (pdf) pdf.addImage(logoUrl,"PNG",509,381,40,20);
+  if (pdf) pdf.addImage(logoUrl,"PNG",509*factor,381*factor,40*factor,20*factor);
   else svg.push(`<image href="${logoUrl}" x="509" y="381" width="40" height="20" preserveAspectRatio="none"/>`);
   return sheet?.document ? null : pdf ? Buffer.from(pdf.output("arraybuffer")) : svg.join("") + "</svg>";
 }
@@ -284,17 +288,18 @@ function planSheets(layers: Layer[], columns: number, rows: number, overlap: num
     paths(feature.geometry).flatMap(part => part.rings.flat().map(p => utm.forward(p) as Point))));
   if (!points.length) throw Error("Ative pelo menos uma camada com coordenadas.");
   const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+  const factor = paperFactor(options.paper ?? 'A2');
   const fraction = 1 - overlap / 100;
   const width = Math.max(...xs) - Math.min(...xs), height = Math.max(...ys) - Math.min(...ys);
   const scale = options.scale ?? Math.max(100000, Math.ceil(Math.max(width / (frame.w * (1+(columns-1)*fraction)),
-    height / (frame.h * (1+(rows-1)*fraction))) * 1.05 / 25) * 25000);
+    height / (frame.h * (1+(rows-1)*fraction))) * 1.05 / (25*factor)) * 25000);
   const center = [(Math.max(...xs)+Math.min(...xs))/2, (Math.max(...ys)+Math.min(...ys))/2];
   const sheets: Sheet[] = [];
   for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
     const number = row * columns + col + 1;
     sheets.push({ center: [
-      center[0] + (col-(columns-1)/2) * frame.w * scale / 1000 * fraction,
-      center[1] - (row-(rows-1)/2) * frame.h * scale / 1000 * fraction,
+      center[0] + (col-(columns-1)/2) * frame.w * scale * factor / 1000 * fraction,
+      center[1] - (row-(rows-1)/2) * frame.h * scale * factor / 1000 * fraction,
     ], scale, number, total: rows*columns, grid });
   }
   return sheets;
@@ -314,9 +319,9 @@ export function corridorSheets(layers: Layer[], overlap: number, grid: number, o
   if (!length) throw Error("O eixo precisa ter extensão maior que zero.");
   const scale = options.scale ?? linearAtlasScale;
   const frame = options.layout?.principal ?? defaultFrame;
-  const coverage = Math.min(frame.w, frame.h) * scale / 1000;
+  const coverage = Math.min(frame.w, frame.h) * scale * paperFactor(options.paper ?? 'A2') / 1000;
   const total = 1 + Math.ceil(Math.max(0,length-coverage) / (coverage*(1-overlap/100)));
-  if (total > 180) throw Error("Aumente o denominador da escala para gerar até 180 folhas.");
+  if (total > 480) throw Error("Aumente o denominador da escala para gerar até 480 folhas.");
   return Array.from({ length: total }, (_, i) => {
     const target = total === 1 ? length/2 : coverage/2 + i*(length-coverage)/(total-1);
     const end = distances.findIndex(distance => distance >= target);
@@ -332,13 +337,14 @@ export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, pa
   const west = Math.min(...sheets.map(sheet => sheet.center[0])), east = Math.max(...sheets.map(sheet => sheet.center[0]));
   const south = Math.min(...sheets.map(sheet => sheet.center[1])), north = Math.max(...sheets.map(sheet => sheet.center[1]));
   const detail = sheets[0].scale;
-  const scale = Math.ceil(Math.max((east-west)/frame.w + detail/1000, (north-south)/frame.h + detail/1000)*1.12/25)*25000;
+  const factor = paperFactor(options.paper ?? 'A2');
+  const scale = Math.ceil(Math.max((east-west)/(frame.w*factor) + detail/1000, (north-south)/(frame.h*factor) + detail/1000)*1.12/25)*25000;
   const index: Sheet = { center: [(east+west)/2,(north+south)/2], scale, number: 1, total: sheets.length+1, grid: 25000 };
   const indexTitle = "Mapa índice | LT Angicos–Jaguaruana II";
   const detailTitle = title ?? "Atlas por corredor | LT Angicos–Jaguaruana II";
   if (!pdf || single) return page === 0 ? pranchaAngicos(layers, pdf, index, indexTitle, { ...options, index: sheets })
     : pranchaAngicos(layers, pdf, sheets[page-1], detailTitle, options);
-  const document = newPdf();
+  const document = newPdf(options.paper);
   pranchaAngicos(layers, true, { ...index, document }, indexTitle, { ...options, index: sheets });
   for (const sheet of sheets) {
     document.addPage();
@@ -348,7 +354,7 @@ export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, pa
 }
 
 export function atlasAngicos(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, title?: string, options: Options = {}) {
-  const document = newPdf();
+  const document = newPdf(options.paper);
   for (const sheet of planSheets(layers, columns, rows, overlap, grid, options)) {
     if (sheet.number > 1) document.addPage();
     pranchaAngicos(layers, true, { ...sheet, document }, title, options);
@@ -360,7 +366,7 @@ export function atlasView(layers: Layer[], columns: number, rows: number, overla
   const sheets = planSheets(layers, columns, rows, overlap, grid, options);
   if (page > 0 && sheets[page-1]) return pranchaAngicos(layers, false, sheets[page-1], title, options);
   const frame = options.layout?.principal ?? defaultFrame;
-  const metres = sheets[0].scale / 1000;
+  const metres = sheets[0].scale * paperFactor(options.paper ?? 'A2') / 1000;
   const west = sheets[0].center[0] - frame.w * metres / 2;
   const north = sheets[0].center[1] + frame.h * metres / 2;
   const [lastX,lastY] = sheets.at(-1)!.center;
@@ -381,6 +387,7 @@ export function atlasView(layers: Layer[], columns: number, rows: number, overla
 export function studioReview(layers: Layer[], sheets: Sheet[] | undefined, options: Options) {
   const frame = options.layout?.principal ?? defaultLayout.principal;
   const { center, scale } = sheets?.[0] ?? mapView(layers, options);
+  const factor = paperFactor(options.paper ?? 'A2');
   const warnings: string[] = [];
   const layout = options.layout ?? defaultLayout;
   if (frame.x < 20 || frame.y < 28 || frame.x+frame.w > 474 || frame.y+frame.h > 410)
@@ -392,10 +399,10 @@ export function studioReview(layers: Layer[], sheets: Sheet[] | undefined, optio
     const axis = layers.filter(layer => layer.id === 15);
     const bounds = extent(axis.length ? axis : layers);
     const [x,y] = center;
-    if (bounds.left < x-frame.w*scale/2000 || bounds.right > x+frame.w*scale/2000 ||
-        bounds.bottom < y-frame.h*scale/2000 || bounds.top > y+frame.h*scale/2000)
+    if (bounds.left < x-frame.w*scale*factor/2000 || bounds.right > x+frame.w*scale*factor/2000 ||
+        bounds.bottom < y-frame.h*scale*factor/2000 || bounds.top > y+frame.h*scale*factor/2000)
       warnings.push("O quadro principal corta parte da área de referência.");
   }
   if (options.model === "uso-solo") warnings.push("O detalhe do MapBiomas depende da resolução dos blocos publicados.");
-  return { scale, sheets: sheets?.length ?? 0, warnings, widthKm: frame.w*scale/1e6, heightKm: frame.h*scale/1e6 };
+  return { scale, sheets: sheets?.length ?? 0, warnings, widthKm: frame.w*scale*factor/1e6, heightKm: frame.h*scale*factor/1e6 };
 }

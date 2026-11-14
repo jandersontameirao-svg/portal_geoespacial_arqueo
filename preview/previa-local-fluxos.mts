@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { ingestCog, renderCog } from "./previa-local-raster.mts";
 import { exportVector } from "./previa-exportar-vetor.mts";
-import { linearAtlasScale, readLayout, readScale, readStudioView } from "./previa-layout.mts";
+import { linearAtlasScale, readPaper, restoreLegend, readLayout, readScale, readStudioView } from "./previa-layout.mts";
 
 const require = createRequire(new URL("../package.json", import.meta.url));
 const { jsPDF } = require("jspdf");
@@ -251,7 +251,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     const mapBiomas = { id: -21, name: "MapBiomas Brasil · 2024" };
     if (!write && method === "previewProducts.list") return {
       linearAtlasScale,
-      products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, layout: readLayout(product.layout), view: readStudioView(product.view) })),
+      products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper), layout: product.paper ? readLayout(product.layout) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
       layers: [...layers.map(({ id, name }) => ({ id, name })), mapBiomas],
     };
     if (!write || method !== "previewProducts.save") return undefined;
@@ -267,7 +267,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     const view = readStudioView(input.product.view);
     if (Object.values(view.insets).some(inset => inset.layers?.some(id => !layers.some(layer => layer.id === id)))) throw Error("Use camadas do projeto nos mapas de situação.");
     const locks = Array.isArray(input.product.locks) ? ["principal", "legenda", "norte", "brasil", "regional"].filter(key => input.product.locks.includes(key)) : [];
-    const product = { id, title: title.trim(), columns, rows, overlap, grid, view, locks,
+    const product = { id, title: title.trim(), columns, rows, overlap, grid, view, locks, paper: readPaper(input.product.paper),
       layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout), scale: readScale(input.product.scale) ?? (id === "corredor" ? linearAtlasScale : undefined) };
     save({ ...state, products: { ...state.products, 11: products.map(item => item.id === id ? product : item) } });
     return product;

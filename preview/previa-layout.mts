@@ -42,3 +42,20 @@ export function readStudioView(value: unknown): StudioView {
   }
   return { east: view.east, north: view.north, labels: view.labels, insets };
 }
+
+export const paperSizes = { A4: [297,210], A3: [420,297], A2: [594,420], A1: [841,594], A0: [1189,841] } as const;
+export type Paper = keyof typeof paperSizes;
+export function readPaper(value: unknown): Paper {
+  if (value == null) return "A2";
+  if (typeof value !== "string" || !Object.hasOwn(paperSizes,value)) throw Error("Formato de papel inválido.");
+  return value as Paper;
+}
+export function paperFactor(paper: Paper) {
+  const [w,h] = paperSizes[paper];
+  return Math.min(w/594,h/420);
+}
+export function restoreLegend(layout: Layout): Layout {
+  const legend = layout.legenda;
+  if (legend.x >= 474 && legend.x+legend.w <= 584 && legend.y >= 30 && legend.y+legend.h <= 269) return layout;
+  return { ...layout, legenda: { ...defaultLayout.legenda } };
+}

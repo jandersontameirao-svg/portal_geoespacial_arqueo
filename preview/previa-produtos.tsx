@@ -5,7 +5,10 @@ type Box = { x: number; y: number; w: number; h: number };
 const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
 type ElementId = keyof typeof names;
 type View = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number }> };
+const papers = ["A4", "A3", "A2", "A1", "A0"] as const;
+type Paper = typeof papers[number];
 type Product = {
+  paper: Paper;
   id: string; title: string; columns: number; rows: number; overlap: number; grid: number;
   scale?: number; locks?: ElementId[]; layerIds: number[]; layout: Record<ElementId, Box>; view: View;
 };
@@ -17,6 +20,7 @@ const input = "mt-1 w-full rounded-md border border-slate-200 bg-white px-2.5 py
 const button = "inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-slate-700";
 const panel = "space-y-4 bg-white p-4 dark:bg-slate-900";
 const format = { width: 594, height: 420 };
+const paperDimensions = { A4:[297,210], A3:[420,297], A2:[594,420], A1:[841,594], A0:[1189,841] } as const;
 
 async function request(method: "list" | "save", product?: Product) {
   const payload = { json: { projectId: 11, product } };
@@ -31,7 +35,7 @@ async function request(method: "list" | "save", product?: Product) {
 
 function sheetUrl(format: "svg" | "pdf" | "json", product: Product, page?: number) {
   const query = new URLSearchParams({
-    modelo: product.id, grade: String(product.grid), titulo: product.title,
+    papel: product.paper, modelo: product.id, grade: String(product.grid), titulo: product.title,
     camadas: product.layerIds.join(","), layout: JSON.stringify(product.layout), vista: JSON.stringify(product.view),
   });
   if (product.scale) query.set("escala", String(product.scale));
@@ -96,6 +100,8 @@ export default function PreviewMapProducts() {
   }, []);
   const saved = products.find(product => product.id === active);
   const draft = drafts[active] ?? saved;
+  const [paperWidth,paperHeight] = paperDimensions[draft?.paper ?? "A2"];
+  const factor = Math.min(paperWidth/594,paperHeight/420);
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
   const corridor = active === "corredor";
   const atlas = corridor || active === "atlas";
@@ -181,7 +187,7 @@ export default function PreviewMapProducts() {
     if (!draft || saving || event.button !== 0 || (kind !== 'pan' && draft.locks?.includes(id))) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     selectElement(id);
-    drag.current = { x:event.clientX, y:event.clientY, kind, id, initial:draft, scale:review?.scale ?? 0 };
+    drag.current = { x:event.clientX, y:event.clientY, kind, id, initial:draft, scale:(review?.scale ?? 0)*factor };
   }
   function move(event: PointerEvent<HTMLButtonElement>) {
     const action = drag.current, bounds = sheet.current?.getBoundingClientRect();
@@ -296,7 +302,7 @@ export default function PreviewMapProducts() {
     if (mode !== "layout" || multiple || event.ctrlKey || event.metaKey || event.altKey ||
         !["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key) || draft.locks?.includes(element)) return;
     event.preventDefault();
-    const box = draft.layout[element], step = event.shiftKey ? 5 : 1;
+    const box = draft.layout[element], step = (event.shiftKey ? 5 : 1)/factor;
     const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
     const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
     boxChange({ ...box, x:Math.max(0,Math.min(format.width-box.w,box.x+dx)), y:Math.max(0,Math.min(format.height-box.h,box.y+dy)) });
@@ -323,10 +329,10 @@ export default function PreviewMapProducts() {
       const url = URL.createObjectURL(await response.blob());
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = saved.id + (single ? "-folha-" + (currentPage+1) : "") + "-LT-Angicos-A2.pdf";
+      anchor.download = saved.id + (single ? "-folha-" + (currentPage+1) : "") + "-LT-Angicos-" + saved.paper + ".pdf";
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
-      setNotice("PDF A2 gerado.");
+      setNotice("PDF " + saved.paper + " gerado.");
     } catch (error) { setNotice((error as Error).message); }
     finally { setExporting(false); }
   }
@@ -337,7 +343,7 @@ export default function PreviewMapProducts() {
   const viewScale = review?.scale;
   const canPan = active === "mapa" && !!viewScale;
   const delta = gesture?.offset && draft && viewScale
-    ? { x:(draft.view.east-gesture.offset.east)*1000/viewScale, y:(gesture.offset.north-draft.view.north)*1000/viewScale }
+    ? { x:(draft.view.east-gesture.offset.east)*1000/(viewScale*factor), y:(gesture.offset.north-draft.view.north)*1000/(viewScale*factor) }
     : undefined;
 
   return <section onKeyDown={keyboard} aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
@@ -424,11 +430,11 @@ export default function PreviewMapProducts() {
           </div>
           <div className="arqueo-studio-canvas min-h-56 overflow-auto p-5" style={{ maxHeight: "70vh" }}>
             <div className="mx-auto" style={{ width: zoom + "%" }}>
-              {mode !== "proof" && <div aria-hidden="true" className="relative mb-1 h-4 border-b border-slate-400 font-mono text-[9px]">{
+              {mode !== "proof" && draft.paper === "A2" && <div aria-hidden="true" className="relative mb-1 h-4 border-b border-slate-400 font-mono text-[9px]">{
                 [0,100,200,300,400,500,594].map(mark => <span className="absolute bottom-0 border-l border-slate-400 pl-0.5" style={{ left:mark/594*100+"%", transform:mark===594 ? "translateX(-100%)" : undefined }} key={mark}>{mark===594 ? "594 mm" : mark}</span>)
               }</div>}
-              <div ref={sheet} className="relative bg-white shadow-lg" style={{ aspectRatio: "594/420" }}>
-                {proof?.for === previewUrl ? <img src={proof.url} alt={atlas && currentPage === 0 ? "Mapa índice do atlas" : "Prancha cartográfica A2"} className="block size-full object-contain" />
+              <div ref={sheet} className="relative bg-white shadow-lg" style={{ aspectRatio: paperWidth + "/" + paperHeight }}>
+                {proof?.for === previewUrl ? <img src={proof.url} alt={atlas && currentPage === 0 ? "Mapa índice do atlas" : "Prancha cartográfica " + draft.paper} className="block size-full object-contain" />
                   : <div className="grid h-full place-items-center text-sm text-slate-700">{error || "Renderizando prancha…"}</div>}
                 {mode === "layout" && !(active === "atlas" && currentPage === 0) && [...elements.filter(id => id !== element), element].map(id => {
                   const selected = selectedElements.includes(id);
@@ -462,11 +468,14 @@ export default function PreviewMapProducts() {
               </select></label>
               <button type="button" className={button} aria-label="Próxima folha" disabled={currentPage >= count} onClick={() => setPage(currentPage+1)}><ChevronRight size={14}/></button>
               {corridor && <><span>{count} folhas de detalhe</span><button type="button" className={button} disabled={dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(true)}>Exportar folha</button></>}
-            </> : <span>A2 horizontal · 594 × 420 mm</span>}
+            </> : <span>{draft.paper} horizontal</span>}
           </div>
         </div>
         <aside className={panel + " border-slate-200 xl:border-l dark:border-slate-700"}>
           <div className="text-sm font-semibold">Propriedades da prancha</div>
+          <label className="block text-xs">Formato da folha<select className={input} value={draft.paper} onChange={event => change({ ...draft, paper:event.target.value as Paper })}>
+            {papers.map(paper => <option key={paper}>{paper}</option>)}
+          </select></label>
           <label className="block text-xs">Título da folha<input className={input} maxLength={85} value={draft.title} onChange={event => change({ ...draft, title:event.target.value })} /></label>
           <label className="block text-xs">Escala do mapa principal 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"
             value={draft.scale ?? ""} onChange={event => change({ ...draft, scale:event.target.value ? event.target.valueAsNumber : undefined })} /></label>
@@ -500,8 +509,8 @@ export default function PreviewMapProducts() {
             }}>{draft.locks?.includes(element) ? <><Unlock size={14} /> Destravar posição</> : <><Lock size={14} /> Travar posição</>}</button>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {([["x","X (mm)"],["y","Y (mm)"],["w","Largura (mm)"],["h","Altura (mm)"]] as const).map(([key,label]) =>
-                <label className="text-xs" key={key}>{label}<input className={input} type="number" step="0.1" disabled={draft.locks?.includes(element)} key={element + key + selection[key]}
-                  defaultValue={Math.round(selection[key]*10)/10} onBlur={event => { if (Number.isFinite(event.target.valueAsNumber)) boxChange({ ...selection, [key]:event.target.valueAsNumber }); }}
+                <label className="text-xs" key={key}>{label}<input className={input} type="number" step="0.1" disabled={draft.locks?.includes(element)} key={draft.paper + element + key + selection[key]}
+                  defaultValue={Math.round(selection[key]*factor*10)/10} onBlur={event => { if (Number.isFinite(event.target.valueAsNumber)) boxChange({ ...selection, [key]:event.target.valueAsNumber/factor }); }}
                   onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>)}
             </div>
             {inset === "regional" && <label className="mt-3 block text-xs">Escala do quadro 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"

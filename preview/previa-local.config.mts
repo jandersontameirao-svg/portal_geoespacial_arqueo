@@ -3,7 +3,7 @@ import { download, downloadVector, projectSearchEntries, workflow } from "./prev
 import { rasterArtifact } from "./previa-local-raster.mts";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { readLayout, readScale, readStudioView } from "./previa-layout.mts";
+import { readLayout, readPaper, readScale, readStudioView } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
 import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas } from "./previa-raster/angicos/prancha.mts";
 
@@ -718,6 +718,7 @@ const demoApi = {
         const requestedGrid = Number(url.searchParams.get("grade"));
         const view = url.searchParams.get("vista");
         const options = {
+          paper: readPaper(url.searchParams.get('papel')),
           view: readStudioView(view ? JSON.parse(view) : undefined),
           available,
           layout: readLayout(layout ? JSON.parse(layout) : undefined),
@@ -739,7 +740,7 @@ const demoApi = {
           pranchaAngicos(layers, pdf, undefined, title, options);
         res.setHeader("Cache-Control", "no-store");
         res.setHeader("Content-Type", pdf ? "application/pdf" : "image/svg+xml; charset=utf-8");
-        if (pdf) res.setHeader("Content-Disposition", `attachment; filename="${model ?? (atlas ? "Atlas" : "Mapa")}-LT-Angicos-Jaguaruana-II-A2.pdf"`);
+        if (pdf) res.setHeader("Content-Disposition", `attachment; filename="${model ?? (atlas ? "Atlas" : "Mapa")}-LT-Angicos-Jaguaruana-II-${options.paper}.pdf"`);
         res.end(body);
       } catch (error) {
         console.error(error);
