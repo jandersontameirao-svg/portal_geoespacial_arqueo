@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { GeoJSON, WMSTileLayer, useMap } from "react-leaflet";
+import { GeoJSON, ImageOverlay, WMSTileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Layers, X } from "lucide-react";
 import type { FeatureCollection } from "geojson";
@@ -80,6 +80,10 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] 
 type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[]; group?: string };
 
 const childNames: Record<string, string> = {
+  sombreado: "Relevo sombreado",
+  elevacao: "Elevação (m)",
+  declividade: "Declividade (graus)",
+  curvas: "Curvas de nível (20 m)",
   "idesp_acervo:bem_tomb_a_2025_01_v0": "Bens tombados · estado de São Paulo (2025.01)",
   "condephaat-capital": "Imóveis tombados · município de São Paulo",
   "IDE:ide_2017_mg_tombamento_iepha_pto": "Bens culturais tombados",
@@ -144,6 +148,8 @@ async function discoverLayers(source: MapSource): Promise<CatalogLayer[]> {
     return id && /^[\w.:-]{1,150}$/.test(id) ? [{ id, label: label || id }] : [];
   });
 }
+
+const copernicusAttribution = "Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved";
 
 function CondephaatLayer() {
   const [data, setData] = useState<FeatureCollection>();
@@ -331,6 +337,17 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     const mapped = connections.filter(source => source.layer && (source.official || source.type === "WMS"));
     return <>
       {mapped.filter(source => !source.group).map(renderSource)}
+      <details className="border-t py-1 text-sm">
+        <summary className="cursor-pointer px-2 py-1">Relevo e topografia</summary>
+        <div className="ml-3">
+          {mapped.filter(source => source.group === "relevo").map(renderSource)}
+          <p className="px-2 text-xs text-slate-600">Recorte da LT · modelo de superfície de 30 m</p>
+          {active.filter(source => source.group === "relevo").flatMap(source => selectedFor(source)).map(id =>
+            <ImageOverlay key={id}
+              url={"/previa/relevo/" + id + ".png"} bounds={[[-5.75, -37.85], [-4.75, -36.38]]}
+              opacity={0.72} className={"preview-glo30-" + id} attribution={copernicusAttribution} />)}
+        </div>
+      </details>
       <details className="border-t py-1 text-sm">
         <summary className="cursor-pointer px-2 py-1">Recursos hídricos</summary>
         <div className="ml-3">{mapped.filter(source => source.group === "recursos-hidricos").map(renderSource)}</div>

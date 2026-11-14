@@ -1,5 +1,7 @@
 # Prévia local do Geoportal
 
+Para reproduzir o relevo da LT Angicos–Jaguaruana II, coloque os quatro GeoTIFFs públicos GLO-30 indicados em `previa-raster/relevo/gerar.py` ao lado do script. Cada arquivo está em `https://copernicus-dem-30m.s3.amazonaws.com/<nome-sem-extensão>/<nome>.tif`. Execute `python preview/previa-raster/relevo/gerar.py` em um ambiente Python com GDAL. O script mosaica e recorta a superfície, calcula declividade e relevo sombreado em uma grade UTM de 30 m, e gera curvas com intervalo vertical de 20 m. Os quatro PNGs são projetados em Web Mercator e gerados localmente.
+
 Código implementado por Codex para revisão e integração ao servidor do Geoportal. Esta prévia usa Vite em loopback, usuário demonstrativo e armazenamento JSON local. A configuração de produção do repositório tem seu próprio servidor e autenticação.
 
 Na raiz do repositório com as dependências instaladas, execute:

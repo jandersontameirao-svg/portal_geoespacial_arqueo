@@ -119,6 +119,9 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  { id: -15, name: "Copernicus GLO-30 · LT Angicos–Jaguaruana II", type: "Raster local",
+    address: "https://registry.opendata.aws/copernicus-dem/", layer: "sombreado,elevacao,declividade,curvas",
+    enabled: false, group: "relevo" },
   { id: -13, name: "ANA · Trechos de drenagem", type: "ArcGIS REST",
     address: "https://www.snirh.gov.br/arcgis/rest/services/IG/Servicos_Base_IG/MapServer",
     layer: "1", enabled: false, group: "recursos-hidricos" },

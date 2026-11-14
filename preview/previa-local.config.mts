@@ -549,6 +549,22 @@ const demoApi = {
     }];
   },
   configureServer(server: { middlewares: { use: (path: string, handler: any) => void } }) {
+    server.middlewares.use("/previa/relevo", (req: any, res: any) => {
+      const name = new URL(req.url, "http://127.0.0.1").pathname.slice(1);
+      if (req.method !== "GET" || !/^(?:sombreado\.png|elevacao\.png|declividade\.png|curvas\.png)$/.test(name)) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      try {
+        const data = readFileSync(new URL("./previa-raster/relevo/" + name, import.meta.url));
+        res.setHeader("Content-Type", "image/png");
+        res.end(data);
+      } catch {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
     server.middlewares.use("/previa/condephaat", async (req: any, res: any) => {
       if (req.method !== "GET") { res.statusCode = 405; res.end(); return; }
       // Fixed public GeoJSON from the São Paulo municipal catalog, sourced from IDE-SP.
