@@ -42,7 +42,14 @@ export function readScale(value: unknown, maximum = 10000000): number | undefine
   return value;
 }
 
-export type StudioView = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number; east?: number; north?: number }> };
+export const studioBackgrounds = { cartografico:"Cartográfico", claro:"Cinza claro", branco:"Branco com limites", nenhum:"Sem base" } as const;
+export type StudioBackground = keyof typeof studioBackgrounds;
+export function readStudioBackground(value: unknown): StudioBackground {
+  if (value === undefined) return "cartografico";
+  if (typeof value === "string" && Object.hasOwn(studioBackgrounds,value)) return value as StudioBackground;
+  throw Error("Fundo de mapa inválido.");
+}
+export type StudioView = { background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
 export function readStudioView(value: unknown): StudioView {
   if (value === undefined) return { east: 0, north: 0, labels: true, insets: { brasil: {}, regional: {} } };
   const view = value as StudioView;
@@ -54,9 +61,9 @@ export function readStudioView(value: unknown): StudioView {
     if (!inset || (inset.layers !== undefined && (!Array.isArray(inset.layers) || inset.layers.length > 40 || !inset.layers.every(Number.isInteger))))
       throw Error("Camadas do mapa de situação inválidas.");
     if (![inset.east ?? 0, inset.north ?? 0].every(n => Number.isFinite(n) && Math.abs(n) <= 10000000)) throw Error("Enquadramento do quadro inválido.");
-    insets[key] = { layers: inset.layers, scale: readScale(inset.scale, 500000000), east:inset.east, north:inset.north };
+    insets[key] = { layers: inset.layers, scale: readScale(inset.scale, 500000000), background:readStudioBackground(inset.background), east:inset.east, north:inset.north };
   }
-  return { east: view.east, north: view.north, labels: view.labels, insets };
+  return { background:readStudioBackground(view.background), east: view.east, north: view.north, labels: view.labels, insets };
 }
 
 export const paperSizes = { A4: [297,210], A3: [420,297], A2: [594,420], A1: [841,594], A0: [1189,841] } as const;

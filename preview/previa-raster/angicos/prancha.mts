@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import { defaultLayout, linearAtlasScale, paperFactor, paperSize, portraitLayout, type Orientation, type Paper, type Layout, type StudioView } from "../../previa-layout.mts";
+import { defaultLayout, linearAtlasScale, paperFactor, paperSize, portraitLayout, type Orientation, type Paper, type Layout, type StudioBackground, type StudioView } from "../../previa-layout.mts";
 
 import { mapBiomasRaster, type ThematicRaster } from "./mapbiomas.mts";
 
@@ -28,6 +28,12 @@ function paths(shape: Shape): { rings: Point[][]; closed: boolean }[] {
   }
 }
 
+const backgroundStyles: Record<StudioBackground, {water:string; land:string; border:string; focus:string}> = {
+  cartografico:{water:"#eef3f4",land:"#f3f0e7",border:"#a5aaa0",focus:"#d3e1c5"},
+  claro:{water:"#fafafa",land:"#e6e8eb",border:"#a0a6ad",focus:"#ccd1d7"},
+  branco:{water:"#ffffff",land:"#ffffff",border:"#a5aaa0",focus:"#ffffff"},
+  nenhum:{water:"#ffffff",land:"none",border:"none",focus:"none"},
+};
 const defaultFrame = defaultLayout.principal;
 const newPdf = (paper: Paper = "A2", orientation: Orientation = "landscape") => new jsPDF({ orientation, unit: "mm", format: paperSize(paper, orientation), compress: true, precision: 6 });
 type Sheet = { center: Point; scale: number; number: number; total: number; grid: number; document?: any };
@@ -179,9 +185,11 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   }
   const heading = title ?? "MAPA DE LOCALIZAÇÃO | LT ANGICOS–JAGUARUANA II";
   label(portrait ? 215 : 247,20.5,heading,Math.min(5.6,(portrait ? 370 : 440)/(heading.length*.62)),true,true);
-  rect(frame.x,frame.y,frame.w,frame.h,"#eef3f4");
+  const background = options.view?.background ?? "cartografico";
+  const base = backgroundStyles[background];
+  rect(frame.x,frame.y,frame.w,frame.h,base.water);
   clip(frame.x,frame.y,frame.w,frame.h,() => {
-    drawFeatures(states.filter(f => ["CE","RN","PB"].includes(f.properties?.SIGLA_UF || "")), main, "#a5aaa0","#f3f0e7");
+    if (background !== "nenhum") drawFeatures(states.filter(f => ["CE","RN","PB"].includes(f.properties?.SIGLA_UF || "")),main,base.border,base.land);
     if (options.raster) {
       if (pdf) pdf.addImage(options.raster.url, "PNG", frame.x*factor, frame.y*factor, frame.w*factor, frame.h*factor);
       else svg.push(`<image href="${options.raster.url}" x="${frame.x}" y="${frame.y}" width="${frame.w}" height="${frame.h}"/>`);
@@ -244,11 +252,13 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     };
     rect(x,y,width,box.h,"#ffffff");
     label(x+1,y+heading*.72,title + ' · 1:' + scale.toLocaleString('pt-BR'),Math.min(3.5,width/Math.max(8,title.length*.58),heading*.7),true);
-    rect(x,top,width,height,"#e8f0f2");
+    const background = inset?.background ?? "cartografico";
+    const base = backgroundStyles[background];
+    rect(x,top,width,height,base.water);
     clip(x,top,width,height,() => {
-      drawFeatures(states,project,"#909b91","#efeee6",.13);
+      if (background !== "nenhum") drawFeatures(states,project,base.border,base.land,.13);
       const focus = states.filter(f => ["CE","RN"].includes(f.properties?.SIGLA_UF || ""));
-      drawFeatures(focus,project,"#647861","#d3e1c5",.2);
+      if (background !== "nenhum") drawFeatures(focus,project,base.border,base.focus,.2);
       if (inset?.layers) {
         for (const id of inset.layers) {
           const layer = (options.available ?? layers).find(item => item.id === id);

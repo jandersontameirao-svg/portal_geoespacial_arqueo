@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock,
 type Box = { x: number; y: number; w: number; h: number };
 const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
 type ElementId = keyof typeof names;
-type View = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number; east?: number; north?: number }> };
+type View = { background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
 const papers = ["A4", "A3", "A2", "A1", "A0"] as const;
 type Product = {
   marks?: {empresa:number; cliente:number};
@@ -512,6 +512,18 @@ export default function PreviewMapProducts() {
           <label className="block text-xs">Quadro de edição
             <select className={input} value={inset ?? "principal"} onChange={event => selectElement(event.target.value as ElementId)}>
               <option value="principal">Mapa principal</option><option value="brasil">Situação nacional</option><option value="regional">Situação regional</option>
+            </select>
+          </label>
+          <label className="block text-xs">Fundo do quadro
+            <select className={input} value={(inset ? draft.view.insets[inset].background : draft.view.background) ?? "cartografico"}
+              onChange={event => {
+                const background = event.target.value as StudioBackground;
+                const view = inset ? { ...draft.view, insets:{ ...draft.view.insets,
+                  [inset]:{ ...draft.view.insets[inset], background },
+                } } : { ...draft.view, background };
+                change({ ...draft,view });
+              }}>
+              {Object.entries(studioBackgrounds).map(([id,label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </label>
           {inset && <label className="flex items-start gap-2 text-xs">
