@@ -49,7 +49,8 @@ export function readStudioBackground(value: unknown): StudioBackground {
   if (typeof value === "string" && Object.hasOwn(studioBackgrounds,value)) return value as StudioBackground;
   throw Error("Fundo de mapa inválido.");
 }
-export type StudioView = { background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
+export type StudioAreaStyle = { color:string; opacity:number };
+export type StudioView = { areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
 export function readStudioView(value: unknown): StudioView {
   if (value === undefined) return { east: 0, north: 0, labels: true, insets: { brasil: {}, regional: {} } };
   const view = value as StudioView;
@@ -63,7 +64,13 @@ export function readStudioView(value: unknown): StudioView {
     if (![inset.east ?? 0, inset.north ?? 0].every(n => Number.isFinite(n) && Math.abs(n) <= 10000000)) throw Error("Enquadramento do quadro inválido.");
     insets[key] = { layers: inset.layers, scale: readScale(inset.scale, 500000000), background:readStudioBackground(inset.background), east:inset.east, north:inset.north };
   }
-  return { background:readStudioBackground(view.background), east: view.east, north: view.north, labels: view.labels, insets };
+  const areaStyles: Record<string,StudioAreaStyle> = {};
+  for (const [id,style] of Object.entries(view.areaStyles ?? {})) {
+    if (!/^\d+$/.test(id) || !style || !/^#[0-9a-f]{6}$/i.test(style.color) ||
+      !Number.isFinite(style.opacity) || style.opacity < 0 || style.opacity > 1) throw Error("Estilo de área inválido.");
+    areaStyles[id] = style;
+  }
+  return { areaStyles, background:readStudioBackground(view.background), east: view.east, north: view.north, labels: view.labels, insets };
 }
 
 export const paperSizes = { A4: [297,210], A3: [420,297], A2: [594,420], A1: [841,594], A0: [1189,841] } as const;

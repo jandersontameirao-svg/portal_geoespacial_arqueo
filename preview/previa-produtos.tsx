@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock,
 type Box = { x: number; y: number; w: number; h: number };
 const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
 type ElementId = keyof typeof names;
-type View = { background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
+type View = { areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
 const papers = ["A4", "A3", "A2", "A1", "A0"] as const;
 type Product = {
   marks?: {empresa:number; cliente:number};
@@ -15,7 +15,7 @@ type Product = {
 };
 type Review = { scale: number; insetScales: Record<"brasil" | "regional", number>; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
 type Brand = { id:number; name:string; kind:"empresa"|"cliente" };
-type Layer = { id: number; name: string };
+type Layer = { id: number; name: string; area?: boolean; color?: string };
 const mapFrames = ["principal","brasil","regional"] as const;
 type MapFrame = typeof mapFrames[number];
 const elements = Object.keys(names) as ElementId[];
@@ -534,7 +534,13 @@ export default function PreviewMapProducts() {
               const index = layerIds?.indexOf(layer.id) ?? -1;
               const required = !inset && ((corridor && layer.id === 15) || (active === "uso-solo" && [15,-21].includes(layer.id)));
               const name = layer.name.replace(/\.geojson$/i,"");
-              return <div className="flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-1 dark:bg-slate-800" key={layer.id}>
+              const style = draft.view.areaStyles?.[layer.id];
+              const color = style?.color ?? layer.color ?? "#5b7655";
+              const opacity = style?.opacity ?? .35;
+              const setAreaStyle = (next: StudioAreaStyle) => change({ ...draft, view:{ ...draft.view,
+                areaStyles:{ ...draft.view.areaStyles,[layer.id]:next },
+              } });
+              return <div key={layer.id} className="rounded-md bg-slate-50 px-1.5 py-1 dark:bg-slate-800"><div className="flex items-center gap-1">
                 <label className="flex min-w-0 grow items-start gap-2 text-xs">
                   <input type="checkbox" checked={index >= 0} disabled={required || layerIds === undefined}
                     onChange={event => setLayerIds(event.target.checked ? [...(layerIds ?? []), layer.id] : layerIds?.filter(id => id !== layer.id))} />
@@ -544,6 +550,30 @@ export default function PreviewMapProducts() {
                   <button type="button" aria-label={"Subir " + name} disabled={index === (layerIds?.length ?? 0)-1} onClick={() => moveLayer(layer.id, 1)} className="p-1 disabled:opacity-30"><ArrowUp size={12}/></button>
                   <button type="button" aria-label={"Descer " + name} disabled={index === 0} onClick={() => moveLayer(layer.id, -1)} className="p-1 disabled:opacity-30"><ArrowDown size={12}/></button>
                 </div>}
+              </div>
+              {layer.area && index >= 0 && <details className="px-1 py-1 text-xs">
+                <summary className="cursor-pointer">Estilo de {name}</summary>
+                <label className="block">Preenchimento
+                  <select className={input} value={!style ? "original" : opacity === 0 ? "contorno" : opacity === 1 ? "chapa" : "transparencia"}
+                    onChange={event => {
+                      const mode=event.target.value;
+                      if (mode === "original") {
+                        const areaStyles = { ...draft.view.areaStyles };
+                        delete areaStyles[layer.id];
+                        change({ ...draft,view:{ ...draft.view,areaStyles } });
+                      } else setAreaStyle({ color,opacity:mode === "chapa" ? 1 : mode === "contorno" ? 0 : .35 });
+                    }}>
+                    <option value="original">Original da camada</option><option value="contorno">Só contorno</option>
+                    <option value="chapa">Chapa</option><option value="transparencia">Com transparência</option>
+                  </select>
+                </label>
+                <label className="mt-2 flex items-center gap-2">Cor <input type="color" value={color}
+                  onChange={event => setAreaStyle({color:event.target.value,opacity})}/></label>
+                <label className="mt-2 block">Transparência {Math.round((1-opacity)*100)}%
+                  <input className="block w-full" aria-label="Transparência" type="range" min={0} max={100} value={Math.round((1-opacity)*100)}
+                    onChange={event => setAreaStyle({color,opacity:1-Number(event.target.value)/100})}/>
+                </label>
+              </details>}
               </div>;
             })}
           </div>

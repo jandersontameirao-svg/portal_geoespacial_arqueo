@@ -122,8 +122,9 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     if (pdf) pdf.setTextColor(ink).setFont("helvetica", bold ? "bold" : "normal").setFontSize(size * factor * 72 / 25.4).text(value, x*factor, y*factor, { align: center ? "center" : "left" });
     else svg.push(`<text x="${x}" y="${y}" fill="${ink}" font-size="${size}" font-weight="${bold ? 700 : 400}" text-anchor="${center ? "middle" : "start"}">${xml(value)}</text>`);
   };
-  const path = (rings: Point[][], closed: boolean, stroke: string, fill = "none", width = .35) => {
+  const path = (rings: Point[][], closed: boolean, stroke: string, fill = "none", width = .35, opacity = 1) => {
     if (pdf) {
+      if (opacity < 1) pdf.saveGraphicsState().setGState(new pdf.GState({opacity}));
       pdf.setLineWidth(width*factor).setDrawColor(stroke);
       if (fill !== "none") pdf.setFillColor(fill);
       pdf.path(rings.flatMap(ring => [
@@ -131,9 +132,10 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
         ...(closed ? [{ op: "h", c: [] }] : []),
       ]));
       if (fill === "none") pdf.stroke(); else pdf.fillStrokeEvenOdd();
+      if (opacity < 1) pdf.restoreGraphicsState();
     } else {
       const d = rings.map(r => r.map(([x,y],i) => `${i ? "L" : "M"}${x.toFixed(3)},${y.toFixed(3)}`).join("") + (closed ? "Z" : "")).join("");
-      svg.push(`<path d="${d}" fill="${fill}" fill-rule="evenodd" stroke="${stroke}" stroke-width="${width}"/>`);
+      svg.push(`<path d="${d}" fill="${fill}" fill-opacity="${opacity}" fill-rule="evenodd" stroke="${stroke}" stroke-width="${width}"/>`);
     }
   };
   const line = (x: number,y: number,x2: number,y2: number,color = ink,width = .24) =>
@@ -147,7 +149,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     draw();
     if (pdf) pdf.restoreGraphicsState(); else svg.push("</g>");
   };
-  const drawFeatures = (features: Feature[], project: (p: Point) => Point, stroke: string, fill = "none", width = .25) => {
+  const drawFeatures = (features: Feature[], project: (p: Point) => Point, stroke: string, fill = "none", width = .25, opacity = 1) => {
     for (const feature of features) {
       for (const part of paths(feature.geometry)) {
         const projected = part.rings.map(ring => ring.map(project));
@@ -156,7 +158,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
           const radius = .55;
           if (pdf) pdf.setFillColor(stroke).circle(x*factor, y*factor, radius*factor, "F");
           else svg.push(`<circle cx="${x}" cy="${y}" r="${radius}" fill="${stroke}"/>`);
-        } else path(projected, part.closed, stroke, part.closed ? fill : "none", width);
+        } else path(projected, part.closed, stroke, part.closed ? fill : "none", width,part.closed ? opacity : 1);
       }
     }
   };
@@ -166,7 +168,10 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   const grid = ([e,n]: Point): Point => [frame.x + frame.w/2 + (e-midX)/step, frame.y + frame.h/2 - (n-midY)/step];
   const main = (p: Point): Point => grid(utm.forward(p));
   const colors: Record<string,string> = { AII: "#d8e8ce", AID: "#f6ce64", ADA: "#e98d8c" };
+  const areaStyle = (layer:Layer) => options.view?.areaStyles?.[String(layer.id)];
   const layerFill = (layer: Layer, name: string) => {
+    const custom = areaStyle(layer);
+    if (custom) return custom.opacity === 0 ? "none" : custom.color;
     const style = layer.defaultStyle;
     if (name === "Eixo" || style?.fillOpacity === 0) return "none";
     if (!style?.weight || !style.color) return colors[name] ?? "none";
@@ -201,7 +206,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     }
     for (const layer of layers) {
       const name = layer.name.replace(/\.geojson$/i,"");
-      drawFeatures(layer.layerData.features, main, layer.defaultStyle?.color || "#58278d", layerFill(layer,name), layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : name === "Eixo" ? .58 : .32);
+      drawFeatures(layer.layerData.features, main, areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? "#58278d", layerFill(layer,name), layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : name === "Eixo" ? .58 : .32,areaStyle(layer)?.opacity || 1);
     }
   });
   const requestedGrid = sheet?.grid ?? options.grid ?? 25000;
@@ -268,7 +273,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
       if (inset?.layers) {
         for (const id of inset.layers) {
           const layer = (options.available ?? layers).find(item => item.id === id);
-          if (layer) drawFeatures(layer.layerData.features,project,layer.defaultStyle?.color ?? '#a52932','none',.35);
+          if (layer) drawFeatures(layer.layerData.features,project,areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? '#a52932',areaStyle(layer) ? layerFill(layer,layer.name) : 'none',.35,areaStyle(layer)?.opacity || 1);
         }
       } else if (national) {
         const [cx,cy] = project([lon,lat]);
@@ -286,12 +291,15 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   label(lx,legend.y+rowHeight*.75,"Legenda cartográfica",Math.min(4,rowHeight*.65,legend.w/12),true);
   layers.slice().reverse().forEach((layer,i) => {
     const name = layer.name.replace(/\.geojson$/i,""), y = legend.y + (i+1.75)*rowHeight;
-    const color = layer.defaultStyle?.color || ink;
+    const color = areaStyle(layer)?.color ?? layer.defaultStyle?.color ?? ink;
     if (layer.layerData.features.every(feature => /Point$/.test(feature.geometry.type))) {
       if (pdf) pdf.setFillColor(color).circle((lx+symbol/2)*factor, (y-1)*factor, Math.min(.8,rowHeight*.15)*factor, "F");
       else svg.push(`<circle cx="${lx+symbol/2}" cy="${y-1}" r="${Math.min(.8,rowHeight*.15)}" fill="${color}"/>`);
     } else if (name === "Eixo") line(lx,y-1,lx+symbol,y-1,color,.6);
-    else rect(lx,y-rowHeight*.35,symbol,rowHeight*.38,layerFill(layer,name),color);
+    else {
+      const top=y-rowHeight*.35, bottom=top+rowHeight*.38;
+      path([[[lx,top],[lx+symbol,top],[lx+symbol,bottom],[lx,bottom]]],true,color,layerFill(layer,name),.24,areaStyle(layer)?.opacity || 1);
+    }
     const caption = ({ Eixo:"Eixo da linha de transmissão", ADA:"ADA · faixa de 30 m por lado", AID:"AID · faixa de 250 m por lado", AII:"AII · municípios interceptados" } as Record<string,string>)[name] || name;
     label(lx+symbol+legend.w*.03,y,caption,Math.min(3.5,rowHeight*.65,legend.w*.84/(caption.length*.62)));
   });
