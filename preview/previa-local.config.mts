@@ -549,6 +549,24 @@ const demoApi = {
     }];
   },
   configureServer(server: { middlewares: { use: (path: string, handler: any) => void } }) {
+    server.middlewares.use("/previa/condephaat", async (req: any, res: any) => {
+      if (req.method !== "GET") { res.statusCode = 405; res.end(); return; }
+      // Fixed public GeoJSON from the São Paulo municipal catalog, sourced from IDE-SP.
+      const source = "https://dadosabertos.urbis.prefeitura.sp.gov.br/dataset/5387954f-357b-4c73-9270-8b80f303bd72/resource/705ab95e-8233-42b4-ba2c-4d2f9ab1b4c6/download/idesp_imoveis_estadual.geojson";
+      try {
+        const response = await fetch(source, { signal: AbortSignal.timeout(12000), redirect: "error" });
+        if (!response.ok) throw Error();
+        const data = await response.json();
+        if (data.type !== "FeatureCollection" || !Array.isArray(data.features) ||
+            data.crs?.properties?.name !== "urn:ogc:def:crs:EPSG::4674") throw Error();
+        res.setHeader("Content-Type", "application/geo+json; charset=utf-8");
+        res.setHeader("Cache-Control", "private, max-age=300");
+        res.end(JSON.stringify(data));
+      } catch {
+        res.statusCode = 502;
+        res.end();
+      }
+    });
     server.middlewares.use("/previa/catalogo-wms", async (req: any, res: any) => {
       const endpoints: Record<string, string> = {
         "-1": "https://geoserver.iphan.gov.br/geoserver/wms",

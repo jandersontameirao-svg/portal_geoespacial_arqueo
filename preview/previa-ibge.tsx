@@ -80,6 +80,7 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] 
 type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[]; group?: string };
 
 const childNames: Record<string, string> = {
+  "condephaat-capital": "Imóveis tombados · município de São Paulo",
   "IDE:ide_2017_mg_tombamento_iepha_pto": "Bens culturais tombados",
   "IDE:ide_2017_mg_ai_patrimonio_cultural_iepha_pol": "Áreas de influência do patrimônio cultural",
   "IDE:ide_2017_mg_celebracoes_formas_expressao_iepha_pto": "Celebrações e formas de expressão",
@@ -130,6 +131,30 @@ async function discoverLayers(source: MapSource): Promise<CatalogLayer[]> {
     const label = fields.find(field => field.localName === "Title")?.textContent?.trim();
     return id && /^[\w.:-]{1,150}$/.test(id) ? [{ id, label: label || id }] : [];
   });
+}
+
+function CondephaatLayer() {
+  const [data, setData] = useState<FeatureCollection>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/previa/condephaat", { signal: controller.signal }).then(response => {
+      if (!response.ok) throw Error();
+      return response.json();
+    }).then(result => { if (!controller.signal.aborted) setData(result); })
+      .catch(() => { if (!controller.signal.aborted) setFailed(true); });
+    return () => controller.abort();
+  }, []);
+  if (failed) return <p role="status" className="px-2 text-xs">Não foi possível carregar a camada do Condephaat.</p>;
+  // SIRGAS 2000 longitude/latitude is used for visualization on the Leaflet map.
+  return data && <GeoJSON data={data} attribution="Condephaat / IDE-SP · URBIS (CC BY-SA 4.0)"
+    style={{ className: "preview-condephaat", color: "#f59e0b", weight: 2, fillOpacity: 0.3 }}
+    pointToLayer={(_, point) => L.circleMarker(point, { radius: 4, color: "#f59e0b", className: "preview-condephaat" })}
+    onEachFeature={(feature, layer) => {
+      const label = document.createElement("span");
+      label.textContent = feature.properties?.denominacao_bem || "Imóvel tombado · Condephaat";
+      layer.bindPopup(label);
+    }} />;
 }
 
 function ArcGisTiles({ source }: { source: MapSource }) {
@@ -298,9 +323,7 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
         <summary className="cursor-pointer px-2 py-1">Patrimônio cultural estadual</summary>
         <div className="ml-3">
           {mapped.filter(source => source.group === "patrimonio-estadual").map(renderSource)}
-          <p className="px-2 py-1 text-xs text-slate-600">
-            Geosserviço a confirmar: <a className="underline" target="_blank" rel="noreferrer" href="https://www.cultura.sp.gov.br/sec_cultura/CONDEPHAAT/Bens_Protegidos/Mapa_Interativo">SP · Condephaat</a>
-          </p>
+          {active.some(source => source.id === -8 && selectedFor(source).includes("condephaat-capital")) && <CondephaatLayer />}
         </div>
       </details>
     </>;

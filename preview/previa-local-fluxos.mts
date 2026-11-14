@@ -119,6 +119,9 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  { id: -8, name: "SP · Condephaat", type: "GeoJSON", address: "https://dadosabertos.urbis.prefeitura.sp.gov.br/dataset/idesp-imoveis-estadual",
+    layer: "condephaat-capital", enabled: false, group: "patrimonio-estadual",
+    status: "Base estadual IDE-SP, recorte do município de São Paulo." },
   { id: -7, name: "MG · IEPHA-MG", type: "WMS", address: "https://geoserver.meioambiente.mg.gov.br/ows",
     layer: "IDE:ide_2017_mg_tombamento_iepha_pto,IDE:ide_2017_mg_ai_patrimonio_cultural_iepha_pol,IDE:ide_2017_mg_celebracoes_formas_expressao_iepha_pto,IDE:ide_2017_mg_lugares_iepha_pto,IDE:ide_2017_mg_saberes_iepha_pol",
     enabled: false, group: "patrimonio-estadual" },
