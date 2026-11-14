@@ -1,5 +1,17 @@
 # Prévia local do Geoportal
 
+O CANIE é exibido pelo WMS oficial ICMBio/INDE, na camada `canie_052026_p`. O identificador corresponde à edição publicada de maio de 2026. SIGEF público, SIGEF privado e assentamentos são exibidos por serviços do Ibama com dados do INCRA. Infraestrutura elétrica usa as linhas de transmissão do GGT/ANEEL.
+
+O WorldCover 2021 v200 usa o bloco público `ESA_WorldCover_10m_2021_v200_S06W039_Map.tif` da [ESA](https://esa-worldcover.org/en/data-access). Gere o PNG local com GDAL:
+
+```sh
+gdal_translate -projwin -37.85 -4.75 -36.38 -5.75 -outsize 1800 0 -of GTiff /vsicurl/https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_S06W039_Map.tif worldcover.tif
+gdalwarp -t_srs EPSG:3857 -te -37.85 -5.75 -36.38 -4.75 -te_srs EPSG:4326 -r near -overwrite worldcover.tif worldcover-3857.tif
+gdal_translate -of PNG -expand rgba worldcover-3857.tif preview/previa-raster/uso-solo/worldcover.png
+```
+
+Crie a pasta de destino antes de gerar o PNG. Preserve a tabela de classes durante a reprojeção com vizinho mais próximo.
+
 Para reproduzir o relevo da LT Angicos–Jaguaruana II, coloque os quatro GeoTIFFs públicos GLO-30 indicados em `previa-raster/relevo/gerar.py` ao lado do script. Cada arquivo está em `https://copernicus-dem-30m.s3.amazonaws.com/<nome-sem-extensão>/<nome>.tif`. Execute `python preview/previa-raster/relevo/gerar.py` em um ambiente Python com GDAL. O script mosaica e recorta a superfície, calcula declividade e relevo sombreado em uma grade UTM de 30 m, e gera curvas com intervalo vertical de 20 m. Os quatro PNGs são projetados em Web Mercator e gerados localmente.
 
 Código implementado por Codex para revisão e integração ao servidor do Geoportal. Esta prévia usa Vite em loopback, usuário demonstrativo e armazenamento JSON local. A configuração de produção do repositório tem seu próprio servidor e autenticação.

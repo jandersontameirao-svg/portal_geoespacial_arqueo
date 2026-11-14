@@ -119,6 +119,21 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  { id: -20, name: "ESA WorldCover · Cobertura do solo (2021)", type: "Raster local",
+    address: "https://esa-worldcover.org/en/data-access", layer: "worldcover",
+    enabled: false, group: "uso-solo", status: "Recorte da LT Angicos–Jaguaruana II." },
+  { id: -16, name: "ICMBio / CECAV · Cavidades CANIE (05/2026)", type: "WMS",
+    address: "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows", layer: "canie_052026_p",
+    enabled: false, group: "cavidades" },
+  ...[
+    { id: -17, title: "Imóveis rurais privados · SIGEF", service: "lim_imovel_sigef_privado_a", layer: "9" },
+    { id: -18, title: "Imóveis rurais públicos · SIGEF", service: "lim_imovel_sigef_publico_a", layer: "10" },
+    { id: -19, title: "Assentamentos rurais", service: "assentamentos_incra", layer: "1" },
+  ].map(({ id, title, service, layer }) => ({
+    id, name: "INCRA via Ibama · " + title, type: "ArcGIS REST",
+    address: "https://pamgia.ibama.gov.br/server/rest/services/01_Publicacoes_Bases/" + service + "/MapServer",
+    layer, enabled: false, group: "fundiario",
+  })),
   { id: -15, name: "Copernicus GLO-30 · LT Angicos–Jaguaruana II", type: "Raster local",
     address: "https://registry.opendata.aws/copernicus-dem/", layer: "sombreado,elevacao,declividade,curvas",
     enabled: false, group: "relevo" },
@@ -151,7 +166,7 @@ const officialConnections = [
   { id: -3, name: "FUNAI/CMR · Terras indígenas", type: "WMS", address: "https://cmr.funai.gov.br/geoserver/ows", layer: "CMR-PUBLICO:lim_terra_indigena_a", enabled: false },
   { id: -4, name: "INCRA · Territórios quilombolas (via Ibama)", type: "ArcGIS REST", address: "https://pamgia.ibama.gov.br/server/rest/services/BasesSincronizadas/lim_quilombos_incra_a/MapServer", layer: "0", enabled: false },
   { id: -5, name: "Palmares · Municípios com comunidades certificadas", type: "GeoJSON · Palmares e IBGE", address: "https://www.gov.br/palmares/pt-br/departamentos/protecao-preservacao-e-articulacao/certificacao-quilombola", layer: "palmares", enabled: false, status: "Destaque por município. Os polígonos representam limites municipais." },
-  { id: -6, name: "ANEEL · Linhas de transmissão (GGT)", type: "ArcGIS REST", address: "https://sigel.aneel.gov.br/arcgis/rest/services/GGT/Dados_WebApp_GGT/MapServer", layer: "0", enabled: false },
+  { id: -6, name: "ANEEL · Linhas de transmissão (GGT)", type: "ArcGIS REST", address: "https://sigel.aneel.gov.br/arcgis/rest/services/GGT/Dados_WebApp_GGT/MapServer", layer: "0", enabled: false, group: "infraestrutura-eletrica" },
 ].map(connection => ({ ...connection, official: true }));
 
 function listConnections() {

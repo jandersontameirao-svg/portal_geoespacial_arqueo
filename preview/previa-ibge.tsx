@@ -80,6 +80,8 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] 
 type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[]; group?: string };
 
 const childNames: Record<string, string> = {
+  canie_052026_p: "Cavidades naturais subterrâneas",
+  worldcover: "Classes de cobertura do solo · recorte da LT",
   sombreado: "Relevo sombreado",
   elevacao: "Elevação (m)",
   declividade: "Declividade (graus)",
@@ -112,7 +114,8 @@ function childrenFor(source: MapSource) {
     "141": "Outorgas de uso da água emitidas pela ANA",
   };
   return [...(source.availableLayers ?? []), ...(source.layer || "").split(",").filter(Boolean)].map(id => ({
-    id, label: source.id === -13 ? "Trechos de drenagem" : source.id === -14 ? hydroNames[id] ?? id
+    id, label: source.group === "fundiario" ? source.name.split(" · ").slice(1).join(" · ")
+      : source.id === -13 ? "Trechos de drenagem" : source.id === -14 ? hydroNames[id] ?? id
       : childNames[id] ?? (id === "0" ? source.name.split(" · ").slice(-1)[0] ?? id : id),
   }));
 }
@@ -337,6 +340,19 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     const mapped = connections.filter(source => source.layer && (source.official || source.type === "WMS"));
     return <>
       {mapped.filter(source => !source.group).map(renderSource)}
+      {active.some(source => source.id === -20 && selectedFor(source).includes("worldcover")) &&
+        <ImageOverlay url="/previa/uso-solo/worldcover.png" bounds={[[-5.75, -37.85], [-4.75, -36.38]]}
+          opacity={0.72} className="preview-worldcover" attribution="ESA WorldCover 2021 v200 · CC BY 4.0" />}
+      {[
+        ["cavidades", "Cavidades naturais"],
+        ["fundiario", "Imóveis rurais e fundiário"],
+        ["uso-solo", "Uso e cobertura do solo"],
+        ["infraestrutura-eletrica", "Infraestrutura elétrica"],
+      ].filter(([group]) => mapped.some(source => source.group === group)).map(([group, title]) =>
+        <details key={group} className="border-t py-1 text-sm">
+          <summary className="cursor-pointer px-2 py-1">{title}</summary>
+          <div className="ml-3">{mapped.filter(source => source.group === group).map(renderSource)}</div>
+        </details>)}
       <details className="border-t py-1 text-sm">
         <summary className="cursor-pointer px-2 py-1">Relevo e topografia</summary>
         <div className="ml-3">
