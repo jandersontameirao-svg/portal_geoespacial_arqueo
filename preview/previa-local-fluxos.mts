@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { ingestCog, renderCog } from "./previa-local-raster.mts";
 import { exportVector } from "./previa-exportar-vetor.mts";
-import { linearAtlasScale, readPaper, readOrientation, restoreLegend, readLayout, readScale, readStudioView } from "./previa-layout.mts";
+import { defaultStudioPaper, linearAtlasScale, readPaper, readOrientation, restoreLegend, readLayout, readScale, readStudioView } from "./previa-layout.mts";
 
 const require = createRequire(new URL("../package.json", import.meta.url));
 const { jsPDF } = require("jspdf");
@@ -238,20 +238,20 @@ export async function workflow(method: string, input: Row = {}, write = false, v
   if (method === "previewProducts.list" || method === "previewProducts.save") {
     if (input.projectId !== 11 || !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
     const defaults = [
-      { id: "mapa", title: "Mapa de localização A2", columns: 1, rows: 1, overlap: 0, grid: 25000 },
+      { id: "mapa", title: "Mapa de localização", columns: 1, rows: 1, overlap: 0, grid: 25000 },
       { id: "influencia", title: "Áreas de influência — ADA, AID e AII", columns: 1, rows: 1, overlap: 0, grid: 25000, layerIds: [12, 13, 14, 15] },
       { id: "detalhe", title: "Detalhe de trecho da LT", columns: 1, rows: 1, overlap: 0, grid: 2000, scale: 25000, layerIds: [13, 14, 15] },
       { id: "prospeccao", title: "Planejamento da prospecção", columns: 1, rows: 1, overlap: 0, grid: 10000, layerIds: [13, 15, 17] },
       { id: "uso-solo", title: "Uso e cobertura do solo — MapBiomas 2024", columns: 1, rows: 1, overlap: 0, grid: 25000, layerIds: [-21, 15] },
       { id: "corredor", title: "Atlas por corredor", columns: 1, rows: 1, overlap: 15, grid: 500, scale: linearAtlasScale, layerIds: [13, 14, 15] },
-      { id: "atlas", title: "Atlas A2", columns: 3, rows: 2, overlap: 10, grid: 10000 },
+      { id: "atlas", title: "Atlas", columns: 3, rows: 2, overlap: 10, grid: 10000 },
     ];
     const products = defaults.map(model => ({ ...model, ...state.products?.[11]?.find(item => item.id === model.id) }));
     const layers = state.files.filter(file => file.projectId === 11 && file.vector);
     const mapBiomas = { id: -21, name: "MapBiomas Brasil · 2024" };
     if (!write && method === "previewProducts.list") return {
       linearAtlasScale,
-      products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper), orientation: readOrientation(product.orientation), layout: product.paper ? readLayout(product.layout, readOrientation(product.orientation)) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
+      products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper ?? defaultStudioPaper), orientation: readOrientation(product.orientation), layout: product.paper ? readLayout(product.layout, readOrientation(product.orientation)) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
       layers: [...layers.map(({ id, name }) => ({ id, name })), mapBiomas],
     };
     if (!write || method !== "previewProducts.save") return undefined;
@@ -268,7 +268,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     if (Object.values(view.insets).some(inset => inset.layers?.some(id => !layers.some(layer => layer.id === id)))) throw Error("Use camadas do projeto nos mapas de situação.");
     const locks = Array.isArray(input.product.locks) ? ["principal", "legenda", "norte", "brasil", "regional"].filter(key => input.product.locks.includes(key)) : [];
     const orientation = readOrientation(input.product.orientation);
-    const product = { id, orientation, title: title.trim(), columns, rows, overlap, grid, view, locks, paper: readPaper(input.product.paper),
+    const product = { id, orientation, title: title.trim(), columns, rows, overlap, grid, view, locks, paper: readPaper(input.product.paper ?? defaultStudioPaper),
       layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout, orientation), scale: readScale(input.product.scale) ?? (id === "corredor" ? linearAtlasScale : undefined) };
     save({ ...state, products: { ...state.products, 11: products.map(item => item.id === id ? product : item) } });
     return product;

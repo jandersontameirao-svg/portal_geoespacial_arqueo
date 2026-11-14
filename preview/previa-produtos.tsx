@@ -101,8 +101,8 @@ export default function PreviewMapProducts() {
   const draft = drafts[active] ?? saved;
   const orientation = draft?.orientation ?? "landscape";
   const portrait = orientation === "portrait";
-  const [paperWidth,paperHeight] = paperSize(draft?.paper ?? "A2",orientation);
-  const factor = paperFactor(draft?.paper ?? "A2");
+  const [paperWidth,paperHeight] = paperSize(draft?.paper ?? defaultStudioPaper,orientation);
+  const factor = paperFactor(draft?.paper ?? defaultStudioPaper);
   const format = { width:paperWidth/factor, height:paperHeight/factor };
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
   const corridor = active === "corredor";
@@ -487,6 +487,12 @@ export default function PreviewMapProducts() {
               <option value="portrait">Retrato</option>
             </select>
           </label>
+          <button type="button" className="text-xs underline"
+            disabled={draft.paper === defaultStudioPaper && !portrait}
+            onClick={() => change({ ...draft, paper:defaultStudioPaper, orientation:"landscape",
+              layout:portrait ? (saved?.orientation === "landscape" ? saved.layout : defaultLayout) : draft.layout })}>
+            Usar padrão A3 paisagem
+          </button>
           <label className="block text-xs">Título da folha<input className={input} maxLength={85} value={draft.title} onChange={event => change({ ...draft, title:event.target.value })} /></label>
           <label className="block text-xs">Escala do mapa principal 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"
             value={draft.scale ?? ""} onChange={event => change({ ...draft, scale:event.target.value ? event.target.valueAsNumber : undefined })} /></label>
@@ -518,12 +524,15 @@ export default function PreviewMapProducts() {
               const locks = draft.locks ?? [];
               change({ ...draft, locks: locks.includes(element) ? locks.filter(id => id !== element) : [...locks, element] });
             }}>{draft.locks?.includes(element) ? <><Unlock size={14} /> Destravar posição</> : <><Lock size={14} /> Travar posição</>}</button>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <details className="mt-3 text-xs">
+              <summary className="cursor-pointer font-medium">Ajuste preciso do elemento</summary>
+              <div className="mt-2 grid grid-cols-2 gap-2">
               {([["x","X (mm)"],["y","Y (mm)"],["w","Largura (mm)"],["h","Altura (mm)"]] as const).map(([key,label]) =>
                 <label className="text-xs" key={key}>{label}<input className={input} type="number" step="0.1" disabled={draft.locks?.includes(element)} key={draft.paper + element + key + selection[key]}
                   defaultValue={Math.round(selection[key]*factor*10)/10} onBlur={event => { if (Number.isFinite(event.target.valueAsNumber)) boxChange({ ...selection, [key]:event.target.valueAsNumber/factor }); }}
                   onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>)}
             </div>
+            </details>
             {inset === "regional" && <label className="mt-3 block text-xs">Escala do quadro 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"
               value={draft.view.insets[inset].scale ?? ""} onChange={event => change({ ...draft, view:{ ...draft.view, insets:{
                 ...draft.view.insets, [inset]:{ ...draft.view.insets[inset], scale:event.target.value ? event.target.valueAsNumber : undefined },
