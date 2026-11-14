@@ -71,6 +71,8 @@ export default function PreviewMapProducts() {
   const [history, setHistory] = useState<Record<string, { past: Product[]; future: Product[] }>>({});
   const [active, setActive] = useState("mapa");
   const [element, setElement] = useState<ElementId>("principal");
+  const [selectedElements, setSelectedElements] = useState<ElementId[]>(["principal"]);
+  const multiple = selectedElements.length > 1;
   const [mode, setMode] = useState<"layout" | "view" | "proof">("layout");
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(100);
@@ -178,7 +180,7 @@ export default function PreviewMapProducts() {
   function start(event: PointerEvent<HTMLButtonElement>, id: ElementId, kind: "move"|"resize"|"pan") {
     if (!draft || saving || event.button !== 0 || (kind !== 'pan' && draft.locks?.includes(id))) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    setElement(id);
+    selectElement(id);
     drag.current = { x:event.clientX, y:event.clientY, kind, id, initial:draft, scale:review?.scale ?? 0 };
   }
   function move(event: PointerEvent<HTMLButtonElement>) {
@@ -229,6 +231,47 @@ export default function PreviewMapProducts() {
     if (pending.box) change({ ...action.initial, layout: { ...action.initial.layout, [action.id]:pending.box } });
   }
 
+  function selectElement(id: ElementId, extend = false) {
+    if (!extend) {
+      setElement(id);
+      setSelectedElements([id]);
+      return;
+    }
+    const next = selectedElements.includes(id)
+      ? selectedElements.filter(item => item !== id) : [...selectedElements, id];
+    if (!next.length) return;
+    setSelectedElements(next);
+    setElement(next.at(-1)!);
+  }
+
+  function distribute(axis: "x" | "y") {
+    if (!draft || selectedElements.length < 3) return;
+    const size = axis === "x" ? "w" : "h";
+    const sorted = [...selectedElements].sort((a,b) => draft.layout[a][axis]-draft.layout[b][axis]);
+    const first = draft.layout[sorted[0]];
+    const last = draft.layout[sorted.at(-1)!];
+    const middle = sorted.slice(1,-1);
+    if (middle.some(id => draft.locks?.includes(id))) {
+      setNotice("Destrave os elementos intermediários para distribuir.");
+      return;
+    }
+    // Keep the two outside elements fixed and equalize the gaps between edges.
+    const span = last[axis]+last[size]-first[axis];
+    const gap = (span-sorted.reduce((sum,id) => sum+draft.layout[id][size],0))/(sorted.length-1);
+    if (gap < -0.000001) {
+      setNotice("Afaste os elementos das extremidades para criar espaço suficiente.");
+      return;
+    }
+    const layout = { ...draft.layout };
+    let position = first[axis]+first[size];
+    for (const id of middle) {
+      position += Math.max(0,gap);
+      layout[id] = { ...layout[id], [axis]:position };
+      position += layout[id][size];
+    }
+    change({ ...draft, layout });
+  }
+
   function align(edge: string) {
     if (!draft) return;
     const box = draft.layout[element];
@@ -250,7 +293,7 @@ export default function PreviewMapProducts() {
       undo(event.shiftKey || event.key.toLowerCase() === "y");
       return;
     }
-    if (mode !== "layout" || event.ctrlKey || event.metaKey || event.altKey ||
+    if (mode !== "layout" || multiple || event.ctrlKey || event.metaKey || event.altKey ||
         !["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key) || draft.locks?.includes(element)) return;
     event.preventDefault();
     const box = draft.layout[element], step = event.shiftKey ? 5 : 1;
@@ -316,7 +359,7 @@ export default function PreviewMapProducts() {
       <label className="min-w-52 grow text-xs text-emerald-100/80">Modelo de mapa ou atlas
         <select className="mt-1 block w-full rounded-md border border-white/25 px-2 py-1.5 text-sm text-white" style={{ background:"#263735" }}
           value={active} disabled={saving || !products.length} onChange={event => {
-            setActive(event.target.value); setPage(0); setElement("principal"); setReview(undefined); setError(""); setNotice(""); setMode("layout");
+            setActive(event.target.value); setPage(0); selectElement("principal"); setReview(undefined); setError(""); setNotice(""); setMode("layout");
           }}>
           {products.map(product => <option key={product.id} value={product.id}>{product.title}</option>)}
         </select>
@@ -337,7 +380,7 @@ export default function PreviewMapProducts() {
         <aside className={panel + " border-slate-200 xl:border-r dark:border-slate-700"}>
           <div className="flex items-center gap-2 text-sm font-semibold"><Layers3 size={16} /> Camadas</div>
           <label className="block text-xs">Quadro de edição
-            <select className={input} value={inset ?? "principal"} onChange={event => setElement(event.target.value as ElementId)}>
+            <select className={input} value={inset ?? "principal"} onChange={event => selectElement(event.target.value as ElementId)}>
               <option value="principal">Mapa principal</option><option value="brasil">Situação nacional</option><option value="regional">Situação regional</option>
             </select>
           </label>
@@ -366,7 +409,7 @@ export default function PreviewMapProducts() {
         <div className="min-w-0 bg-slate-100 dark:bg-slate-800">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
             {(["layout","view","proof"] as const).map(tab => <button key={tab} type="button" className={button + (mode === tab ? " bg-emerald-100 text-emerald-950 dark:text-white dark:bg-emerald-900" : "")}
-              aria-pressed={mode === tab} disabled={tab === "view" && !canPan} onClick={() => { setMode(tab); if (tab === "view") setElement("principal"); }}>
+              aria-pressed={mode === tab} disabled={tab === "view" && !canPan} onClick={() => { setMode(tab); if (tab === "view") selectElement("principal"); }}>
               {{ layout:"Layout", view:"Enquadrar", proof:"Prova" }[tab]}
             </button>)}
             <button type="button" className={button} aria-label="Desfazer" disabled={!entries.past.length} onClick={() => undo()}><Undo2 size={15} /></button>
@@ -388,14 +431,14 @@ export default function PreviewMapProducts() {
                 {proof?.for === previewUrl ? <img src={proof.url} alt={atlas && currentPage === 0 ? "Mapa índice do atlas" : "Prancha cartográfica A2"} className="block size-full object-contain" />
                   : <div className="grid h-full place-items-center text-sm text-slate-700">{error || "Renderizando prancha…"}</div>}
                 {mode === "layout" && !(active === "atlas" && currentPage === 0) && [...elements.filter(id => id !== element), element].map(id => {
-                  const selected = id === element;
+                  const selected = selectedElements.includes(id);
                   const locked = draft.locks?.includes(id);
-                  const box = (selected ? gesture?.box : undefined) ?? draft.layout[id];
+                  const box = (id === element ? gesture?.box : undefined) ?? draft.layout[id];
                   return <div key={id} className={"pointer-events-none absolute " + (selected ? "border border-emerald-600" : "")} style={{
                     left: box.x/594*100+"%", top: box.y/420*100+"%", width: box.w/594*100+"%", height: box.h/420*100+"%",
                   }}>
-                    <button type="button" aria-label={"Selecionar " + names[id]} onClick={() => setElement(id)} className="pointer-events-auto absolute inset-0 hover:ring-1 hover:ring-inset hover:ring-emerald-600" />
-                    {selected && !locked && <><button type="button" aria-label={"Mover " + names[id]} className="pointer-events-auto absolute -top-4 left-0 cursor-move touch-none whitespace-nowrap rounded-sm bg-emerald-800 px-1.5 text-[10px] text-white"
+                    <button type="button" aria-label={"Selecionar " + names[id]} aria-pressed={selected} onClick={event => selectElement(id,event.shiftKey)} className="pointer-events-auto absolute inset-0 hover:ring-1 hover:ring-inset hover:ring-emerald-600" />
+                    {selected && !multiple && !locked && <><button type="button" aria-label={"Mover " + names[id]} className="pointer-events-auto absolute -top-4 left-0 cursor-move touch-none whitespace-nowrap rounded-sm bg-emerald-800 px-1.5 text-[10px] text-white"
                       onPointerDown={event => start(event,id,"move")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)}>{names[id]}</button>
                     <button type="button" aria-label={"Redimensionar " + names[id]} className="pointer-events-auto absolute -bottom-1 -right-1 size-3 cursor-nwse-resize touch-none rounded-sm border border-white bg-emerald-700"
                       onPointerDown={event => start(event,id,"resize")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} /></>}
@@ -434,7 +477,21 @@ export default function PreviewMapProducts() {
             </label>)}
           <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.view.labels} onChange={event => change({ ...draft, view:{ ...draft.view, labels:event.target.checked } })}/> Rótulos municipais</label>
           <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
-            <label className="block text-xs font-medium">Elemento da folha<select className={input} value={element} onChange={event => setElement(event.target.value as ElementId)}>
+            {mode === "layout" && !(active === "atlas" && currentPage === 0) && <details className="mb-3 text-xs" open={multiple || undefined}>
+              <summary className="cursor-pointer font-medium">Seleção e distribuição · {selectedElements.length} {multiple ? "elementos" : "elemento"}</summary>
+              <p className="my-2 text-slate-500">Use Shift + clique na folha ou marque os elementos abaixo.</p>
+              <div className="space-y-1">
+                {elements.map(id => <label key={id} className="flex items-center gap-2">
+                  <input type="checkbox" checked={selectedElements.includes(id)} onChange={() => selectElement(id,true)} /> {names[id]}
+                </label>)}
+              </div>
+              <p className="mt-2 text-slate-500">Selecione pelo menos três. As extremidades ficam no lugar.</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                <button type="button" className={button} disabled={selectedElements.length < 3} onClick={() => distribute("x")}>Distribuir horizontalmente</button>
+                <button type="button" className={button} disabled={selectedElements.length < 3} onClick={() => distribute("y")}>Distribuir verticalmente</button>
+              </div>
+            </details>}
+            {!multiple && <><label className="block text-xs font-medium">Elemento da folha<select className={input} value={element} onChange={event => selectElement(event.target.value as ElementId)}>
               {elements.map(id => <option value={id} key={id}>{names[id]}</option>)}
             </select></label>
             <button type="button" className={button + " mt-2"} onClick={() => {
@@ -465,6 +522,7 @@ export default function PreviewMapProducts() {
               </div>
             </details>}
             {mode === "layout" && <p className="mt-2 text-xs text-slate-500">Setas movem 1 mm. Shift + setas movem 5 mm. Shift no arraste restringe o eixo ou mantém a proporção.</p>}
+            </>}
             {canPan && element === "principal" && <button type="button" className="mt-3 text-xs underline" disabled={!draft.view.east && !draft.view.north}
               onClick={() => change({ ...draft, view:{ ...draft.view, east:0, north:0 } })}>Restaurar enquadramento</button>}
           </div>
