@@ -28,7 +28,7 @@ function paths(shape: Shape): { rings: Point[][]; closed: boolean }[] {
   }
 }
 
-const backgroundStyles: Record<StudioBackground, {water:string; land:string; border:string; focus:string}> = {
+const backgroundStyles: Partial<Record<StudioBackground, {water:string; land:string; border:string; focus:string}>> = {
   cartografico:{water:"#eef3f4",land:"#f3f0e7",border:"#a5aaa0",focus:"#d3e1c5"},
   claro:{water:"#fafafa",land:"#e6e8eb",border:"#a0a6ad",focus:"#ccd1d7"},
   branco:{water:"#ffffff",land:"#ffffff",border:"#a5aaa0",focus:"#ffffff"},
@@ -38,7 +38,7 @@ const defaultFrame = defaultLayout.principal;
 const newPdf = (paper: Paper = "A2", orientation: Orientation = "landscape") => new jsPDF({ orientation, unit: "mm", format: paperSize(paper, orientation), compress: true, precision: 6 });
 type Sheet = { center: Point; scale: number; number: number; total: number; grid: number; document?: any };
 
-type Options = { brands?: ({image:string; width:number; height:number} | undefined)[]; paper?: Paper; orientation?: Orientation; view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
+type Options = { baseImages?: Partial<Record<"principal"|"brasil"|"regional",string>>; brands?: ({image:string; width:number; height:number} | undefined)[]; paper?: Paper; orientation?: Orientation; view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
 function extent(layers: Layer[]) {
   let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
   for (const layer of layers) for (const feature of layer.layerData.features) for (const part of paths(feature.geometry)) {
@@ -185,11 +185,16 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   }
   const heading = title ?? "MAPA DE LOCALIZAÇÃO | LT ANGICOS–JAGUARUANA II";
   label(portrait ? 215 : 247,20.5,heading,Math.min(5.6,(portrait ? 370 : 440)/(heading.length*.62)),true,true);
+  const baseImage = (url:string,x:number,y:number,w:number,h:number) => {
+    if (pdf) pdf.addImage(url,"PNG",x*factor,y*factor,w*factor,h*factor);
+    else svg.push(`<image href="${url}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`);
+  };
   const background = options.view?.background ?? "cartografico";
-  const base = backgroundStyles[background];
+  const base = backgroundStyles[background] ?? backgroundStyles.cartografico!;
   rect(frame.x,frame.y,frame.w,frame.h,base.water);
   clip(frame.x,frame.y,frame.w,frame.h,() => {
-    if (background !== "nenhum") drawFeatures(states.filter(f => ["CE","RN","PB"].includes(f.properties?.SIGLA_UF || "")),main,base.border,base.land);
+    if (options.baseImages?.principal) baseImage(options.baseImages.principal,frame.x,frame.y,frame.w,frame.h);
+    else if (background !== "nenhum") drawFeatures(states.filter(f => ["CE","RN","PB"].includes(f.properties?.SIGLA_UF || "")),main,base.border,base.land);
     if (options.raster) {
       if (pdf) pdf.addImage(options.raster.url, "PNG", frame.x*factor, frame.y*factor, frame.w*factor, frame.h*factor);
       else svg.push(`<image href="${options.raster.url}" x="${frame.x}" y="${frame.y}" width="${frame.w}" height="${frame.h}"/>`);
@@ -253,12 +258,13 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     rect(x,y,width,box.h,"#ffffff");
     label(x+1,y+heading*.72,title + ' · 1:' + scale.toLocaleString('pt-BR'),Math.min(3.5,width/Math.max(8,title.length*.58),heading*.7),true);
     const background = inset?.background ?? "cartografico";
-    const base = backgroundStyles[background];
+    const base = backgroundStyles[background] ?? backgroundStyles.cartografico!;
     rect(x,top,width,height,base.water);
     clip(x,top,width,height,() => {
-      if (background !== "nenhum") drawFeatures(states,project,base.border,base.land,.13);
+      if (options.baseImages?.[key]) baseImage(options.baseImages[key],x,top,width,height);
+      else if (background !== "nenhum") drawFeatures(states,project,base.border,base.land,.13);
       const focus = states.filter(f => ["CE","RN"].includes(f.properties?.SIGLA_UF || ""));
-      if (background !== "nenhum") drawFeatures(focus,project,base.border,base.focus,.2);
+      if (!options.baseImages?.[key] && background !== "nenhum") drawFeatures(focus,project,base.border,base.focus,.2);
       if (inset?.layers) {
         for (const id of inset.layers) {
           const layer = (options.available ?? layers).find(item => item.id === id);
@@ -311,6 +317,10 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   detailLabel(348,`Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
   detailLabel(355,"Fontes  Camadas do projeto · IBGE 2024",3.25);
   detailLabel(362,options.raster ? (options.model === "uso-solo" ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Copernicus DEM GLO-30 · recorte da LT") : "Responsável  __________________",3.25);
+  const sources = [options.view?.background,options.view?.insets.brasil.background,options.view?.insets.regional.background];
+  if (sources.includes("esri-imagery")) detailLabel(366,"Satélite: Esri, Vantor, Earthstar Geographics e comunidade GIS",2.1);
+  if (sources.includes("esri-light-gray") || sources.includes("esri-dark-gray"))
+    detailLabel(370,"Base cinza: Esri, HERE, Garmin, OpenStreetMap e comunidade GIS",2.1);
   const logo = readFileSync(new URL("./logo-arqueo.png", import.meta.url));
   const defaultBrand = {image:"data:image/png;base64,"+logo.toString("base64"),width:logo.readUInt32BE(16),height:logo.readUInt32BE(20)};
   const brands = [options.brands?.[0] ?? defaultBrand,options.brands?.[1]].filter(brand => brand !== undefined);
@@ -379,7 +389,7 @@ export function corridorSheets(layers: Layer[], overlap: number, grid: number, o
   });
 }
 
-export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, page: number, title: string | undefined, options: Options, single = false) {
+export async function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, page: number, title: string | undefined, options: Options, single = false) {
   const frame = options.layout?.principal ?? defaultFrame;
   if (!Number.isInteger(page) || page < 0 || page > sheets.length) throw Error('Folha fora do atlas.');
   const west = Math.min(...sheets.map(sheet => sheet.center[0])), east = Math.max(...sheets.map(sheet => sheet.center[0]));
@@ -390,29 +400,29 @@ export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, pa
   const index: Sheet = { center: [(east+west)/2,(north+south)/2], scale, number: 1, total: sheets.length+1, grid: 25000 };
   const indexTitle = "Mapa índice | LT Angicos–Jaguaruana II";
   const detailTitle = title ?? "Atlas por corredor | LT Angicos–Jaguaruana II";
-  if (!pdf || single) return page === 0 ? pranchaAngicos(layers, pdf, index, indexTitle, { ...options, index: sheets })
-    : pranchaAngicos(layers, pdf, sheets[page-1], detailTitle, options);
+  if (!pdf || single) return page === 0 ? pranchaAngicos(layers, pdf, index, indexTitle, { ...await prepareStudioBases(layers,options,index), index: sheets })
+    : pranchaAngicos(layers, pdf, sheets[page-1], detailTitle, await prepareStudioBases(layers,options,sheets[page-1]));
   const document = newPdf(options.paper, options.orientation);
-  pranchaAngicos(layers, true, { ...index, document }, indexTitle, { ...options, index: sheets });
+  pranchaAngicos(layers, true, { ...index, document }, indexTitle, { ...await prepareStudioBases(layers,options,index), index: sheets });
   for (const sheet of sheets) {
     document.addPage(paperSize(options.paper ?? 'A2', options.orientation), options.orientation ?? 'landscape');
-    pranchaAngicos(layers, true, { ...sheet, document }, detailTitle, options);
+    pranchaAngicos(layers, true, { ...sheet, document }, detailTitle, await prepareStudioBases(layers,options,sheet));
   }
   return Buffer.from(document.output("arraybuffer"));
 }
 
-export function atlasAngicos(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, title?: string, options: Options = {}) {
+export async function atlasAngicos(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, title?: string, options: Options = {}) {
   const document = newPdf(options.paper, options.orientation);
   for (const sheet of planSheets(layers, columns, rows, overlap, grid, options)) {
     if (sheet.number > 1) document.addPage(paperSize(options.paper ?? 'A2', options.orientation), options.orientation ?? 'landscape');
-    pranchaAngicos(layers, true, { ...sheet, document }, title, options);
+    pranchaAngicos(layers, true, { ...sheet, document }, title, await prepareStudioBases(layers,options,sheet));
   }
   return Buffer.from(document.output("arraybuffer"));
 }
 
-export function atlasView(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, page: number, title?: string, options: Options = {}) {
+export async function atlasView(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, page: number, title?: string, options: Options = {}) {
   const sheets = planSheets(layers, columns, rows, overlap, grid, options);
-  if (page > 0 && sheets[page-1]) return pranchaAngicos(layers, false, sheets[page-1], title, options);
+  if (page > 0 && sheets[page-1]) return pranchaAngicos(layers, false, sheets[page-1], title, await prepareStudioBases(layers,options,sheets[page-1]));
   const frame = options.layout?.principal ?? defaultFrame;
   const metres = sheets[0].scale * paperFactor(options.paper ?? 'A2') / 1000;
   const west = sheets[0].center[0] - frame.w * metres / 2;
@@ -482,4 +492,73 @@ export function printTerrain(layers: Layer[], options: Options, contours: boolea
     [[0,"#256943"],[100,"#7bb153"],[250,"#f0d782"],[500,"#ac6937"],[800,"#6e4234"],[1200,"#f4f4f4"]]
       .map(([value,color]) => ({color:String(color),name:String(value)+" m"}));
   return {url:"data:image/png;base64,"+PNG.sync.write(image).toString("base64"),legend};
+}
+
+const esriServices = {
+  "esri-imagery":"World_Imagery",
+  "esri-light-gray":"Canvas/World_Light_Gray_Base",
+  "esri-dark-gray":"Canvas/World_Dark_Gray_Base",
+} as const;
+type EsriBase = keyof typeof esriServices;
+const isEsriBase = (id: string | undefined): id is EsriBase => !!id && Object.hasOwn(esriServices,id);
+const baseImages = new Map<string,Promise<string>>();
+async function exportBase(id: EsriBase, projection: typeof utm, center: number[], width: number, height: number, pixels: number) {
+  const key = JSON.stringify([id,center,width,height,pixels,projection === utm]);
+  const cached = baseImages.get(key);
+  if (cached) return cached;
+  const pending = (async () => {
+    const { PNG } = createRequire(require.resolve("qrcode"))("pngjs");
+    const mercator = proj4("EPSG:4326","EPSG:3857");
+    const sample = (x:number,y:number) => mercator.forward(projection.inverse([center[0]+(x-.5)*width,center[1]+(.5-y)*height]));
+    const edge = Array.from({length:17},(_,i) => i/16).flatMap(t => [sample(0,t),sample(1,t),sample(t,0),sample(t,1)]);
+    const xs = edge.map(p=>p[0]), ys = edge.map(p=>p[1]);
+    const west=Math.min(...xs), east=Math.max(...xs), south=Math.min(...ys), north=Math.max(...ys);
+    const rows=Math.max(64,Math.round(pixels*height/width));
+    const query = new URLSearchParams({bbox:[west,south,east,north].join(","),bboxSR:"3857",imageSR:"3857",
+      size:pixels+","+rows,format:"png32",transparent:"true",f:"image"});
+    // Match the export image aspect to its bounding box so Esri does not expand the extent.
+    const sourceHeight = Math.max(1,Math.round(pixels*(north-south)/(east-west)));
+    const adjustedNorth = (north+south+(east-west)*sourceHeight/pixels)/2;
+    const adjustedSouth = adjustedNorth-(east-west)*sourceHeight/pixels;
+    query.set("bbox",[west,adjustedSouth,east,adjustedNorth].join(","));
+    query.set("size",pixels+","+sourceHeight);
+    const response=await fetch("https://server.arcgisonline.com/ArcGIS/rest/services/"+esriServices[id]+"/MapServer/export?"+query,{signal:AbortSignal.timeout(15000)});
+    if (!response.ok || !response.headers.get("content-type")?.includes("image/png")) throw Error("O mapa-base Esri está indisponível para esta folha.");
+    const source=PNG.sync.read(Buffer.from(await response.arrayBuffer()));
+    const image=new PNG({width:pixels,height:rows});
+    for(let y=0;y<rows;y++) for(let x=0;x<pixels;x++){
+      const [e,n]=sample((x+.5)/pixels,(y+.5)/rows);
+      const sx=Math.max(0,Math.min(source.width-1,Math.floor((e-west)/(east-west)*source.width)));
+      const sy=Math.max(0,Math.min(source.height-1,Math.floor((adjustedNorth-n)/(adjustedNorth-adjustedSouth)*source.height)));
+      const offset=(sy*source.width+sx)*4;
+      source.data.copy(image.data,(y*pixels+x)*4,offset,offset+4);
+    }
+    return "data:image/png;base64,"+PNG.sync.write(image).toString("base64");
+  })();
+  if(baseImages.size>=40) baseImages.delete(baseImages.keys().next().value!);
+  baseImages.set(key,pending);
+  pending.catch(()=>baseImages.delete(key));
+  return pending;
+}
+
+export async function prepareStudioBases(layers: Layer[], options: Options, sheet?: Sheet): Promise<Options> {
+  const view=options.view;
+  if(!view) return options;
+  const factor=paperFactor(options.paper ?? "A2");
+  const images: Options["baseImages"]={};
+  const tasks: Promise<unknown>[]=[];
+  if(isEsriBase(view.background)){
+    const frame=options.layout?.principal ?? defaultFrame;
+    const {center,scale}=sheet ?? mapView(layers,options);
+    tasks.push(exportBase(view.background,utm,center,frame.w*scale*factor/1000,frame.h*scale*factor/1000,750).then(image=>{images.principal=image}));
+  }
+  for(const key of ["brasil","regional"] as const){
+    const id=view.insets[key].background;
+    if(!isEsriBase(id)) continue;
+    const box=(options.layout ?? defaultLayout)[key];
+    const {projection,center,scale,height}=overviewView(key,options);
+    tasks.push(exportBase(id,projection,center,box.w*scale*factor/1000,height*scale*factor/1000,320).then(image=>{images[key]=image}));
+  }
+  await Promise.all(tasks);
+  return {...options,baseImages:images};
 }

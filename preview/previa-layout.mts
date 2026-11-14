@@ -42,7 +42,7 @@ export function readScale(value: unknown, maximum = 10000000): number | undefine
   return value;
 }
 
-export const studioBackgrounds = { cartografico:"Cartográfico", claro:"Cinza claro", branco:"Branco com limites", nenhum:"Sem base" } as const;
+export const studioBackgrounds = { cartografico:"Cartográfico", claro:"Cinza claro", branco:"Branco com limites", nenhum:"Sem base", "esri-imagery":"ESRI Satélite", "esri-light-gray":"ESRI Light Gray", "esri-dark-gray":"ESRI Dark Gray" } as const;
 export type StudioBackground = keyof typeof studioBackgrounds;
 export function readStudioBackground(value: unknown): StudioBackground {
   if (value === undefined) return "cartografico";

@@ -514,7 +514,7 @@ export default function PreviewMapProducts() {
               <option value="principal">Mapa principal</option><option value="brasil">Situação nacional</option><option value="regional">Situação regional</option>
             </select>
           </label>
-          <label className="block text-xs">Fundo do quadro
+          <label className="block text-xs">Mapa-base do quadro
             <select className={input} value={(inset ? draft.view.insets[inset].background : draft.view.background) ?? "cartografico"}
               onChange={event => {
                 const background = event.target.value as StudioBackground;

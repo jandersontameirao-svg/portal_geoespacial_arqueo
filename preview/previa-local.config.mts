@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { studioLayerRequirements, readLayout, readOrientation, readPaper, readScale, readStudioView } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
-import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas, printTerrain } from "./previa-raster/angicos/prancha.mts";
+import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas, printTerrain, prepareStudioBases } from "./previa-raster/angicos/prancha.mts";
 
 const arqueoA2Renderer = readFileSync(new URL("./previa-raster/composicao-a2.ts.txt", import.meta.url), "utf8");
 const arqueoA2Seeds = [
@@ -743,9 +743,9 @@ const demoApi = {
         }
         if (model === "uso-solo") options.raster = await printMapBiomas(layers, options);
         if (model === "relevo" || model === "topografia") options.raster = printTerrain(layers,options,model === "topografia");
-        const body = corridor ? corridorAtlas(layers, corridor, pdf, Number(url.searchParams.get("folha") ?? 0), title, options, url.searchParams.has("folha")) : atlas ? (pdf ? atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
-          atlasView(layers, columns, rows, overlap, grid, Number(url.searchParams.get("folha") ?? 0), title, options)) :
-          pranchaAngicos(layers, pdf, undefined, title, options);
+        const body = corridor ? await corridorAtlas(layers, corridor, pdf, Number(url.searchParams.get("folha") ?? 0), title, options, url.searchParams.has("folha")) : atlas ? (pdf ? await atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
+          await atlasView(layers, columns, rows, overlap, grid, Number(url.searchParams.get("folha") ?? 0), title, options)) :
+          pranchaAngicos(layers, pdf, undefined, title, await prepareStudioBases(layers,options));
         res.setHeader("Cache-Control", "no-store");
         res.setHeader("Content-Type", pdf ? "application/pdf" : "image/svg+xml; charset=utf-8");
         if (pdf) res.setHeader("Content-Disposition", `attachment; filename="${(model ?? (atlas ? "Atlas" : "Mapa")).replace(/[^a-z0-9-]/gi,"")}-LT-Angicos-Jaguaruana-II-${options.paper}.pdf"`);
