@@ -97,8 +97,19 @@ const childNames: Record<string, string> = {
 
 function childrenFor(source: MapSource) {
   if (source.id === -2) return layers.map(layer => ({ id: layer.id, label: layer.label }));
+  const hydroNames: Record<string, string> = {
+    "53": "Bacias hidrográficas · nível 1 (BHO 2017)",
+    "54": "Bacias hidrográficas · nível 2 (BHO 2017)",
+    "140": "Massas d’água",
+    "156": "Reservatórios do Nordeste · SAR",
+    "159": "Reservatórios do Sistema Interligado Nacional · SAR",
+    "154": "Estações da rede de qualidade da água (2020)",
+    "134": "Índice de Qualidade das Águas · IQA (2020)",
+    "141": "Outorgas de uso da água emitidas pela ANA",
+  };
   return [...(source.availableLayers ?? []), ...(source.layer || "").split(",").filter(Boolean)].map(id => ({
-    id, label: childNames[id] ?? (id === "0" ? source.name.split(" · ").slice(-1)[0] ?? id : id),
+    id, label: source.id === -13 ? "Trechos de drenagem" : source.id === -14 ? hydroNames[id] ?? id
+      : childNames[id] ?? (id === "0" ? source.name.split(" · ").slice(-1)[0] ?? id : id),
   }));
 }
 
@@ -320,6 +331,10 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     const mapped = connections.filter(source => source.layer && (source.official || source.type === "WMS"));
     return <>
       {mapped.filter(source => !source.group).map(renderSource)}
+      <details className="border-t py-1 text-sm">
+        <summary className="cursor-pointer px-2 py-1">Recursos hídricos</summary>
+        <div className="ml-3">{mapped.filter(source => source.group === "recursos-hidricos").map(renderSource)}</div>
+      </details>
       <details className="border-t py-1 text-sm">
         <summary className="cursor-pointer px-2 py-1">Patrimônio cultural estadual</summary>
         <div className="ml-3">

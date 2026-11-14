@@ -119,6 +119,12 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  { id: -13, name: "ANA · Trechos de drenagem", type: "ArcGIS REST",
+    address: "https://www.snirh.gov.br/arcgis/rest/services/IG/Servicos_Base_IG/MapServer",
+    layer: "1", enabled: false, group: "recursos-hidricos" },
+  { id: -14, name: "ANA · Bacias, águas e monitoramento", type: "ArcGIS REST",
+    address: "https://www.snirh.gov.br/arcgis/rest/services/INDE/Camadas/MapServer",
+    layer: "53,54,140,156,159,154,134,141", enabled: false, group: "recursos-hidricos" },
   // Public services used by the IPHAE map at https://www.iphae.rs.gov.br/mapa.
   ...[
     { id: -10, title: "Bens tombados", service: "bens_tombados" },
