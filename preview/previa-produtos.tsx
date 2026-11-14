@@ -470,11 +470,12 @@ export default function PreviewMapProducts() {
               </select></label>
               <button type="button" className={button} aria-label="Próxima folha" disabled={currentPage >= count} onClick={() => setPage(currentPage+1)}><ChevronRight size={14}/></button>
               {corridor && <><span>{count} folhas de detalhe</span><button type="button" className={button} disabled={dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(true)}>Exportar folha</button></>}
-            </> : <span>{draft.paper} · {portrait ? "Retrato" : "Paisagem"}</span>}
+            </> : <span>{draft.paper} · {portrait ? "Vertical" : "Horizontal"}</span>}
           </div>
         </div>
         <aside className={panel + " border-slate-200 xl:border-l dark:border-slate-700"}>
           <div className="text-sm font-semibold">Propriedades da prancha</div>
+          <div className="grid grid-cols-2 gap-2">
           <label className="block text-xs">Formato da folha<select className={input} value={draft.paper} onChange={event => change({ ...draft, paper:event.target.value as Paper })}>
             {papers.map(paper => <option key={paper}>{paper}</option>)}
           </select></label>
@@ -483,10 +484,11 @@ export default function PreviewMapProducts() {
               const next = event.target.value as Orientation;
               change({ ...draft, orientation:next, layout:saved?.orientation === next ? saved.layout : next === "portrait" ? portraitLayout : defaultLayout });
             }}>
-              <option value="landscape">Paisagem</option>
-              <option value="portrait">Retrato</option>
+              <option value="landscape">Horizontal</option>
+              <option value="portrait">Vertical</option>
             </select>
           </label>
+          </div>
           <button type="button" className="text-xs underline"
             disabled={draft.paper === defaultStudioPaper && !portrait}
             onClick={() => change({ ...draft, paper:defaultStudioPaper, orientation:"landscape",
