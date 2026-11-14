@@ -80,6 +80,7 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] 
 type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[]; group?: string };
 
 const childNames: Record<string, string> = {
+  "idesp_acervo:bem_tomb_a_2025_01_v0": "Bens tombados · estado de São Paulo (2025.01)",
   "condephaat-capital": "Imóveis tombados · município de São Paulo",
   "IDE:ide_2017_mg_tombamento_iepha_pto": "Bens culturais tombados",
   "IDE:ide_2017_mg_ai_patrimonio_cultural_iepha_pol": "Áreas de influência do patrimônio cultural",

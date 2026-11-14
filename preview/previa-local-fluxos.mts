@@ -119,6 +119,9 @@ const iphanConnection = {
 
 const officialConnections = [
   iphanConnection,
+  { id: -9, name: "SP · Condephaat estadual", type: "WMS", address: "https://www.idesp.sp.gov.br/geoserver/idesp_acervo/wms",
+    layer: "idesp_acervo:bem_tomb_a_2025_01_v0", enabled: false, group: "patrimonio-estadual",
+    status: "Bens tombados mapeados pela IDE-SP em todo o estado · edição 2025.01." },
   { id: -8, name: "SP · Condephaat", type: "GeoJSON", address: "https://dadosabertos.urbis.prefeitura.sp.gov.br/dataset/idesp-imoveis-estadual",
     layer: "condephaat-capital", enabled: false, group: "patrimonio-estadual",
     status: "Base estadual IDE-SP, recorte do município de São Paulo." },
