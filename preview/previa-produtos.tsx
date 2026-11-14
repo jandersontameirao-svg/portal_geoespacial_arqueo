@@ -6,9 +6,9 @@ const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte",
 type ElementId = keyof typeof names;
 type View = { east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { layers?: number[]; scale?: number }> };
 const papers = ["A4", "A3", "A2", "A1", "A0"] as const;
-type Paper = typeof papers[number];
 type Product = {
   paper: Paper;
+  orientation: Orientation;
   id: string; title: string; columns: number; rows: number; overlap: number; grid: number;
   scale?: number; locks?: ElementId[]; layerIds: number[]; layout: Record<ElementId, Box>; view: View;
 };
@@ -19,8 +19,7 @@ const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractio
 const input = "mt-1 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white";
 const button = "inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-slate-700";
 const panel = "space-y-4 bg-white p-4 dark:bg-slate-900";
-const format = { width: 594, height: 420 };
-const paperDimensions = { A4:[297,210], A3:[420,297], A2:[594,420], A1:[841,594], A0:[1189,841] } as const;
+
 
 async function request(method: "list" | "save", product?: Product) {
   const payload = { json: { projectId: 11, product } };
@@ -35,7 +34,7 @@ async function request(method: "list" | "save", product?: Product) {
 
 function sheetUrl(format: "svg" | "pdf" | "json", product: Product, page?: number) {
   const query = new URLSearchParams({
-    papel: product.paper, modelo: product.id, grade: String(product.grid), titulo: product.title,
+    papel: product.paper, orientacao: product.orientation, modelo: product.id, grade: String(product.grid), titulo: product.title,
     camadas: product.layerIds.join(","), layout: JSON.stringify(product.layout), vista: JSON.stringify(product.view),
   });
   if (product.scale) query.set("escala", String(product.scale));
@@ -46,7 +45,7 @@ function sheetUrl(format: "svg" | "pdf" | "json", product: Product, page?: numbe
   return "/previa/prancha/11." + format + "?" + query;
 }
 
-function fitBox(box: Box): Box {
+function fitBox(box: Box, format: {width:number; height:number}): Box {
   const clamp = (value: number, max: number, min = 0) => Math.min(max, Math.max(min, Math.round(value*10)/10));
   const x = clamp(box.x, format.width-10), y = clamp(box.y, format.height-10);
   return { x, y, w: clamp(box.w, format.width-x, 10), h: clamp(box.h, format.height-y, 10) };
@@ -100,8 +99,11 @@ export default function PreviewMapProducts() {
   }, []);
   const saved = products.find(product => product.id === active);
   const draft = drafts[active] ?? saved;
-  const [paperWidth,paperHeight] = paperDimensions[draft?.paper ?? "A2"];
-  const factor = Math.min(paperWidth/594,paperHeight/420);
+  const orientation = draft?.orientation ?? "landscape";
+  const portrait = orientation === "portrait";
+  const [paperWidth,paperHeight] = paperSize(draft?.paper ?? "A2",orientation);
+  const factor = paperFactor(draft?.paper ?? "A2");
+  const format = { width:paperWidth/factor, height:paperHeight/factor };
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
   const corridor = active === "corredor";
   const atlas = corridor || active === "atlas";
@@ -165,7 +167,7 @@ export default function PreviewMapProducts() {
       : { past: entries.past.slice(0,-1), future: [draft, ...entries.future] } }));
   }
   function boxChange(box: Box) {
-    if (draft && !draft.locks?.includes(element)) change({ ...draft, layout: { ...draft.layout, [element]: fitBox(box) } });
+    if (draft && !draft.locks?.includes(element)) change({ ...draft, layout: { ...draft.layout, [element]: fitBox(box,format) } });
   }
   function setLayerIds(ids?: number[]) {
     if (!draft) return;
@@ -211,18 +213,18 @@ export default function PreviewMapProducts() {
         east: Math.max(-500000,Math.min(500000,Math.round(action.initial.view.east-dx*action.scale/1000))),
         north: Math.max(-500000,Math.min(500000,Math.round(action.initial.view.north+dy*action.scale/1000))),
       },
-    } : action.kind === "resize" ? { box: fitBox({ ...box, w:box.w+dx, h:box.h+dy }) } :
-      { box: fitBox({ ...box, x:Math.min(format.width-box.w,box.x+dx), y:Math.min(format.height-box.h,box.y+dy) }) };
+    } : action.kind === "resize" ? { box: fitBox({ ...box, w:box.w+dx, h:box.h+dy },format) } :
+      { box: fitBox({ ...box, x:Math.min(format.width-box.w,box.x+dx), y:Math.min(format.height-box.h,box.y+dy) },format) };
     if (next.box && snap && !event.altKey && !event.shiftKey) {
       const others = elements.filter(id => id !== action.id).map(id => action.initial.layout[id]);
-      const targetX = [20,format.width/2,474,584,...others.flatMap(b => [b.x,b.x+b.w/2,b.x+b.w])];
-      const targetY = [10,format.height/2,410,...others.flatMap(b => [b.y,b.y+b.h/2,b.y+b.h])];
+      const targetX = [20,format.width/2,...(portrait ? [202,410] : [474,584]),...others.flatMap(b => [b.x,b.x+b.w/2,b.x+b.w])];
+      const targetY = [10,format.height/2,...(portrait ? [428,584] : [410]),...others.flatMap(b => [b.y,b.y+b.h/2,b.y+b.h])];
       const resize = action.kind === "resize", b = next.box;
       const x = alignAxis(b.x,b.w,targetX,5*format.width/bounds.width,resize);
       const y = alignAxis(b.y,b.h,targetY,5*format.height/bounds.height,resize);
       next = { box:fitBox(resize ? { ...b,w:b.w+x.delta,h:b.h+y.delta } : {
         ...b,x:Math.min(format.width-b.w,b.x+x.delta),y:Math.min(format.height-b.h,b.y+y.delta),
-      }), guideX:x.guide,guideY:y.guide };
+      },format), guideX:x.guide,guideY:y.guide };
     }
     latestGesture.current = next;
     setGesture(next);
@@ -282,7 +284,7 @@ export default function PreviewMapProducts() {
     if (!draft) return;
     const box = draft.layout[element];
     const target = reference === "page" || reference === element
-      ? { x:20, y:10, w:564, h:400 } : draft.layout[reference];
+      ? { x:20, y:10, w:portrait ? 390 : 564, h:portrait ? 574 : 400 } : draft.layout[reference];
     const x = edge === "left" ? target.x : edge === "right" ? target.x+target.w-box.w :
       edge === "center" ? target.x+(target.w-box.w)/2 : box.x;
     const y = edge === "top" ? target.y : edge === "bottom" ? target.y+target.h-box.h :
@@ -431,7 +433,7 @@ export default function PreviewMapProducts() {
           <div className="arqueo-studio-canvas min-h-56 overflow-auto p-5" style={{ maxHeight: "70vh" }}>
             <div className="mx-auto" style={{ width: zoom + "%" }}>
               {mode !== "proof" && draft.paper === "A2" && <div aria-hidden="true" className="relative mb-1 h-4 border-b border-slate-400 font-mono text-[9px]">{
-                [0,100,200,300,400,500,594].map(mark => <span className="absolute bottom-0 border-l border-slate-400 pl-0.5" style={{ left:mark/594*100+"%", transform:mark===594 ? "translateX(-100%)" : undefined }} key={mark}>{mark===594 ? "594 mm" : mark}</span>)
+                [...Array.from({ length:Math.ceil(paperWidth/100) },(_,i) => i*100),paperWidth].map(mark => <span className="absolute bottom-0 border-l border-slate-400 pl-0.5" style={{ left:mark/paperWidth*100+"%", transform:mark===paperWidth ? "translateX(-100%)" : undefined }} key={mark}>{mark===paperWidth ? paperWidth + " mm" : mark}</span>)
               }</div>}
               <div ref={sheet} className="relative bg-white shadow-lg" style={{ aspectRatio: paperWidth + "/" + paperHeight }}>
                 {proof?.for === previewUrl ? <img src={proof.url} alt={atlas && currentPage === 0 ? "Mapa índice do atlas" : "Prancha cartográfica " + draft.paper} className="block size-full object-contain" />
@@ -441,7 +443,7 @@ export default function PreviewMapProducts() {
                   const locked = draft.locks?.includes(id);
                   const box = (id === element ? gesture?.box : undefined) ?? draft.layout[id];
                   return <div key={id} className={"pointer-events-none absolute " + (selected ? "border border-emerald-600" : "")} style={{
-                    left: box.x/594*100+"%", top: box.y/420*100+"%", width: box.w/594*100+"%", height: box.h/420*100+"%",
+                    left: box.x/format.width*100+"%", top: box.y/format.height*100+"%", width: box.w/format.width*100+"%", height: box.h/format.height*100+"%",
                   }}>
                     <button type="button" aria-label={"Selecionar " + names[id]} aria-pressed={selected} onClick={event => selectElement(id,event.shiftKey)} className="pointer-events-auto absolute inset-0 hover:ring-1 hover:ring-inset hover:ring-emerald-600" />
                     {selected && !multiple && !locked && <><button type="button" aria-label={"Mover " + names[id]} className="pointer-events-auto absolute -top-4 left-0 cursor-move touch-none whitespace-nowrap rounded-sm bg-emerald-800 px-1.5 text-[10px] text-white"
@@ -450,11 +452,11 @@ export default function PreviewMapProducts() {
                       onPointerDown={event => start(event,id,"resize")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} /></>}
                   </div>;
                 })}
-                {gesture?.guideX !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-10 border-l border-dashed border-fuchsia-600" style={{ left:gesture.guideX/594*100+"%" }} />}
-                {gesture?.guideY !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-fuchsia-600" style={{ top:gesture.guideY/420*100+"%" }} />}
+                {gesture?.guideX !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-10 border-l border-dashed border-fuchsia-600" style={{ left:gesture.guideX/format.width*100+"%" }} />}
+                {gesture?.guideY !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-fuchsia-600" style={{ top:gesture.guideY/format.height*100+"%" }} />}
                 {mode === "view" && canPan && <button type="button" aria-label="Arrastar enquadramento do mapa principal"
                   className="absolute cursor-grab touch-none border border-dashed border-emerald-600 active:cursor-grabbing"
-                  style={{ left: (draft.layout.principal.x+(delta?.x ?? 0))/594*100+"%", top: (draft.layout.principal.y+(delta?.y ?? 0))/420*100+"%", width: draft.layout.principal.w/594*100+"%", height:draft.layout.principal.h/420*100+"%" }}
+                  style={{ left: (draft.layout.principal.x+(delta?.x ?? 0))/format.width*100+"%", top: (draft.layout.principal.y+(delta?.y ?? 0))/format.height*100+"%", width: draft.layout.principal.w/format.width*100+"%", height:draft.layout.principal.h/format.height*100+"%" }}
                   onPointerDown={event => start(event,"principal","pan")} onPointerMove={move} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)} />}
               </div>
             </div>
@@ -468,7 +470,7 @@ export default function PreviewMapProducts() {
               </select></label>
               <button type="button" className={button} aria-label="Próxima folha" disabled={currentPage >= count} onClick={() => setPage(currentPage+1)}><ChevronRight size={14}/></button>
               {corridor && <><span>{count} folhas de detalhe</span><button type="button" className={button} disabled={dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(true)}>Exportar folha</button></>}
-            </> : <span>{draft.paper} horizontal</span>}
+            </> : <span>{draft.paper} · {portrait ? "Retrato" : "Paisagem"}</span>}
           </div>
         </div>
         <aside className={panel + " border-slate-200 xl:border-l dark:border-slate-700"}>
@@ -476,6 +478,15 @@ export default function PreviewMapProducts() {
           <label className="block text-xs">Formato da folha<select className={input} value={draft.paper} onChange={event => change({ ...draft, paper:event.target.value as Paper })}>
             {papers.map(paper => <option key={paper}>{paper}</option>)}
           </select></label>
+          <label className="block text-xs">Orientação da folha
+            <select className={input} value={orientation} onChange={event => {
+              const next = event.target.value as Orientation;
+              change({ ...draft, orientation:next, layout:saved?.orientation === next ? saved.layout : next === "portrait" ? portraitLayout : defaultLayout });
+            }}>
+              <option value="landscape">Paisagem</option>
+              <option value="portrait">Retrato</option>
+            </select>
+          </label>
           <label className="block text-xs">Título da folha<input className={input} maxLength={85} value={draft.title} onChange={event => change({ ...draft, title:event.target.value })} /></label>
           <label className="block text-xs">Escala do mapa principal 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"
             value={draft.scale ?? ""} onChange={event => change({ ...draft, scale:event.target.value ? event.target.valueAsNumber : undefined })} /></label>

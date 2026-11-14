@@ -3,7 +3,7 @@ import { download, downloadVector, projectSearchEntries, workflow } from "./prev
 import { rasterArtifact } from "./previa-local-raster.mts";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { readLayout, readPaper, readScale, readStudioView } from "./previa-layout.mts";
+import { readLayout, readOrientation, readPaper, readScale, readStudioView } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
 import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas } from "./previa-raster/angicos/prancha.mts";
 
@@ -47,7 +47,7 @@ const demoApi = {
     if (id.replaceAll("\\", "/").endsWith("/pages/PreviewMapProducts.tsx")) {
       const source = new URL("./previa-produtos.tsx", import.meta.url);
       this.addWatchFile(fileURLToPath(source));
-      return readFileSync(source, "utf8");
+      return readFileSync(new URL("./previa-layout.mts", import.meta.url), "utf8") + "\n" + readFileSync(source, "utf8");
     }
     if (id.replaceAll("\\", "/").endsWith("/components/PreviewIbgeLayers.tsx")) {
       return readFileSync(new URL("./previa-ibge.tsx", import.meta.url), "utf8");
@@ -717,11 +717,13 @@ const demoApi = {
         const model = url.searchParams.get("modelo");
         const requestedGrid = Number(url.searchParams.get("grade"));
         const view = url.searchParams.get("vista");
+        const orientation = readOrientation(url.searchParams.get('orientacao'));
         const options = {
+          orientation,
           paper: readPaper(url.searchParams.get('papel')),
           view: readStudioView(view ? JSON.parse(view) : undefined),
           available,
-          layout: readLayout(layout ? JSON.parse(layout) : undefined),
+          layout: readLayout(layout ? JSON.parse(layout) : undefined, orientation),
           scale: readScale(scale ? Number(scale) : undefined),
           grid: Number.isInteger(requestedGrid) && requestedGrid >= 1000 && requestedGrid <= 50000 ? requestedGrid : undefined,
           model: model ?? undefined,

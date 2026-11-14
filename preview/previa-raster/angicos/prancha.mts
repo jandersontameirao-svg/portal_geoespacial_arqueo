@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import { defaultLayout, linearAtlasScale, paperFactor, paperSizes, type Paper, type Layout, type StudioView } from "../../previa-layout.mts";
+import { defaultLayout, linearAtlasScale, paperFactor, paperSize, portraitLayout, type Orientation, type Paper, type Layout, type StudioView } from "../../previa-layout.mts";
 
 import { mapBiomasRaster, type ThematicRaster } from "./mapbiomas.mts";
 
@@ -29,10 +29,10 @@ function paths(shape: Shape): { rings: Point[][]; closed: boolean }[] {
 }
 
 const defaultFrame = defaultLayout.principal;
-const newPdf = (paper: Paper = "A2") => new jsPDF({ orientation: "landscape", unit: "mm", format: [...paperSizes[paper]], compress: true, precision: 6 });
+const newPdf = (paper: Paper = "A2", orientation: Orientation = "landscape") => new jsPDF({ orientation, unit: "mm", format: paperSize(paper, orientation), compress: true, precision: 6 });
 type Sheet = { center: Point; scale: number; number: number; total: number; grid: number; document?: any };
 
-type Options = { paper?: Paper; view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
+type Options = { paper?: Paper; orientation?: Orientation; view?: StudioView; available?: Layer[]; layout?: Layout; scale?: number; model?: string; grid?: number; raster?: ThematicRaster; index?: Sheet[] };
 function extent(layers: Layer[]) {
   let left = Infinity, right = -Infinity, bottom = Infinity, top = -Infinity;
   for (const layer of layers) for (const feature of layer.layerData.features) for (const part of paths(feature.geometry)) {
@@ -69,7 +69,7 @@ export async function printMapBiomas(layers: Layer[], options: Options) {
   return mapBiomasRaster(point => utm.inverse(point), x-width/2, y+height/2, width, height);
 }
 export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, title?: string, options: Options = {}) {
-  const layout = options.layout ?? defaultLayout;
+  const layout = options.layout ?? (options.orientation === 'portrait' ? portraitLayout : defaultLayout);
   const frame = layout.principal;
   // Shared layout for SVG preview and PDF: project the GeoJSON to UTM 24S,
   // convert metres to printed millimetres, then clip to the main map frame.
@@ -78,8 +78,10 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   const logo = readFileSync(new URL("./logo-arqueo.png", import.meta.url)).toString("base64");
   const paper = options.paper ?? "A2";
   const factor = paperFactor(paper);
-  const [paperWidth,paperHeight] = paperSizes[paper];
-  const pdf = asPdf ? sheet?.document ?? newPdf(paper) : null;
+  const portrait = options.orientation === 'portrait';
+  const [paperWidth,paperHeight] = paperSize(paper, options.orientation);
+  const pageWidth = portrait ? 420 : 594, pageHeight = portrait ? 594 : 420;
+  const pdf = asPdf ? sheet?.document ?? newPdf(paper, options.orientation) : null;
   const svg = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${paperWidth/factor} ${paperHeight/factor}" width="${paperWidth}mm" height="${paperHeight}mm" font-family="Arial, sans-serif">`];
   let clipId = 0;
   const rect = (x: number, y: number, w: number, h: number, fill = "none", stroke = ink) => {
@@ -144,12 +146,18 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     const opacity = style.fillOpacity ?? .18;
     return "#" + [1,3,5].map(i => Math.round(255 * (1-opacity) + parseInt(style.color!.slice(i,i+2),16)*opacity).toString(16).padStart(2,"0")).join("");
   };
-  rect(0,0,594,420,"#ffffff","none");
-  rect(20,10,564,400);
-  line(20,26,584,26);
-  line(474,10,474,410);
-  label(247,20.5,title ?? "MAPA DE LOCALIZAÇÃO | LT ANGICOS–JAGUARUANA II",5.6,true,true);
-  label(529,20,"MAPAS DE SITUAÇÃO",4.3,true,true);
+  rect(0,0,pageWidth,pageHeight,"#ffffff","none");
+  rect(20,10,pageWidth-30,pageHeight-20);
+  line(20,26,pageWidth-10,26);
+  if (portrait) {
+    line(20,428,410,428);
+    line(202,428,202,584);
+  } else {
+    line(474,10,474,410);
+    label(529,20,"MAPAS DE SITUAÇÃO",4.3,true,true);
+  }
+  const heading = title ?? "MAPA DE LOCALIZAÇÃO | LT ANGICOS–JAGUARUANA II";
+  label(portrait ? 215 : 247,20.5,heading,Math.min(5.6,(portrait ? 370 : 440)/(heading.length*.62)),true,true);
   rect(frame.x,frame.y,frame.w,frame.h,"#eef3f4");
   clip(frame.x,frame.y,frame.w,frame.h,() => {
     drawFeatures(states.filter(f => ["CE","RN","PB"].includes(f.properties?.SIGLA_UF || "")), main, "#a5aaa0","#f3f0e7");
@@ -234,7 +242,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     });
     rect(x,top,width,height);
   };
-  for (const y of [200,269,296,325,372]) line(474,y,584,y);
+  if (!portrait) for (const y of [200,269,296,325,372]) line(474,y,584,y);
   overview("Brasil",layout.brasil,[-74,-34,-34,6],true);
   overview("Região do empreendimento",layout.regional,[-41.8,-8.5,-34.6,-2.2],false);
   const legend = layout.legenda, rowHeight = legend.h / (layers.length+1+(options.raster?.legend.length ?? 0));
@@ -257,23 +265,27 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
     rect(lx,y-rowHeight*.55,symbol,rowHeight*.42,color,color);
     label(lx+symbol+legend.w*.03,y,name,Math.min(3.5,rowHeight*.68));
   });
-  label(479,277,"Referência geodésica",4,true);
-  label(479,285,"SIRGAS2000 / UTM 24S");
-  label(479,291,"EPSG:31984 · grade em metros",3);
-  label(479,303,"Escala do mapa principal",4,true);
+  const detailX = portrait ? 211 : 479;
+  const detailY = portrait ? 436 : 277;
+  const detailLabel = (y:number, value:string, size?:number, bold?:boolean) => label(detailX, detailY+y-277, value, size, bold);
+  detailLabel(277,"Referência geodésica",4,true);
+  detailLabel(285,"SIRGAS2000 / UTM 24S");
+  detailLabel(291,"EPSG:31984 · grade em metros",3);
+  detailLabel(303,"Escala do mapa principal",4,true);
   const distance = Math.min(sheet ? 5000 : 20000, 10 ** Math.floor(Math.log10(step*75))), bar = distance / step;
-  for (let i=0;i<4;i++) rect(479+i*bar/4,308,bar/4,2,i%2 ? "#ffffff" : ink);
-  label(479,315,"0",2.8);
-  label(479+bar,315,distance >= 1000 ? `${distance/1000} km` : `${distance} m`,2.8,false,true);
-  label(479,321,"1:" + scale.toLocaleString("pt-BR"),3.5,true);
-  label(479,333,"Identificação da folha",4,true);
-  label(479,341,"Projeto  LT Angicos–Jaguaruana II");
-  label(479,348,`Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
-  label(479,355,"Fontes  Camadas do projeto · IBGE 2024",3.25);
-  label(479,362,options.raster ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Responsável  __________________",3.25);
+  for (let i=0;i<4;i++) rect(detailX+i*bar/4,detailY+31,bar/4,2,i%2 ? "#ffffff" : ink);
+  detailLabel(315,"0",2.8);
+  label(detailX+bar,detailY+38,distance >= 1000 ? `${distance/1000} km` : `${distance} m`,2.8,false,true);
+  detailLabel(321,"1:" + scale.toLocaleString("pt-BR"),3.5,true);
+  detailLabel(333,"Identificação da folha",4,true);
+  detailLabel(341,"Projeto  LT Angicos–Jaguaruana II");
+  detailLabel(348,`Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
+  detailLabel(355,"Fontes  Camadas do projeto · IBGE 2024",3.25);
+  detailLabel(362,options.raster ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Responsável  __________________",3.25);
   const logoUrl = "data:image/png;base64," + logo;
-  if (pdf) pdf.addImage(logoUrl,"PNG",509*factor,381*factor,40*factor,20*factor);
-  else svg.push(`<image href="${logoUrl}" x="509" y="381" width="40" height="20" preserveAspectRatio="none"/>`);
+  const logoX = portrait ? 350 : 509, logoY = portrait ? 551 : 381;
+  if (pdf) pdf.addImage(logoUrl,"PNG",logoX*factor,logoY*factor,40*factor,20*factor);
+  else svg.push(`<image href="${logoUrl}" x="${logoX}" y="${logoY}" width="40" height="20" preserveAspectRatio="none"/>`);
   return sheet?.document ? null : pdf ? Buffer.from(pdf.output("arraybuffer")) : svg.join("") + "</svg>";
 }
 
@@ -344,19 +356,19 @@ export function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boolean, pa
   const detailTitle = title ?? "Atlas por corredor | LT Angicos–Jaguaruana II";
   if (!pdf || single) return page === 0 ? pranchaAngicos(layers, pdf, index, indexTitle, { ...options, index: sheets })
     : pranchaAngicos(layers, pdf, sheets[page-1], detailTitle, options);
-  const document = newPdf(options.paper);
+  const document = newPdf(options.paper, options.orientation);
   pranchaAngicos(layers, true, { ...index, document }, indexTitle, { ...options, index: sheets });
   for (const sheet of sheets) {
-    document.addPage();
+    document.addPage(paperSize(options.paper ?? 'A2', options.orientation), options.orientation ?? 'landscape');
     pranchaAngicos(layers, true, { ...sheet, document }, detailTitle, options);
   }
   return Buffer.from(document.output("arraybuffer"));
 }
 
 export function atlasAngicos(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, title?: string, options: Options = {}) {
-  const document = newPdf(options.paper);
+  const document = newPdf(options.paper, options.orientation);
   for (const sheet of planSheets(layers, columns, rows, overlap, grid, options)) {
-    if (sheet.number > 1) document.addPage();
+    if (sheet.number > 1) document.addPage(paperSize(options.paper ?? 'A2', options.orientation), options.orientation ?? 'landscape');
     pranchaAngicos(layers, true, { ...sheet, document }, title, options);
   }
   return Buffer.from(document.output("arraybuffer"));
@@ -390,7 +402,8 @@ export function studioReview(layers: Layer[], sheets: Sheet[] | undefined, optio
   const factor = paperFactor(options.paper ?? 'A2');
   const warnings: string[] = [];
   const layout = options.layout ?? defaultLayout;
-  if (frame.x < 20 || frame.y < 28 || frame.x+frame.w > 474 || frame.y+frame.h > 410)
+  const portrait = options.orientation === 'portrait';
+  if (frame.x < 20 || frame.y < 28 || frame.x+frame.w > (portrait ? 410 : 474) || frame.y+frame.h > (portrait ? 428 : 410))
     warnings.push("O quadro principal ultrapassa a área útil do modelo.");
   const insets = [layout.legenda, layout.brasil, layout.regional];
   if (insets.some((a,i) => insets.slice(i+1).some(b => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y)))
