@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { GeoJSON, ImageOverlay, WMSTileLayer, useMap } from "react-leaflet";
+import { GeoJSON, ImageOverlay, Popup, WMSTileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Layers, X } from "lucide-react";
 import type { FeatureCollection } from "geojson";
@@ -423,4 +423,73 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
       <OfficialLayer key={layer.id} layer={layer} projectBounds={projectBounds} />)}
     </div>
   </details></>;
+}
+
+type IphanSite = { id:number; nome:string; codigo:string; classificacao:string; sintese:string };
+
+export function PreviewIphanSites({projectId = 0}:{projectId?:number}) {
+  const map = useMap();
+  const [active,setActive] = useState(false);
+  const [result,setResult] = useState<{point:L.LatLng; status:string; sites:IphanSite[]}>();
+  const current = useRef<AbortController>();
+  const control = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (control.current) L.DomEvent.disableClickPropagation(control.current); },[]);
+  useEffect(() => {
+    if (!active) return;
+    const identify = async (event:L.LeafletMouseEvent) => {
+      current.current?.abort();
+      const point = event.latlng;
+      if (map.getZoom() < 10) {
+        setResult({point,status:"Aproxime o mapa e clique sobre um sítio.",sites:[]});
+        return;
+      }
+      const container = map.latLngToContainerPoint(point);
+      const sw = map.containerPointToLatLng(container.add([-9,9]));
+      const ne = map.containerPointToLatLng(container.add([9,-9]));
+      const box = [sw.lng,sw.lat,ne.lng,ne.lat];
+      const controller = new AbortController();
+      current.current = controller;
+      setResult({point,status:"Consultando o IPHAN…",sites:[]});
+      try {
+        const input = encodeURIComponent(JSON.stringify({json:{projectId,box}}));
+        const response = await fetch("/api/trpc/previewIphan.identify?input="+input,{signal:controller.signal});
+        const data = await response.json();
+        if (!response.ok || data.error) throw Error(data.error?.json?.message ?? "Consulta indisponível.");
+        if (controller.signal.aborted) return;
+        const sites:IphanSite[] = data.result.data.json;
+        setResult({point,sites,status:sites.length ? "" : "Nenhum sítio retornado neste ponto do mapa."});
+      } catch (error) {
+        if (!controller.signal.aborted) setResult({point,sites:[],status:error instanceof Error ? error.message : "Consulta indisponível."});
+      }
+    };
+    map.on("click",identify);
+    return () => {map.off("click",identify);current.current?.abort();};
+  },[active,map,projectId]);
+
+  return <>
+    <div ref={control} className="absolute bottom-8 right-3 z-[1000]">
+      <button type="button" aria-pressed={active}
+        className="rounded-md border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow aria-pressed:bg-emerald-100"
+        onClick={() => {setActive(value => !value);setResult(undefined);}}>Consultar sítios IPHAN</button>
+      {active && <p className="mt-1 rounded bg-white px-2 py-1 text-xs text-slate-800">Clique sobre um sítio no mapa.</p>}
+    </div>
+    {active && <WMSTileLayer url="https://geoserver.iphan.gov.br/geoserver/SICG/wms"
+      params={{layers:"SICG:sitios_pol,SICG:sitios",format:"image/png",transparent:true}} />}
+    {active && result && <Popup position={result.point} closeOnClick={false} maxWidth={360} maxHeight={320}
+      eventHandlers={{remove:() => {current.current?.abort();setResult(undefined);}}}>
+      {result.status && <div role="status">{result.status}</div>}
+      {result.sites.map(site => <article key={site.id} className="space-y-2 border-b pb-3 pt-2">
+        <strong className="block">{site.nome || "Sítio arqueológico"}</strong>
+        <div>Código IPHAN: {site.codigo || "Não informado"}</div>
+        <div>Classificação: {site.classificacao || "Não informada"}</div>
+        <div><b>Síntese:</b> {site.sintese || "Não publicada"}</div>
+        <div>Tipologia: pendente de conferência na ficha oficial.</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <a href="https://sicg.iphan.gov.br/sicg/pesquisarBem" target="_blank" rel="noreferrer">Pesquisar ficha no SICG</a>
+          <button type="button" className="rounded border px-2 py-1"
+            onClick={() => window.dispatchEvent(new CustomEvent("studio-open-atena",{detail:"Guardar sítio IPHAN "+site.id}))}>Guardar com a Atena</button>
+        </div>
+      </article>)}
+    </Popup>}
+  </>;
 }

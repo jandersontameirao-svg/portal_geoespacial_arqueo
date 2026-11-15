@@ -87,11 +87,15 @@ const demoApi = {
     return payload.result.data.json;
   };
   const runPreviewPlan = async () => {
-    if (!previewPlan || working.current || previewPlan.projectId !== currentProject.current) return;
+    if (!previewPlan || working.current || previewPlan.projectId !== (currentProject.current ?? 0)) return;
     const action = previewPlan;
     working.current = true; setBusy(true); setPreviewPlan(null);
     try {
       const result = await localAtena("previewRun", action.projectId, action.text);
+      if (result.knowledgeMessage) {
+        append(result.knowledgeMessage);
+        return;
+      }
       if (result.drawingSaved) {
         await utils.geometries.list.invalidate({projectId:action.projectId});
         append(result.message);
@@ -115,7 +119,18 @@ const demoApi = {
   const interpret = trpc.atena.interpret.useMutation();`)
         .replace('const invalidateContext = () => { revision.current++;', 'const invalidateContext = () => { setPreviewPlan(null); setPreviewDownload(null); revision.current++;')
         .replace('setDraft(""); setPending(null); const token', 'setDraft(""); setPending(null); setPreviewPlan(null); const token')
-        .replace('      const command = classifyAtenaChatCommand(text);', `      if (/^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo|(?:criar|crie|gere|gerar)\\s+(?:a\\s+)?(?:ada|aid|aii|ponto|linha|pol[ií]gono))\\b/i.test(text.trim()) ||
+        .replace('      const command = classifyAtenaChatCommand(text);', `      const iphanQuestion = /^(?:guardar|consultar|qual a tipologia d[eo])\\s+s[ií]tio\\b/i.test(text.trim());
+      if (iphanQuestion) {
+        const id = projectId ?? 0;
+        const saving = /^guardar\\b/i.test(text.trim());
+        const result = await localAtena(saving ? "previewPlan" : "previewRun", id, text);
+        if (mounted.current && token === revision.current) {
+          if (result.knowledgeMessage) append(result.knowledgeMessage);
+          else setPreviewPlan({ projectId:id, text, summary:result.summary });
+        }
+        return;
+      }
+      if (/^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo|(?:guardar|consultar)\\\\s+s[ií]tio|(?:criar|crie|gere|gerar)\\s+(?:a\\s+)?(?:ada|aid|aii|ponto|linha|pol[ií]gono))\\b/i.test(text.trim()) ||
         (/\\b(buffer|malha|a2|atlas)\\b/i.test(text) && !/^abrir atlas[.!]?$/i.test(text))) {
         if (!projectId) { await showProjects(); return; }
         const result = await localAtena("previewPlan", projectId, text);
@@ -124,7 +139,7 @@ const demoApi = {
       }
       const command = classifyAtenaChatCommand(text);`)
         .replace('        {visiblePlan &&', `        {previewDownload && previewDownload.projectId === projectId && <Button asChild size="sm"><a href={previewDownload.url} download>{previewDownload.name}</a></Button>}
-        {previewPlan?.projectId === projectId && previewPlan && <div className="space-y-2 rounded border bg-card p-3 text-sm">
+        {previewPlan?.projectId === (projectId ?? 0) && previewPlan && <div className="space-y-2 rounded border bg-card p-3 text-sm">
           <p>{previewPlan.summary}</p>
           <Button size="sm" disabled={busy} onClick={() => void runPreviewPlan()}>Confirmar e executar</Button>
           <Button size="sm" variant="ghost" onClick={() => setPreviewPlan(null)}>Descartar plano</Button>
@@ -221,7 +236,7 @@ const demoApi = {
           <label className="grid gap-1 text-sm">Formato da malha<select className="rounded-md border bg-background p-2" value={gridPattern} onChange={event => setGridPattern(event.target.value)}>
             <option value="quadrada">Quadrada</option><option value="triangular">Triangular (linhas alternadas)</option>
           </select></label>`)
-        .replace('<InvalidateMapOnResize />', '<InvalidateMapOnResize /><PreviewIbgeLayers projectBounds={municipalProjectBounds} />')
+        .replace('<InvalidateMapOnResize />', '<InvalidateMapOnResize /><PreviewIbgeLayers projectBounds={municipalProjectBounds} /><PreviewIphanSites projectId={projectId} />')
         .replace("  const selectedVectorFeatures = useMemo", `  const municipalProjectBounds = useMemo(() => {
     const bounds = L.latLngBounds([]);
     for (const layer of projectVectorLayers) bounds.extend(L.geoJSON(layer.layerData).getBounds());
@@ -230,7 +245,7 @@ const demoApi = {
     return bounds.isValid() ? bounds.pad(.15).toBBoxString() : "";
   }, [projectVectorLayers, rasterLayers, geometries]);
   const selectedVectorFeatures = useMemo`)
-        .concat('\nimport PreviewIbgeLayers from "./PreviewIbgeLayers.tsx";')
+        .concat('\nimport PreviewIbgeLayers, { PreviewIphanSites } from "./PreviewIbgeLayers.tsx";')
         .replace('<CardContent className="space-y-3">{geometriesLoading', `<CardContent className="space-y-3">{canEdit && projectVectorLayers.length > 0 && <details className="rounded-lg border p-3">
           <summary className="cursor-pointer text-sm font-medium">Editar simbologia</summary>
           {projectVectorLayers.map(layer => <form key={layer.id} className="mt-3 grid gap-2 border-t pt-2 text-sm" onSubmit={async event => {
@@ -359,7 +374,7 @@ const demoApi = {
     const badge = /(\{\/\* Info Badge \*\/\}\r?\n)      (<div[^\n]+>[\s\S]*?^      <\/div>)/m;
     if (!badge.test(source)) return;
     return source.replace(badge, "")
-      .concat('\nimport PreviewIbgeLayers from "./PreviewIbgeLayers.tsx";')
+      .concat('\nimport PreviewIbgeLayers, { PreviewIphanSites } from "./PreviewIbgeLayers.tsx";')
       .replace('useState<"2d" | "3d">("3d")', 'useState<"2d" | "3d">("2d")')
       .concat(`\nfunction PreviewProjectExtent({ projectId }: { projectId: number }) {
   const map = useMapEvents({});
@@ -381,7 +396,7 @@ const demoApi = {
 }
 
 `)
-      .replace('<BaseLayerMapOverlays />', '{projectId && <PreviewProjectExtent key={projectId} projectId={projectId} />}\n          <BaseLayerMapOverlays /><PreviewIbgeLayers /><PreviewScreenScale />')
+      .replace('<BaseLayerMapOverlays />', '{projectId && <PreviewProjectExtent key={projectId} projectId={projectId} />}\n          <BaseLayerMapOverlays /><PreviewIbgeLayers /><PreviewIphanSites projectId={projectId} /><PreviewScreenScale />')
       .replace("onNavigate={(lat, lng) =>", "onNavigate={(lat, lng, zoom = 14) =>")
       .replace("setMapZoom(14);\n            }}", "setMapZoom(zoom);\n            }}")
       .concat(`\nfunction PreviewScreenScale() {

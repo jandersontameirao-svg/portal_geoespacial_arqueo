@@ -13,7 +13,7 @@ const municipalAnchors = JSON.parse(readFileSync(new URL("./previa-raster/angico
 const storePath = fileURLToPath(new URL("./previa-local-dados.json", import.meta.url));
 const seed = { id: 1, name: "Levantamento arqueológico demonstrativo", code: "DEMO-01", description: "Projeto fictício para explorar o Geoportal.", clientName: "Cliente fictício", status: "active", createdAt: "2026-11-12T12:00:00Z" };
 type Row = Record<string, any>;
-type State = { geometries?: Row[]; projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
+type State = { iphanKnowledge?: Row[]; geometries?: Row[]; projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
 let state: State;
 try {
   state = JSON.parse(readFileSync(storePath, "utf8"));
@@ -250,7 +250,53 @@ function validRemoteSelection(values: unknown[], type: string) {
     typeof value === "string" && pattern.test(value)))].slice(0, 40);
 }
 
+const iphanSiteEndpoint = "https://geoserver.iphan.gov.br/geoserver/SICG/wfs";
+const iphanFields = "id_bem,identificacao_bem,co_iphan,codigo_iphan,ds_classificacao,sintese_bem,dt_cadastro";
+
+async function iphanRecords(filter: {bbox:string} | {id:number} | {code:string}) {
+  // The endpoint is fixed. The viewport and numeric record ID are validated before use.
+  const plain = (value:unknown, limit:number) => String(value ?? "").slice(0,limit)
+    .replace(/<\/?(?:p|div|br|li)\b[^>]*>/gi," ").replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim();
+  const rows = await Promise.all(["sitios","sitios_pol"].map(async layer => {
+    const params = new URLSearchParams({service:"WFS",version:"1.0.0",request:"GetFeature",typeName:"SICG:"+layer,
+      maxFeatures:"8",outputFormat:"application/json",propertyName:iphanFields});
+    if ("bbox" in filter) params.set("bbox",filter.bbox+",EPSG:4326");
+    else if ("id" in filter) params.set("CQL_FILTER","id_bem="+filter.id);
+    else params.set("CQL_FILTER","codigo_iphan='"+filter.code+"' OR co_iphan='"+filter.code+"'");
+    const response = await fetch(iphanSiteEndpoint+"?"+params,{signal:AbortSignal.timeout(10000),redirect:"error"});
+    if (!response.ok) throw Error("O serviço de sítios do IPHAN não respondeu.");
+    const body = await response.json();
+    if (!Array.isArray(body.features)) throw Error("O IPHAN não retornou registros consultáveis.");
+    return body.features.flatMap(({properties:p}:Row) => {
+      if (!Number.isSafeInteger(p?.id_bem) || p.id_bem < 1) return [];
+      return [{id:p.id_bem, nome:plain(p.identificacao_bem,300),
+        codigo:plain(p.codigo_iphan || p.co_iphan,100), classificacao:plain(p.ds_classificacao,150),
+        sintese:plain(p.sintese_bem,12000), cadastro:plain(p.dt_cadastro,24),
+        fonte:"GeoServer IPHAN / SICG", camada:"SICG:"+layer, tipologia:null}];
+    });
+  }));
+  return [...new Map(rows.flat().map(record => [record.id,record])).values()];
+}
+
+// Keep earlier source observations and avoid duplicating a record read twice.
+function saveIphanKnowledge(record:Row, projectId:number, consultadoEm:string) {
+  const records = state.iphanKnowledge ?? [];
+  const latest = records.findLast(row => row.id === record.id);
+  if (latest && Object.keys(record).every(key => record[key] === latest[key])) return;
+  save({...state,iphanKnowledge:[...records,{...record,projectId,consultadoEm,
+    ficha:"https://sicg.iphan.gov.br/sicg/pesquisarBem"}]});
+}
+
 export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
+  if (method === "previewIphan.identify" && !write) {
+    if (input.projectId !== 0 && !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
+    const box = input.box;
+    if (!Array.isArray(box) || box.length !== 4 || !box.every(Number.isFinite) ||
+        box[0] < -180 || box[2] > 180 || box[1] < -90 || box[3] > 90 ||
+        box[2] <= box[0] || box[3] <= box[1] || box[2]-box[0] > .15 || box[3]-box[1] > .15)
+      throw Error("Aproxime o mapa para identificar um sítio.");
+    return iphanRecords({bbox:box.join(",")});
+  }
   if (method === "previewConnections.list" && !write) return listConnections();
   if (method === "previewConnections.save" && write) {
     const { id, type } = input;
@@ -440,6 +486,32 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     case "atena.previewRun": {
       const text = String(input.text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const request = String(input.text ?? "").trim();
+      const iphan = request.match(/^(guardar|consultar|qual a tipologia d[eo])\s+s[ií]tio(?:\s+do)?\s+IPHAN\s+([\p{L}\d._/-]{1,100})[!?]?$/iu);
+      if (iphan) {
+        const [,verb,key] = iphan;
+        const records = state.iphanKnowledge ?? [];
+        if (input.projectId !== 0 && !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
+        const sources = records.filter(row => String(row.id) === key || row.codigo.toLowerCase() === key.toLowerCase());
+        const previous = sources.at(-1);
+        if (verb.toLowerCase() !== "guardar") {
+          const numericId = /^\d+$/.test(key) && Number.isSafeInteger(Number(key)) ? Number(key) : 0;
+          const matches = previous ? [previous] : await iphanRecords(numericId ? {id:numericId} : {code:key});
+          if (matches.length !== 1) throw Error("Informe um código IPHAN que identifique um único sítio.");
+          const record = matches[0] as Row;
+          const date = record.consultadoEm ?? new Date().toISOString();
+          if (method === "atena.previewPlan") return {summary:`Consultar “${record.nome}” ${previous ? "no acervo IPHAN da prévia" : "no GeoServer oficial e guardar o registro no acervo"}.`};
+          if (!previous) saveIphanKnowledge(record,input.projectId,date);
+          const message = `${record.nome} · ${record.codigo || "sem código"} · ${record.classificacao || "sem classificação"}. ${record.sintese || "Sem síntese publicada"}. Tipologia oficial: pendente de conferência na ficha SICG. Fonte: ${record.camada}, consultada em ${date.slice(0,10)}.`;
+          return {knowledgeMessage:message};
+        }
+        const id = Number(key);
+        if (!/^\d+$/.test(key) || !Number.isSafeInteger(id) || id < 1) throw Error("Use Guardar com a Atena na janela do sítio para identificá-lo no SICG.");
+        const [record] = await iphanRecords({id});
+        if (!record) throw Error("O IPHAN não retornou o sítio selecionado.");
+        if (method === "atena.previewPlan") return {summary:`Guardar “${record.nome}” no acervo IPHAN da prévia, com atributos do GeoServer. A tipologia fica pendente de conferência na ficha oficial.`};
+        saveIphanKnowledge(record,input.projectId,new Date().toISOString());
+        return {knowledgeMessage:`Sítio “${record.nome}” guardado no acervo IPHAN da prévia. Para recuperar, peça: Consultar sítio IPHAN ${record.codigo || record.id}.`};
+      }
       if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra um projeto para executar o comando.");
       const influence = request.match(/^(?:criar|gere|gerar|crie)\s+(?:a\s+)?(ADA|AID|AII)(?:\s+(?:a partir d[eo]|d[eo]|n[eo])\s+"?([^"!.]+)(?:\.geojson)?"?)?[.!]?$/i);
       if (influence) {
