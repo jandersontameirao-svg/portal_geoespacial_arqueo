@@ -124,7 +124,7 @@ const demoApi = {
   const interpret = trpc.atena.interpret.useMutation();`)
         .replace('const invalidateContext = () => { revision.current++;', 'const invalidateContext = () => { setPreviewPlan(null); setPreviewDownload(null); revision.current++;')
         .replace('setDraft(""); setPending(null); const token', 'setDraft(""); setPending(null); setPreviewPlan(null); const token')
-        .replace('      const command = classifyAtenaChatCommand(text);', `      const iphanQuestion = /^(?:guardar|consultar|qual a tipologia d[eo])\\s+s[ií]tio\\b/i.test(text.trim());
+        .replace('      const command = classifyAtenaChatCommand(text);', `      const iphanQuestion = /^(?:guardar|consultar|conferir tipologia d[eo]|qual a tipologia d[eo])\\s+s[ií]tio\\b/i.test(text.trim());
       const iphanCrossing = /\\b(cruzar|cruze|cruzamento|intersectar|intersecte)\\b/i.test(text) &&
         /\\biphan\\b/i.test(text) && /\\b(ada|aid|aii)\\b/i.test(text);
       if (iphanCrossing) {

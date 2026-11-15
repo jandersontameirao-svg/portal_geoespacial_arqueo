@@ -322,7 +322,7 @@ function iphanInfluenceLayers(projectId:number) {
 
 async function officialSiteTypology(id:number, code:string) {
   const url = new URL("https://sicg.iphan.gov.br/sicg/pesquisarBem/detalharBem");
-  url.search = new URLSearchParams({"pesquisaBemVO.filtro":"BEM_MAT","pesquisaBemVO.idBem":String(id)}).toString();
+  url.search = new URLSearchParams({"pesquisaBemVO.filtro":"BEM_MATERIAL","pesquisaBemVO.idBem":String(id)}).toString();
   const checkedAt = new Date().toISOString();
   try {
     const response = await fetch(url,{signal:AbortSignal.timeout(7500),redirect:"error"});
@@ -330,15 +330,19 @@ async function officialSiteTypology(id:number, code:string) {
     const body = await response.json();
     // Only accept an explicit site typology from a record that identifies the same site.
     // A classification or a word found in the synthesis is not a typology from the official record.
-    const records = [body?.sitioArqueologico,body?.bem?.sitioArqueologico,body?.bem,body].filter(Boolean);
+    const detail = body?.detalharBemVO ?? body;
+    const records = [detail?.sitioArqueologico,detail?.bem?.sitioArqueologico,detail?.bem,detail].filter(Boolean);
     const record = records.find(item =>
-      String(item.idBem ?? item.id_bem ?? "") === String(id) ||
+      String(item.idBem ?? item.id_bem ?? item.id ?? "") === String(id) ||
       (code && String(item.codigoIphan ?? item.codigo_iphan ?? "").toLowerCase() === code.toLowerCase()));
     const value = record?.tipologiaSitio ?? record?.tipologiaArqueologica ??
-      (record && records.slice(0,2).includes(record) && (record === body?.sitioArqueologico || record === body?.bem?.sitioArqueologico) ? record.tipologia : undefined);
+      (record && records.slice(0,2).includes(record) && (record === detail?.sitioArqueologico || record === detail?.bem?.sitioArqueologico) ? record.tipologia : undefined);
     if (typeof value === "string" && value.trim() && value.length <= 1000)
       return {status:"confirmada",checkedAt,url:url.href,value:value.trim()};
-    return {status:"sem_tipologia_estruturada",checkedAt,url:url.href};
+    // Preserve an explicit designation from the matched public record as descriptive evidence.
+    const literal = record?.sintese?.trim?.().match(/^s[ií]tio l[ií]tico\b/iu)?.[0];
+    return {status:"sem_tipologia_estruturada",checkedAt,url:url.href,
+      ...(literal ? {descricaoTipologica:literal,campo:"detalharBemVO.sintese"} : {})};
   } catch {
     return {status:"ficha_indisponivel",checkedAt,url:url.href};
   }
@@ -400,9 +404,12 @@ async function crossIphanInfluence(projectId:number, areas:ReturnType<typeof iph
     const {geometry,...attrs} = record;
     const check = typologies.get(record.id);
     const prior = knowledge.findLast(item => item.id === record.id && item.tipologia);
+    const description = knowledge.findLast(item => item.id === record.id && item.descricaoTipologicaSicg);
     // A temporary upstream failure must not discard an earlier confirmed observation.
     knowledge.push({...attrs,projectId,consultadoEm:checkedAt,
       tipologia:check?.value ?? prior?.tipologia ?? null,
+      descricaoTipologicaSicg:check?.descricaoTipologica ?? description?.descricaoTipologicaSicg,
+      fonteDescricaoTipologica:check?.descricaoTipologica ? check.url : description?.fonteDescricaoTipologica,
       verificacaoTipologia:check ?? {status:"consulta_pendente"},
       fonteTipologia:check?.value ? check.url : prior?.fonteTipologia,
       ficha:"https://sicg.iphan.gov.br/sicg/pesquisarBem"});
@@ -650,13 +657,26 @@ export async function workflow(method: string, input: Row = {}, write = false, v
           ? {summary:"Cruzar pontos e polígonos do SICG com ADA, AID e AII. Mostrar as áreas no mapa e guardar os sítios com fonte e estado da tipologia na ficha oficial."}
           : crossIphanInfluence(input.projectId,areas);
       }
-      const iphan = request.match(/^(guardar|consultar|qual a tipologia d[eo])\s+s[ií]tio(?:\s+do)?\s+IPHAN\s+([\p{L}\d._/-]{1,100})[!?]?$/iu);
+      const iphan = request.match(/^(guardar|consultar|conferir tipologia d[eo]|qual a tipologia d[eo])\s+s[ií]tio(?:\s+do)?\s+IPHAN\s+([\p{L}\d._/-]{1,100})[!?]?$/iu);
       if (iphan) {
         const [,verb,key] = iphan;
         const records = state.iphanKnowledge ?? [];
         if (input.projectId !== 0 && !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
         const sources = records.filter(row => String(row.id) === key || row.codigo.toLowerCase() === key.toLowerCase());
         const previous = sources.at(-1);
+        if (verb.toLowerCase().startsWith("conferir")) {
+          if (!previous) throw Error("Guarde o sítio no acervo antes de conferir sua ficha.");
+          if (method === "atena.previewPlan") return {summary:"Conferir o detalhe oficial de “"+previous.nome+"” no SICG."};
+          const check = await officialSiteTypology(previous.id,previous.codigo);
+          const current = (state.iphanKnowledge ?? []).findLast(row => row.id === previous.id) ?? previous;
+          save({...state,iphanKnowledge:[...(state.iphanKnowledge ?? []),{...current,
+            tipologia:check.value ?? current.tipologia ?? null, verificacaoTipologia:check,
+            descricaoTipologicaSicg:check.descricaoTipologica ?? current.descricaoTipologicaSicg,
+            fonteDescricaoTipologica:check.descricaoTipologica ? check.url : current.fonteDescricaoTipologica,
+            fonteTipologia:check.value ? check.url : current.fonteTipologia,
+          }]});
+          return {knowledgeMessage:`${previous.nome} · ${check.value ?? check.descricaoTipologica ?? "tipologia pendente"}. Fonte: ${check.url}`};
+        }
         if (verb.toLowerCase() !== "guardar") {
           const numericId = /^\d+$/.test(key) && Number.isSafeInteger(Number(key)) ? Number(key) : 0;
           const matches = previous ? [previous] : await iphanRecords(numericId ? {id:numericId} : {code:key});
@@ -665,7 +685,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
           const date = record.consultadoEm ?? new Date().toISOString();
           if (method === "atena.previewPlan") return {summary:`Consultar “${record.nome}” ${previous ? "no acervo IPHAN da prévia" : "no GeoServer oficial e guardar o registro no acervo"}.`};
           if (!previous) saveIphanKnowledge(record,input.projectId,date);
-          const message = `${record.nome} · ${record.codigo || "sem código"} · ${record.classificacao || "sem classificação"}. ${record.sintese || "Sem síntese publicada"}. Tipologia oficial: ${record.tipologia ?? "pendente de conferência na ficha SICG"}. Fonte: ${record.camada}, consultada em ${date.slice(0,10)}.`;
+          const message = `${record.nome} · ${record.codigo || "sem código"} · ${record.classificacao || "sem classificação"}. ${record.sintese || "Sem síntese publicada"}. Tipologia oficial: ${record.tipologia ?? "pendente de conferência na ficha SICG"}.${record.descricaoTipologicaSicg ? " Descrição no SICG: "+record.descricaoTipologicaSicg+". Fonte: "+(record.fonteDescricaoTipologica ?? record.verificacaoTipologia?.url)+"." : ""} Fonte: ${record.camada}, consultada em ${date.slice(0,10)}.`;
           return {knowledgeMessage:message};
         }
         const id = Number(key);
