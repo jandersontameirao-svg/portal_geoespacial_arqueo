@@ -71,18 +71,21 @@ export function studioSymbolPoints(symbol:StudioSymbol): [number,number][] {
   });
 }
 export type StudioView = { vectorStyles?: Record<string,StudioVectorStyle>; areaStyles?: Record<string,StudioAreaStyle>; background?: StudioBackground; east: number; north: number; labels: boolean; insets: Record<"brasil" | "regional", { background?: StudioBackground; layers?: number[]; scale?: number; east?: number; north?: number }> };
+export function defaultStudioInset(): StudioView["insets"]["brasil"] {
+  return { background: "cartografico" };
+}
 export function readStudioView(value: unknown): StudioView {
-  if (value === undefined) return { east: 0, north: 0, labels: true, insets: { brasil: {}, regional: {} } };
+  const insets: StudioView["insets"] = { brasil: defaultStudioInset(), regional: defaultStudioInset() };
+  if (value === undefined) return { east: 0, north: 0, labels: true, insets };
   const view = value as StudioView;
   if (!view || ![view.east, view.north].every(n => Number.isFinite(n) && Math.abs(n) <= 500000) ||
       typeof view.labels !== "boolean" || !view.insets) throw Error("Enquadramento inválido.");
-  const insets = { brasil: {}, regional: {} } as StudioView["insets"];
   for (const key of ["brasil", "regional"] as const) {
     const inset = view.insets[key];
     if (!inset || (inset.layers !== undefined && (!Array.isArray(inset.layers) || inset.layers.length > 40 || !inset.layers.every(Number.isInteger))))
       throw Error("Camadas do mapa de situação inválidas.");
     if (![inset.east ?? 0, inset.north ?? 0].every(n => Number.isFinite(n) && Math.abs(n) <= 10000000)) throw Error("Enquadramento do quadro inválido.");
-    insets[key] = { layers: inset.layers, scale: readScale(inset.scale, 500000000), background:readStudioBackground(inset.background), east:inset.east, north:inset.north };
+    insets[key] = { layers: inset.layers, scale: readScale(inset.scale, 500000000), background:readStudioBackground(inset.background ?? defaultStudioInset().background), east:inset.east, north:inset.north };
   }
   const areaStyles: Record<string,StudioAreaStyle> = {};
   for (const [id,style] of Object.entries(view.areaStyles ?? {})) {

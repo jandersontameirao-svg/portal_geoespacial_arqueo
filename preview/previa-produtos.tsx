@@ -511,7 +511,7 @@ export default function PreviewMapProducts() {
           <div className="flex items-center gap-2 text-sm font-semibold"><Layers3 size={16} /> Camadas</div>
           <label className="block text-xs">Quadro de edição
             <select className={input} value={inset ?? "principal"} onChange={event => selectElement(event.target.value as ElementId)}>
-              <option value="principal">Mapa principal</option><option value="brasil">Situação nacional</option><option value="regional">Situação regional</option>
+              <option value="principal">Mapa principal</option><option value="brasil">Brasil</option><option value="regional">Região do empreendimento</option>
             </select>
           </label>
           <label className="block text-xs">Mapa-base do quadro
@@ -526,6 +526,10 @@ export default function PreviewMapProducts() {
               {Object.entries(studioBackgrounds).map(([id,label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </label>
+          {inset && <button type="button" className={button} onClick={() => change({
+            ...draft,
+            view: { ...draft.view, insets: { ...draft.view.insets, [inset]: defaultStudioInset() } },
+          })}>Restaurar situação padrão</button>}
           {inset && <label className="flex items-start gap-2 text-xs">
             <input type="checkbox" checked={layerIds === undefined} onChange={event => setLayerIds(event.target.checked ? undefined : [15])} /> Usar conteúdo do modelo
           </label>}
