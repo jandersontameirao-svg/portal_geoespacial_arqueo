@@ -721,12 +721,24 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       { id: "corredor", title: "Atlas por corredor", columns: 1, rows: 1, overlap: 15, grid: 500, scale: linearAtlasScale, layerIds: [14, 15] },
       { id: "atlas", title: "Atlas", columns: 3, rows: 2, overlap: 10, grid: 10000, layerIds: [14, 15] },
     ];
-    const products = defaults.map(model => ({ ...model, ...state.products?.[11]?.find(item => item.id === model.id) }));
     const layers = state.files.filter(file => file.projectId === 11 && file.vector);
+    const savedProducts = state.products?.[11] ?? [];
+    const requestedResult = input.modelId ?? input.product?.id;
+    // Result maps get their own product ID, leaving existing map drafts and products independent.
+    for (const layer of layers) {
+      const id = "resultado-"+layer.id;
+      if (requestedResult !== id && !savedProducts.some(item => item.id === id)) continue;
+      defaults.push({id,title:"Mapa do resultado",columns:1,rows:1,overlap:0,grid:25000,layerIds:[layer.id]});
+    }
+    const products = defaults.map(model => {
+      const saved = savedProducts.find(item => item.id === model.id);
+      return {...model,...saved};
+    });
     const mapBiomas = { id: -21, name: "MapBiomas Brasil · 2024" };
     if (!write && method === "previewProducts.list") return {
       linearAtlasScale,
       models:studioModels,
+      persistedResultIds:savedProducts.filter(item => item.id.startsWith("resultado-")).map(item => item.id),
       brands:(state.studioBrands ?? []).map(({id,name,kind}) => ({id,name,kind})),
       products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper ?? defaultStudioPaper), orientation: readOrientation(product.orientation), layout: product.paper ? readLayout(product.layout, readOrientation(product.orientation)) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
       layers: [...layers.map(({ id, name, vector, defaultStyle, analysisKind }) => ({ id, name, area:vector.features.some((feature:Row) => /Polygon$/.test(feature.geometry.type)), line:vector.features.some((feature:Row) => /LineString$/.test(feature.geometry.type)), point:vector.features.some((feature:Row) => /Point$/.test(feature.geometry.type)), iphanInfluence:analysisKind === "iphan-influence", color:defaultStyle?.color })), mapBiomas, ...studioTerrain],
@@ -779,6 +791,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       case "files.list":
       case "files.listAll": return projectRows(state.files, input).map(({ contents, vector, ...file }) => ({
         ...file,
+        previewMapReady:Boolean(vector || file.cog),
         exportFormats: vector ? ["shp", "kml", "geojson", ...(vector.features.every((feature: Row) => /^(Multi)?(Point|LineString)$/.test(feature.geometry.type)) ? ["gpx"] : [])] : [],
       }));
       case "geometries.listForProjects":
@@ -849,6 +862,18 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         };
         const result = await crossIphanInfluence(input.projectId,areas);
         return atlas ? {...result,studioUrl:atlas.studioUrl} : result;
+      }
+      if (/^(qual|que) (camada|produto|mapa) .*(abert[oa]|selecionad[oa])/.test(text)) {
+        if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra o projeto para consultar a área de trabalho.");
+        const workspace = input.workspace;
+        const layer = state.files.find(file => file.projectId === input.projectId && file.id === workspace?.layerId && (file.vector || file.cog));
+        if (workspace?.tab === "products") {
+          const saved = state.products?.[input.projectId]?.find(item => item.id === workspace.modelId);
+          const model = studioModels.find(item => item.id === workspace.modelId);
+          const title = saved?.title ?? layer?.name ?? model?.title;
+          return {knowledgeMessage:title ? "Produto no Estúdio: "+title+".":"Abra um produto pelo Estúdio para identificá-lo pelo endereço."};
+        }
+        return {knowledgeMessage:layer ? "Camada aberta no mapa: "+layer.name+".":"Use Abrir no mapa ou Ver no mapa para indicar uma camada."};
       }
       const wantsDevelopments = /\bempreendimentos?\b/.test(text) && /\baii\b/.test(text);
       if (wantsDevelopments || (/\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\b/.test(text) && /\bprojetos\b/.test(text) &&

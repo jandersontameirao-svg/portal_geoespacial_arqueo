@@ -1,3 +1,4 @@
+import { useSearch } from "wouter";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock, Unlock, Magnet, Maximize, Minus, Plus, Redo2, Save, Sparkles, Undo2 } from "lucide-react";
 
@@ -19,14 +20,18 @@ type Layer = { id: number; name: string; area?: boolean; line?:boolean; point?:b
 const mapFrames = ["principal","brasil","regional"] as const;
 type MapFrame = typeof mapFrames[number];
 const elements = Object.keys(names) as ElementId[];
+const comparableProduct = (value: unknown) => JSON.stringify(value,(_key,field) =>
+  field && typeof field === "object" && !Array.isArray(field)
+    ? Object.fromEntries(Object.entries(field).sort(([left],[right]) => left.localeCompare(right)))
+    : field);
 const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const input = "mt-1 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white";
 const button = "inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-slate-700";
 const panel = "space-y-4 bg-white p-4 dark:bg-slate-900";
 
 
-async function request(method: "list" | "save", product?: Product) {
-  const payload = { json: { projectId: 11, product } };
+async function request(method: "list" | "save", product?: Product, modelId?:string) {
+  const payload = { json: { projectId: 11, product, modelId } };
   const endpoint = "/api/trpc/previewProducts." + method;
   const response = product ? await fetch(endpoint, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -76,8 +81,11 @@ export default function PreviewMapProducts() {
   const [layers, setLayers] = useState<Layer[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Product>>({});
   const [history, setHistory] = useState<Record<string, { past: Product[]; future: Product[] }>>({});
-  const [initialParams] = useState(() => new URLSearchParams(location.search));
+  const studioSearch=useSearch();
+  const initialParams=new URLSearchParams(studioSearch);
   const [active, setActive] = useState(() => initialParams.get("modelo") ?? "mapa");
+  const activeModel=useRef(active);
+  activeModel.current=active;
   const [library,setLibrary] = useState(false);
   const [settings, setSettings] = useState<"sheet" | "layers" | null>(null);
   const [brands,setBrands] = useState<Brand[]>([]);
@@ -101,6 +109,8 @@ export default function PreviewMapProducts() {
   const drag = useRef<{ x:number; y:number; kind:"move"|"resize"|"pan"; id:ElementId; initial:Product; scale:number } | null>(null);
   const latestGesture = useRef<typeof gesture>();
   useEffect(() => {
+    if (new URLSearchParams(studioSearch).get("tab") !== "products") return;
+    let activeRequest=true;
     try {
       const key = "preview-atena-studio-result";
       const result = JSON.parse(sessionStorage.getItem(key) ?? "null");
@@ -109,7 +119,8 @@ export default function PreviewMapProducts() {
         setNotice(result.message);
       }
     } catch { /* The atlas remains available without session storage. */ }
-    request("list").then(data => {
+    request("list",undefined,new URLSearchParams(studioSearch).get("modelo") ?? activeModel.current).then(data => {
+      if (!activeRequest) return;
       setProducts(data.products); setBrands(data.brands ?? []);
       const params = initialParams;
       const product = data.products.find((item:Product) => item.id === params.get("modelo"));
@@ -117,7 +128,15 @@ export default function PreviewMapProducts() {
       const focusAda = product?.id === "corredor" && params.get("foco") === "ada";
       const focusSites = product?.id === "atlas" && params.get("foco") === "sitios-influencia";
       const scale = Number(params.get("escala"));
-      if (product && papers.includes(paper as Paper) && (orientation === "landscape" || orientation === "portrait")) {
+      const requested = data.layers.find((layer:Layer) => layer.id === Number(params.get("camada")));
+      if (product && requested && product.id.startsWith("resultado-") && !data.persistedResultIds?.includes(product.id)) {
+        const referenceIds = data.layers.filter((layer:Layer) => /^(AII|Eixo)\.geojson$/i.test(layer.name)).map((layer:Layer) => layer.id);
+        setDrafts(current => current[product.id] ? current : ({...current,[product.id]:{
+          ...product,title:requested.name.replace(/\.geojson$/i,"").slice(0,85),
+          paper:"A3",orientation:"landscape",layout:defaultLayout,scale:undefined,
+          layerIds:[...new Set<number>([...referenceIds,requested.id])],
+        }}));
+      } else if (product && papers.includes(paper as Paper) && (orientation === "landscape" || orientation === "portrait")) {
         setDrafts(current => ({ ...current,[product.id]:{ ...product,paper:paper as Paper,orientation,
           layout:product.orientation === orientation ? product.layout : orientation === "portrait" ? portraitLayout : defaultLayout,
           marks:params.has("empresa") && params.has("cliente")
@@ -130,9 +149,10 @@ export default function PreviewMapProducts() {
           ...(focusAda ? {layerIds:[14,15], scale:Number.isInteger(scale) && scale >= 1000 && scale <= 10000000 ? scale : linearAtlasScale} : {}),
         } }));
       }
-      setActive(current => data.products.some((product:Product) => product.id === current) ? current : "mapa"); setLayers(data.layers); setAtlasDefault(data.linearAtlasScale);
-    }).catch(error => setNotice(error.message));
-  }, []);
+      setActive(current => product?.id ?? (data.products.some((item:Product) => item.id === current) ? current : "mapa")); setLayers(data.layers); setAtlasDefault(data.linearAtlasScale);
+    }).catch(error => {if(activeRequest)setNotice(error.message);});
+    return () => {activeRequest=false;};
+  }, [studioSearch]);
   const saved = products.find(product => product.id === active);
   const draft = drafts[active] ?? saved;
   const orientation = draft?.orientation ?? "landscape";
@@ -140,7 +160,7 @@ export default function PreviewMapProducts() {
   const [paperWidth,paperHeight] = paperSize(draft?.paper ?? defaultStudioPaper,orientation);
   const factor = paperFactor(draft?.paper ?? defaultStudioPaper);
   const format = { width:paperWidth/factor, height:paperHeight/factor };
-  const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
+  const dirty = comparableProduct(saved) !== comparableProduct(draft);
   const corridor = active === "corredor";
   const atlas = corridor || active === "atlas";
   const entries = history[active] ?? { past: [], future: [] };
@@ -380,8 +400,8 @@ export default function PreviewMapProducts() {
       setProducts(current => current.map(item => item.id === product.id ? product : item));
       setDrafts(current => ({ ...current, [product.id]: product }));
       const params = new URLSearchParams(location.search);
-      if (params.has("empresa") && params.get("modelo") === product.id) {
-        for (const key of ["papel","orientacao","empresa","cliente","foco","escala"]) params.delete(key);
+      if ((params.has("empresa") || params.has("camada")) && params.get("modelo") === product.id) {
+        for (const key of ["papel","orientacao","empresa","cliente","foco","escala","camada"]) params.delete(key);
         window.history.replaceState(window.history.state,"",location.pathname+"?"+params);
       }
       setNotice("Produto salvo.");
@@ -470,12 +490,18 @@ export default function PreviewMapProducts() {
     : undefined;
 
   function openModel(id:string) {
+    const params=new URLSearchParams(window.location.search);
+    if(params.get("tab")==="products") {
+      params.set("modelo",id);
+      for(const key of ["camada","papel","orientacao","escala","foco","empresa","cliente"]) params.delete(key);
+      window.history.replaceState(window.history.state,"",window.location.pathname+"?"+params);
+    }
     setActive(id); setLibrary(false); setPage(0); selectElement("principal");
     setReview(undefined); setError(""); setNotice(""); setMode("proof");
   }
   return <section onKeyDown={keyboard} aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
     <style>{`
-      .arqueo-studio-workspace { display:grid; grid-template-areas:"canvas" "settings"; }
+      .arqueo-studio-export { background:#b84c1b; color:#fff; }\n      .arqueo-studio-export:disabled { background:#ffffff1a; color:#ffffffa6; }\n      .arqueo-studio-workspace { display:grid; grid-template-areas:"canvas" "settings"; }
       .arqueo-studio-workspace > aside { grid-area:settings; min-width:0; }
       .arqueo-studio-workspace > div { grid-area:canvas; }
       .arqueo-studio-canvas { background-image:radial-gradient(#94a3b860 1px, transparent 1px); background-size:14px 14px; }
@@ -495,7 +521,7 @@ export default function PreviewMapProducts() {
           value={active} disabled={saving || !products.length} onChange={event => {
             openModel(event.target.value);
           }}>
-          {products.map(product => <option key={product.id} value={product.id}>{product.title}</option>)}
+          {products.map(product => <option key={product.id} value={product.id}>{drafts[product.id]?.title ?? product.title}</option>)}
         </select>
       </label>
       <div className="flex flex-wrap gap-2">
@@ -505,7 +531,7 @@ export default function PreviewMapProducts() {
         </button>
         <button type="button" aria-expanded={library} className="rounded-md border border-white/30 px-3 py-2 text-sm" onClick={() => setLibrary(!library)}>Biblioteca de modelos</button>
         <button type="button" className="inline-flex items-center gap-2 rounded-md border border-white/30 px-3 py-2 text-sm disabled:opacity-50" disabled={!draft || saving || !dirty || !!error || proof?.for !== previewUrl || !draft.title.trim()} onClick={() => void save()}><Save size={16} /> Salvar produto</button>
-        <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-950 disabled:opacity-50"
+        <button type="button" className="inline-flex items-center gap-2 rounded-md arqueo-studio-export px-3 py-2 text-sm font-semibold"
           disabled={!saved || dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(false)}><Download size={16} /> {exporting ? "Gerando PDF…" : atlas ? "Exportar atlas" : "Exportar PDF"}</button>
       </div>
     </header>
