@@ -11,7 +11,7 @@ type Product = {
   marks?: {empresa:number; cliente:number};
   paper: Paper;
   orientation: Orientation;
-  id: string; title: string; columns: number; rows: number; overlap: number; grid: number;
+  id: string; templateId?: string; title: string; columns: number; rows: number; overlap: number; grid: number;
   scale?: number; locks?: ElementId[]; layerIds: number[]; layout: Record<ElementId, Box>; view: View;
 };
 type Review = { scale: number; insetScales: Record<"brasil" | "regional", number>; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
@@ -30,8 +30,8 @@ const button = "inline-flex items-center justify-center gap-2 rounded-md border 
 const panel = "space-y-4 bg-white p-4 dark:bg-slate-900";
 
 
-async function request(method: "list" | "save", product?: Product, modelId?:string) {
-  const payload = { json: { projectId: 11, product, modelId } };
+async function request(method: "list" | "save", product?: Product, modelId?:string, copy = false) {
+  const payload = { json: { projectId: 11, product, modelId, copy } };
   const endpoint = "/api/trpc/previewProducts." + method;
   const response = product ? await fetch(endpoint, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -42,12 +42,13 @@ async function request(method: "list" | "save", product?: Product, modelId?:stri
 }
 
 function sheetUrl(format: "svg" | "pdf" | "json", product: Product, page?: number) {
+  const modelId = product.templateId ?? product.id;
   const query = new URLSearchParams({
-    papel: product.paper, orientacao: product.orientation, modelo: product.id, grade: String(product.grid), titulo: product.title,
+    papel: product.paper, orientacao: product.orientation, modelo: modelId, grade: String(product.grid), titulo: product.title,
     empresa:String(product.marks?.empresa ?? 0), cliente:String(product.marks?.cliente ?? 0), camadas: product.layerIds.join(","), layout: JSON.stringify(product.layout), vista: JSON.stringify(product.view),
   });
   if (product.scale) query.set("escala", String(product.scale));
-  if (product.id === "atlas" || product.id === "corredor") {
+  if (modelId === "atlas" || modelId === "corredor") {
     query.set("atlas", [product.columns, product.rows, product.overlap, product.grid].join(","));
   }
   if (page !== undefined) query.set("folha", String(page));
@@ -78,6 +79,8 @@ function alignAxis(origin: number, size: number, targets: number[], tolerance: n
 
 export default function PreviewMapProducts() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [savedIds,setSavedIds] = useState<string[]>([]);
+  const [showSaved,setShowSaved] = useState(false);
   const [layers, setLayers] = useState<Layer[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Product>>({});
   const [history, setHistory] = useState<Record<string, { past: Product[]; future: Product[] }>>({});
@@ -121,7 +124,7 @@ export default function PreviewMapProducts() {
     } catch { /* The atlas remains available without session storage. */ }
     request("list",undefined,new URLSearchParams(studioSearch).get("modelo") ?? activeModel.current).then(data => {
       if (!activeRequest) return;
-      setProducts(data.products); setBrands(data.brands ?? []);
+      setSavedIds(data.savedProductIds ?? []); setProducts(data.products); setBrands(data.brands ?? []);
       const params = initialParams;
       const product = data.products.find((item:Product) => item.id === params.get("modelo"));
       const paper = params.get("papel"), orientation = params.get("orientacao");
@@ -161,11 +164,12 @@ export default function PreviewMapProducts() {
   const factor = paperFactor(draft?.paper ?? defaultStudioPaper);
   const format = { width:paperWidth/factor, height:paperHeight/factor };
   const dirty = comparableProduct(saved) !== comparableProduct(draft);
-  const corridor = active === "corredor";
-  const atlas = corridor || active === "atlas";
+  const modelId = draft?.templateId ?? active;
+  const corridor = modelId === "corredor";
+  const atlas = corridor || modelId === "atlas";
   const entries = history[active] ?? { past: [], future: [] };
   const reviewUrl = draft ? sheetUrl("json", draft) : "";
-  const count = corridor ? review?.sheets ?? 0 : active === "atlas" && draft ? draft.rows*draft.columns : 0;
+  const count = corridor ? review?.sheets ?? 0 : modelId === "atlas" && draft ? draft.rows*draft.columns : 0;
   const currentPage = Math.min(page, count);
   const previewUrl = draft ? sheetUrl("svg", draft, currentPage) : "";
   const inset = element === "brasil" || element === "regional" ? element : undefined;
@@ -392,24 +396,26 @@ export default function PreviewMapProducts() {
     } catch (error) { setNotice((error as Error).message); }
   }
 
-  async function save() {
+  async function save(copy = false) {
     if (!draft) return;
     setSaving(true); setNotice("");
     try {
-      const product: Product = await request("save", draft);
-      setProducts(current => current.map(item => item.id === product.id ? product : item));
+      const product: Product = await request("save", draft, undefined, copy);
+      setProducts(current => copy ? [...current,product] : current.map(item => item.id === product.id ? product : item));
+      setSavedIds(current => [...new Set([...current,product.id])]);
+      if (copy) openModel(product.id);
       setDrafts(current => ({ ...current, [product.id]: product }));
       const params = new URLSearchParams(location.search);
       if ((params.has("empresa") || params.has("camada")) && params.get("modelo") === product.id) {
         for (const key of ["papel","orientacao","empresa","cliente","foco","escala","camada"]) params.delete(key);
         window.history.replaceState(window.history.state,"",location.pathname+"?"+params);
       }
-      setNotice("Produto salvo.");
+      setNotice(copy ? "Cópia salva como produto independente." : "Produto salvo.");
     } catch (error) { setNotice((error as Error).message); }
     finally { setSaving(false); }
   }
   async function exportPdf(single: boolean) {
-    if (!saved || exporting) return;
+    if (!saved || !savedIds.includes(active) || exporting) return;
     setExporting(true);
     setNotice("");
     try {
@@ -426,7 +432,7 @@ export default function PreviewMapProducts() {
     finally { setExporting(false); }
   }
 
-  const order = [...layers].filter(layer => layer.id > 0 || (!inset && ((active === "uso-solo" && layer.id === -21) || (active === "relevo" && layer.id === -22) || (active === "topografia" && layer.id === -23))))
+  const order = [...layers].filter(layer => layer.id > 0 || (!inset && ((modelId === "uso-solo" && layer.id === -21) || (modelId === "relevo" && layer.id === -22) || (modelId === "topografia" && layer.id === -23))))
     .sort((a,b) => (layerIds?.indexOf(b.id) ?? -1) - (layerIds?.indexOf(a.id) ?? -1));
   const selection = draft?.layout[element];
   function scaleFor(id: ElementId) {
@@ -496,7 +502,7 @@ export default function PreviewMapProducts() {
       for(const key of ["camada","papel","orientacao","escala","foco","empresa","cliente"]) params.delete(key);
       window.history.replaceState(window.history.state,"",window.location.pathname+"?"+params);
     }
-    setActive(id); setLibrary(false); setPage(0); selectElement("principal");
+    setActive(id); setLibrary(false); setShowSaved(false); setPage(0); selectElement("principal");
     setReview(undefined); setError(""); setNotice(""); setMode("proof");
   }
   return <section onKeyDown={keyboard} aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
@@ -516,7 +522,7 @@ export default function PreviewMapProducts() {
         <h2 className="text-lg font-semibold tracking-tight">Estúdio Cartográfico</h2>
         <p className="text-xs text-emerald-100/75">LT Angicos–Jaguaruana II · Grupo Arqueo</p>
       </div>
-      <label className="min-w-52 grow text-xs text-emerald-100/80">Modelo de mapa ou atlas
+      <label className="min-w-52 grow text-xs text-emerald-100/80">Mapa ou atlas em edição
         <select className="mt-1 block w-full rounded-md border border-white/25 px-2 py-1.5 text-sm text-white" style={{ background:"#263735" }}
           value={active} disabled={saving || !products.length} onChange={event => {
             openModel(event.target.value);
@@ -529,17 +535,29 @@ export default function PreviewMapProducts() {
           className="inline-flex items-center gap-2 rounded-md border border-emerald-200/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-white/10">
           <Sparkles size={16} aria-hidden="true"/> Trabalhar com a Atena
         </button>
-        <button type="button" aria-expanded={library} className="rounded-md border border-white/30 px-3 py-2 text-sm" onClick={() => setLibrary(!library)}>Biblioteca de modelos</button>
-        <button type="button" className="inline-flex items-center gap-2 rounded-md border border-white/30 px-3 py-2 text-sm disabled:opacity-50" disabled={!draft || saving || !dirty || !!error || proof?.for !== previewUrl || !draft.title.trim()} onClick={() => void save()}><Save size={16} /> Salvar produto</button>
+        <button type="button" aria-expanded={showSaved} className="rounded-md border border-white/30 px-3 py-2 text-sm" onClick={() => {setShowSaved(!showSaved); setLibrary(false);}}>Mapas e atlas do projeto ({savedIds.length})</button>
+        <button type="button" aria-expanded={library} className="rounded-md border border-white/30 px-3 py-2 text-sm" onClick={() => {setLibrary(!library); setShowSaved(false);}}>Biblioteca de modelos</button>
+        <button type="button" className="inline-flex items-center gap-2 rounded-md border border-white/30 px-3 py-2 text-sm disabled:opacity-50" disabled={!draft || saving || (!dirty && savedIds.includes(active)) || !!error || proof?.for !== previewUrl || !draft.title.trim()} onClick={() => void save()}><Save size={16} /> Salvar produto</button>
+        <button type="button" className="rounded-md border border-white/30 px-3 py-2 text-sm disabled:opacity-50" disabled={!draft || saving || !!error || proof?.for !== previewUrl || !draft.title.trim()} onClick={() => void save(true)}>Salvar como novo</button>
         <button type="button" className="inline-flex items-center gap-2 rounded-md arqueo-studio-export px-3 py-2 text-sm font-semibold"
-          disabled={!saved || dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(false)}><Download size={16} /> {exporting ? "Gerando PDF…" : atlas ? "Exportar atlas" : "Exportar PDF"}</button>
+          title={!savedIds.includes(active) ? "Salve o produto para exportar o PDF." : undefined} disabled={!saved || !savedIds.includes(active) || dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(false)}><Download size={16} /> {exporting ? "Gerando PDF…" : atlas ? "Exportar atlas" : "Exportar PDF"}</button>
       </div>
     </header>
     <div aria-live="polite" className="flex min-h-8 flex-wrap gap-x-3 border-b border-slate-200 px-5 py-1.5 text-xs dark:border-slate-700">
-      <span>{dirty ? "Alterações por salvar" : saved ? "Versão salva" : "Carregando produtos…"}</span>
+      <span>{dirty ? "Alterações por salvar" : savedIds.includes(active) ? "Versão salva" : saved ? "Modelo pronto para salvar" : "Carregando produtos…"}</span>
       {notice && <span role="status">{notice}</span>}
       {error && <span role="alert" className="font-medium text-red-700 dark:text-red-300">{error}</span>}
     </div>
+    {showSaved && <div className="space-y-3 border-b p-5">
+      <h3 className="text-sm font-semibold">Mapas e atlas do projeto</h3>
+      {!savedIds.length && <p className="text-sm">Nenhum produto salvo. Escolha um modelo e salve o primeiro mapa ou atlas.</p>}
+      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{products.filter(product => savedIds.includes(product.id)).map(product => <li key={product.id}>
+        <button type="button" className="w-full rounded-lg border p-3 text-left hover:border-emerald-600" onClick={() => openModel(product.id)}>
+          <span className="block text-sm font-semibold">{product.title}</span>
+          <span className="block text-xs">{product.paper} {product.orientation === "portrait" ? "retrato" : "paisagem"} · Abrir no Estúdio</span>
+        </button>
+      </li>)}</ul>
+    </div>}
     {library && <div className="space-y-4 border-b p-5">
       {Array.from(new Set(studioModels.map(model => model.group))).map(group => <div key={group}>
         <h3 className="mb-2 text-sm font-semibold">{group}</h3>
@@ -589,7 +607,7 @@ export default function PreviewMapProducts() {
           <div className="space-y-1">
             {order.map(layer => {
               const index = layerIds?.indexOf(layer.id) ?? -1;
-              const required = !inset && ((corridor && layer.id === 15) || (active === "uso-solo" && [15,-21].includes(layer.id)));
+              const required = !inset && ((corridor && layer.id === 15) || (modelId === "uso-solo" && [15,-21].includes(layer.id)));
               const name = layer.name.replace(/\.geojson$/i,"");
               const style = draft.view.areaStyles?.[layer.id];
               const color = style?.color ?? layer.color ?? "#5b7655";
@@ -694,7 +712,7 @@ export default function PreviewMapProducts() {
         <div className="min-w-0 bg-slate-100 dark:bg-slate-800">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
             {(["proof","layout","view"] as const).map(tab => <button key={tab} type="button" className={button + (mode === tab ? " bg-emerald-100 text-emerald-950 dark:text-white dark:bg-emerald-900" : "")}
-              aria-pressed={mode === tab} disabled={tab === "view" && active === "atlas" && currentPage === 0} onClick={() => { setMode(tab); if (tab === "view" && !inset) selectElement("principal"); }}>
+              aria-pressed={mode === tab} disabled={tab === "view" && modelId === "atlas" && currentPage === 0} onClick={() => { setMode(tab); if (tab === "view" && !inset) selectElement("principal"); }}>
               {{ layout:"Editar elementos", view:"Enquadrar mapa", proof:"Prévia" }[tab]}
             </button>)}
             <button type="button" className={button} aria-label="Desfazer" disabled={!entries.past.length} onClick={() => undo()}><Undo2 size={15} /></button>
@@ -727,7 +745,7 @@ export default function PreviewMapProducts() {
               <div ref={sheet} className="relative bg-white shadow-lg" style={{ aspectRatio: paperWidth + "/" + paperHeight }}>
                 {proof?.for === previewUrl ? <img src={proof.url} alt={atlas && currentPage === 0 ? "Mapa índice do atlas" : "Prancha cartográfica " + draft.paper} className="block size-full object-contain" />
                   : <div className="grid h-full place-items-center text-sm text-slate-700">{error || "Renderizando prancha…"}</div>}
-                {mode === "layout" && !(active === "atlas" && currentPage === 0) && [...elements.filter(id => id !== element), element].map(id => {
+                {mode === "layout" && !(modelId === "atlas" && currentPage === 0) && [...elements.filter(id => id !== element), element].map(id => {
                   const selected = selectedElements.includes(id);
                   const locked = draft.locks?.includes(id);
                   const box = (id === element ? gesture?.box : undefined) ?? draft.layout[id];
@@ -743,7 +761,7 @@ export default function PreviewMapProducts() {
                 })}
                 {gesture?.guideX !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-10 border-l border-dashed border-fuchsia-600" style={{ left:gesture.guideX/format.width*100+"%" }} />}
                 {gesture?.guideY !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-fuchsia-600" style={{ top:gesture.guideY/format.height*100+"%" }} />}
-                {mode === "view" && !(active === "atlas" && currentPage === 0) && mapFrames.map(id => {
+                {mode === "view" && !(modelId === "atlas" && currentPage === 0) && mapFrames.map(id => {
                   const box = draft.layout[id], selected = mapElement === id;
                   const draggable = (id !== "principal" || !atlas) && !!scaleFor(id);
                   return <button key={id} type="button" data-map-frame={id} aria-label={"Enquadrar feições: " + names[id]}
@@ -763,7 +781,7 @@ export default function PreviewMapProducts() {
                 {Array.from({ length: count }, (_,i) => <option key={i+1} value={i+1}>Folha {i+(corridor ? 2 : 1)}</option>)}
               </select></label>
               <button type="button" className={button} aria-label="Próxima folha" disabled={currentPage >= count} onClick={() => setPage(currentPage+1)}><ChevronRight size={14}/></button>
-              {corridor && <><span>{count} folhas de detalhe</span><button type="button" className={button} disabled={dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(true)}>Exportar folha</button></>}
+              {corridor && <><span>{count} folhas de detalhe</span><button type="button" className={button} disabled={!savedIds.includes(active) || dirty || exporting || !!error || proof?.for !== previewUrl} onClick={() => void exportPdf(true)}>Exportar folha</button></>}
             </> : <span>{draft.paper} · {portrait ? "Vertical" : "Horizontal"}</span>}
           </div>
         </div>
@@ -820,7 +838,7 @@ export default function PreviewMapProducts() {
           <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.view.labels} onChange={event => change({ ...draft, view:{ ...draft.view, labels:event.target.checked } })}/> Rótulos municipais</label>
           </details>
           <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
-            {mode === "layout" && !(active === "atlas" && currentPage === 0) && <details className="mb-3 text-xs" open={multiple || undefined}>
+            {mode === "layout" && !(modelId === "atlas" && currentPage === 0) && <details className="mb-3 text-xs" open={multiple || undefined}>
               <summary className="cursor-pointer font-medium">Seleção e distribuição · {selectedElements.length} {multiple ? "elementos" : "elemento"}</summary>
               <p className="my-2 text-slate-500">Use Shift + clique na folha ou marque os elementos abaixo.</p>
               <div className="space-y-1">

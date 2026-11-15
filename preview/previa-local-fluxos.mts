@@ -724,28 +724,37 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     const layers = state.files.filter(file => file.projectId === 11 && file.vector);
     const savedProducts = state.products?.[11] ?? [];
     const requestedResult = input.modelId ?? input.product?.id;
+    const configured = savedProducts.filter(item => item.paper && item.layout);
+    const reportIds: string[] = [];
     // Result maps get their own product ID, leaving existing map drafts and products independent.
     for (const layer of layers) {
       const id = "resultado-"+layer.id;
-      if (requestedResult !== id && !savedProducts.some(item => item.id === id)) continue;
-      defaults.push({id,title:"Mapa do resultado",columns:1,rows:1,overlap:0,grid:25000,layerIds:[layer.id]});
+      const iphanReport = layer.analysisKind === "iphan-empreendimentos-aii";
+      if (iphanReport) reportIds.push(id);
+      if (!iphanReport && requestedResult !== id && !configured.some(item => item.id === id)) continue;
+      defaults.push({id,title:iphanReport ? "Empreendimentos do IPHAN na AII" : "Mapa do resultado",columns:1,rows:1,overlap:0,grid:25000,layerIds:iphanReport ? [layer.areaSourceId,layer.id].filter(Boolean) : [layer.id]});
     }
-    const products = defaults.map(model => {
-      const saved = savedProducts.find(item => item.id === model.id);
-      return {...model,...saved};
-    });
+    // Models seed the editor; stored products are independent documents and retain their IDs.
+    const products: Row[] = [...new Map<string,Row>([
+      ...defaults.map(model => [model.id,model] as const),
+      ...configured.map(item => [item.id,item] as const),
+    ]).values()];
+    const savedProductIds = [...new Set([...configured.map(item => item.id), ...reportIds])];
     const mapBiomas = { id: -21, name: "MapBiomas Brasil · 2024" };
     if (!write && method === "previewProducts.list") return {
       linearAtlasScale,
       models:studioModels,
-      persistedResultIds:savedProducts.filter(item => item.id.startsWith("resultado-")).map(item => item.id),
+      savedProductIds,
+      persistedResultIds:configured.filter(item => item.id.startsWith("resultado-")).map(item => item.id),
       brands:(state.studioBrands ?? []).map(({id,name,kind}) => ({id,name,kind})),
       products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper ?? defaultStudioPaper), orientation: readOrientation(product.orientation), layout: product.paper ? readLayout(product.layout, readOrientation(product.orientation)) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
       layers: [...layers.map(({ id, name, vector, defaultStyle, analysisKind }) => ({ id, name, area:vector.features.some((feature:Row) => /Polygon$/.test(feature.geometry.type)), line:vector.features.some((feature:Row) => /LineString$/.test(feature.geometry.type)), point:vector.features.some((feature:Row) => /Point$/.test(feature.geometry.type)), iphanInfluence:analysisKind === "iphan-influence", color:defaultStyle?.color })), mapBiomas, ...studioTerrain],
     };
     if (!write || method !== "previewProducts.save") return undefined;
-    const { id, title, columns, rows, overlap, grid } = input.product ?? {};
-    if (!products.some(product => product.id === id) || typeof title !== "string" || !title.trim() || title.length > 85 ||
+    const { id: sourceId, title, columns, rows, overlap, grid } = input.product ?? {};
+    const source = products.find(product => product.id === sourceId);
+    const id = source?.templateId ?? sourceId;
+    if (!source || typeof title !== "string" || !title.trim() || title.length > 85 ||
         ![columns, rows].every(n => Number.isInteger(n) && n >= 1 && n <= 8) || columns*rows > 24 ||
         !Number.isFinite(overlap) || overlap < 0 || overlap > 30 ||
         !Number.isInteger(grid) || grid < (id === "corredor" ? 100 : 1000) || grid > 50000) throw Error("Confira o título e os parâmetros da grade.");
@@ -762,9 +771,10 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     const orientation = readOrientation(input.product.orientation);
     const marks = { empresa:input.product.marks?.empresa ?? 0, cliente:input.product.marks?.cliente ?? 0 };
     for (const [kind,brandId] of Object.entries(marks)) if (brandId !== 0 && !(state.studioBrands ?? []).some(brand => brand.id === brandId && brand.kind === kind)) throw Error("Marca indisponível para esta posição.");
-    const product = { id, marks, orientation, title: title.trim(), columns, rows, overlap, grid, view, locks, paper: readPaper(input.product.paper ?? defaultStudioPaper),
+    const productId = input.copy === true ? `produto-${crypto.randomUUID()}` : sourceId;
+    const product = { id:productId, ...(productId !== id ? {templateId:id} : {}), marks, orientation, title: title.trim(), columns, rows, overlap, grid, view, locks, paper: readPaper(input.product.paper ?? defaultStudioPaper),
       layerIds: [...new Set(layerIds)], layout: readLayout(input.product.layout, orientation), scale: readScale(input.product.scale) ?? (id === "corredor" ? linearAtlasScale : undefined) };
-    save({ ...state, products: { ...state.products, 11: products.map(item => item.id === id ? product : item) } });
+    save({ ...state, products: { ...state.products, 11: [...savedProducts.filter(item => item.id !== productId), product] } });
     return product;
   }
   if (!write) {
