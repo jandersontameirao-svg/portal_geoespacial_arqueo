@@ -13,7 +13,7 @@ const municipalAnchors = JSON.parse(readFileSync(new URL("./previa-raster/angico
 const storePath = fileURLToPath(new URL("./previa-local-dados.json", import.meta.url));
 const seed = { id: 1, name: "Levantamento arqueológico demonstrativo", code: "DEMO-01", description: "Projeto fictício para explorar o Geoportal.", clientName: "Cliente fictício", status: "active", createdAt: "2026-11-12T12:00:00Z" };
 type Row = Record<string, any>;
-type State = { iphanKnowledge?: Row[]; geometries?: Row[]; projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
+type State = { mapProjectIds?: number[]; iphanKnowledge?: Row[]; geometries?: Row[]; projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
 let state: State;
 try {
   state = JSON.parse(readFileSync(storePath, "utf8"));
@@ -490,7 +490,59 @@ function annotateIphanVector(file:Row) {
   })};
 }
 
+type PreviewBounds = [number,number,number,number];
+function regionalProjectSelection(projectId:number) {
+  const bbox = require("@turf/bbox").default;
+  const valid = (box:unknown): box is PreviewBounds => Array.isArray(box) && box.length === 4 &&
+    box.every(Number.isFinite) && box[0] <= box[2] && box[1] <= box[3] &&
+    box[0] >= -180 && box[2] <= 180 && box[1] >= -90 && box[3] <= 90;
+  const filesFor = (id:number) => state.files.filter(file => file.projectId === id && !file.analysisKind);
+  const boundsFor = (project:Row) => {
+    const bounds:PreviewBounds[] = [];
+    if (project.aoiBounds) {
+      try {
+        const box = bbox(typeof project.aoiBounds === "string" ? JSON.parse(project.aoiBounds) : project.aoiBounds);
+        if (valid(box)) bounds.push(box);
+      } catch { /* Invalid or absent AOI does not contribute to the map selection. */ }
+    }
+    for (const file of filesFor(project.id)) {
+      if (file.vector?.features.length) {
+        const box = bbox(file.vector);
+        if (valid(box)) bounds.push(box);
+      }
+      if (file.cog?.bounds) {
+        const {west,south,east,north} = file.cog.bounds;
+        const box = [west,south,east,north];
+        if (valid(box)) bounds.push(box);
+      }
+    }
+    return bounds;
+  };
+  const reference = state.projects.find(project => project.id === projectId);
+  if (!reference) throw Error("Indique o projeto usado como referência.");
+  const aii = filesFor(projectId).find(file => /^AII\.geojson$/i.test(file.name) && file.vector?.features.length);
+  const extents = aii ? [bbox(aii.vector)].filter(valid) : boundsFor(reference);
+  if (!extents.length) throw Error("O projeto de referência ainda não tem um recorte geográfico válido.");
+  const region = extents.reduce<PreviewBounds>((a,b) =>
+    [Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])],extents[0]);
+  const projects = state.projects.filter(project => boundsFor(project).some(([w,s,e,n]) =>
+    w <= region[2] && e >= region[0] && s <= region[3] && n >= region[1]));
+  if (projects.length > 500) throw Error("O recorte excede o limite de 500 projetos exibidos. Selecione um recorte menor.");
+  return {reference, projects, basis:aii ? "envolvente da AII" : "envolvente das feições e áreas cadastradas"};
+}
+
 export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
+  if (method === "projectSelection.get" && !write) {
+    return state.mapProjectIds ?? state.projects.filter(project =>
+      state.files.some(file => file.projectId === project.id && file.vector)).slice(0,500).map(project => project.id);
+  }
+  if (method === "projectSelection.set" && write) {
+    if (!Array.isArray(input.projectIds) || input.projectIds.length > 500 || !input.projectIds.every(Number.isSafeInteger))
+      throw Error("Selecione até 500 projetos.");
+    const mapProjectIds = [...new Set<number>(input.projectIds)].filter(id => state.projects.some(project => project.id === id));
+    save({...state,mapProjectIds});
+    return {success:true,count:mapProjectIds.length};
+  }
   if (method === "previewIphan.identify" && !write) {
     if (input.projectId !== 0 && !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
     const box = input.box;
@@ -635,6 +687,9 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         ...file,
         exportFormats: vector ? ["shp", "kml", "geojson", ...(vector.features.every((feature: Row) => /^(Multi)?(Point|LineString)$/.test(feature.geometry.type)) ? ["gpx"] : [])] : [],
       }));
+      case "geometries.listForProjects":
+        return (state.geometries ?? []).filter(row => input.projectIds?.includes(row.projectId) && row.visible === 1)
+          .map(row => ({...row,effectiveVisible:true}));
       case "geometries.list": return projectRows(state.geometries ?? [], input);
       case "gisAnalysis.list": return projectRows(state.files, input).filter(file => file.vector).map(file => ({
         id: file.id, name: file.name, projectId: file.projectId, layerType: "vector", layerData: annotateIphanVector(file), metadata: { kind: "vector", featureCount: file.vector.features.length },
@@ -700,6 +755,27 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         };
         const result = await crossIphanInfluence(input.projectId,areas);
         return atlas ? {...result,studioUrl:atlas.studioUrl} : result;
+      }
+      if (/\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\b/.test(text) && /\bprojetos\b/.test(text) &&
+          /\b(regiao|entorno|vizinhos|proximos)\b/.test(text)) {
+        const normalize = (value:string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+          .toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+        const query = " "+normalize(request)+" ";
+        const named = state.projects.filter(project => {
+          const name = normalize(project.name);
+          const code = normalize(project.code ?? "");
+          const short = name.split(" ").slice(0,2).join(" ");
+          return query.includes(" "+name+" ") || (code && query.includes(" "+code+" ")) ||
+            (short.startsWith("lt ") && query.includes(" "+short+" "));
+        });
+        if (named.length > 1) throw Error("Há mais de um projeto de referência. Informe o código do projeto.");
+        const {reference,projects,basis} = regionalProjectSelection(named[0]?.id ?? input.projectId);
+        const names = projects.map(project => project.name).join(", ");
+        const message = `${projects.length} projeto(s) no recorte de ${reference.name}, usando a ${basis}: ${names}.`;
+        if (method === "atena.previewPlan") return {summary:message};
+        const ids = projects.map(project => project.id);
+        await workflow("projectSelection.set",{projectIds:ids},true);
+        return {mapSelection:true,ids,referenceId:reference.id,message};
       }
       const iphan = request.match(/^(guardar|consultar|conferir tipologia d[eo]|qual a tipologia d[eo])\s+s[ií]tio(?:\s+do)?\s+IPHAN\s+([\p{L}\d._/-]{1,100})[!?]?$/iu);
       if (iphan) {

@@ -133,6 +133,22 @@ const demoApi = {
         .replace('      const command = classifyAtenaChatCommand(text);', `      const iphanQuestion = /^(?:guardar|consultar|conferir tipologia d[eo]|qual a tipologia d[eo])\\s+s[ií]tio\\b/i.test(text.trim());
       const iphanCrossing = /\\b(cruzar|cruze|cruzamento|intersectar|intersecte)\\b/i.test(text) &&
         /\\biphan\\b/i.test(text) && /\\b(ada|aid|aii)\\b/i.test(text);
+      const regionalSelection = /\\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\\b/i.test(text) &&
+        /\\bprojetos\\b/i.test(text) && /regi[aã]o|entorno|vizinhos|pr[oó]ximos/i.test(text);
+      if (regionalSelection) {
+        const id = projectId ?? 0;
+        const result = await localAtena("previewRun",id,text);
+        if (mounted.current && token === revision.current) {
+          append(result.message);
+          utils.projectSelection.get.setData(undefined,result.ids);
+          if (window.location.pathname === "/") {
+            window.dispatchEvent(new CustomEvent("preview-project-selection",{detail:result.ids}));
+          } else {
+            window.location.assign("/?projectId="+result.referenceId);
+          }
+        }
+        return;
+      }
       if (iphanCrossing) {
         if (!projectId) { await showProjects(); return; }
         const result = await localAtena("previewPlan",projectId,text);
@@ -400,6 +416,18 @@ const demoApi = {
     if (!badge.test(source)) return;
     return source.replace(badge, "")
       .concat('\nimport PreviewIbgeLayers, { archaeologicalFeaturePopup } from "./PreviewIbgeLayers.tsx";')
+      .replace('new Set([...selection.data, ...(projectId ? [projectId] : [])])', 'new Set(selection.data)')
+      .replace('  const [selectionError, setSelectionError]', `  useEffect(() => {
+    const updateFromAtena = (event: Event) => {
+      if (event instanceof CustomEvent && Array.isArray(event.detail) && event.detail.every(Number.isSafeInteger)) {
+        setSelectedIds(event.detail);
+        setSelectionError(undefined);
+      }
+    };
+    window.addEventListener("preview-project-selection", updateFromAtena);
+    return () => window.removeEventListener("preview-project-selection", updateFromAtena);
+  }, []);
+  const [selectionError, setSelectionError]`)
       .replace('useState<"2d" | "3d">("3d")', 'useState<"2d" | "3d">("2d")')
       .concat(`\nfunction PreviewProjectExtent({ projectId }: { projectId: number }) {
   const map = useMapEvents({});
@@ -547,8 +575,7 @@ const demoApi = {
           box-shadow: none;
           backdrop-filter: none;
         }
-        #map-panel-trigger-projects { display: none; }
-        #map-panel-trigger-basemap, #map-panel-trigger-layers {
+        #map-panel-trigger-projects, #map-panel-trigger-basemap, #map-panel-trigger-layers {
           width: 2.25rem;
           height: 2.25rem;
           min-height: 0;
@@ -557,16 +584,18 @@ const demoApi = {
           border-radius: .5rem;
           box-shadow: 0 10px 15px -3px #0002;
         }
+        #map-panel-trigger-projects[aria-expanded="false"],
         #map-panel-trigger-basemap[aria-expanded="false"],
         #map-panel-trigger-layers[aria-expanded="false"] {
           background: rgb(255 255 255 / .9);
           color: #171717;
         }
+        #map-panel-trigger-projects[aria-expanded="false"]:hover,
         #map-panel-trigger-basemap[aria-expanded="false"]:hover,
         #map-panel-trigger-layers[aria-expanded="false"]:hover { background: white; }
-        #map-panel-trigger-basemap > span, #map-panel-trigger-layers > span,
+        #map-panel-trigger-projects > span, #map-panel-trigger-basemap > span, #map-panel-trigger-layers > span,
         #map-panel-trigger-basemap > svg:last-child { display: none; }
-        #map-panel-trigger-basemap > svg:first-child, #map-panel-trigger-layers > svg {
+        #map-panel-trigger-projects > svg, #map-panel-trigger-basemap > svg:first-child, #map-panel-trigger-layers > svg {
           display: block;
           width: 1.25rem;
           height: 1.25rem;
@@ -580,7 +609,6 @@ const demoApi = {
         }
         .preview-home-layout .preview-ibge-control { top: 9.25rem; }
         .preview-home-layout:has(.preview-ibge-control) #map-panel-trigger-layers { display: none; }
-        .preview-home-layout:has(.preview-ibge-control) .preview-ibge-control { top: 6.5rem; }
         .preview-ibge-control > summary {
           display: grid;
           place-items: center;
