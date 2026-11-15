@@ -583,7 +583,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       models:studioModels,
       brands:(state.studioBrands ?? []).map(({id,name,kind}) => ({id,name,kind})),
       products: products.map(product => ({ layerIds: layers.filter(file => file.isVisible !== false).map(file => file.id), ...product, paper: readPaper(product.paper ?? defaultStudioPaper), orientation: readOrientation(product.orientation), layout: product.paper ? readLayout(product.layout, readOrientation(product.orientation)) : restoreLegend(readLayout(product.layout)), view: readStudioView(product.view) })),
-      layers: [...layers.map(({ id, name, vector, defaultStyle }) => ({ id, name, area:vector.features.some((feature:Row) => /Polygon$/.test(feature.geometry.type)), line:vector.features.some((feature:Row) => /LineString$/.test(feature.geometry.type)), point:vector.features.some((feature:Row) => /Point$/.test(feature.geometry.type)), color:defaultStyle?.color })), mapBiomas, ...studioTerrain],
+      layers: [...layers.map(({ id, name, vector, defaultStyle, analysisKind }) => ({ id, name, area:vector.features.some((feature:Row) => /Polygon$/.test(feature.geometry.type)), line:vector.features.some((feature:Row) => /LineString$/.test(feature.geometry.type)), point:vector.features.some((feature:Row) => /Point$/.test(feature.geometry.type)), iphanInfluence:analysisKind === "iphan-influence", color:defaultStyle?.color })), mapBiomas, ...studioTerrain],
     };
     if (!write || method !== "previewProducts.save") return undefined;
     const { id, title, columns, rows, overlap, grid } = input.product ?? {};
@@ -768,6 +768,22 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       }
       if (/^(?:criar|crie)\s+(ponto|linha|poligono)\b/.test(text))
         throw Error('Informe a feição, o nome entre aspas e as coordenadas [longitude, latitude]. Exemplo: criar ponto "Amostra" com coordenadas [-37.3,-5.2].');
+      const siteLocationAtlas = /\batlas\b/.test(text) && /\blocalizacao\b/.test(text) &&
+        /\bsitios?\b/.test(text) && /\b(influencia|ada|aid|aii)\b/.test(text);
+      if (siteLocationAtlas) {
+        if (input.projectId !== 11) throw Error("O atlas de localização dos sítios está disponível na prévia da LT Angicos.");
+        iphanInfluenceLayers(input.projectId);
+        const results = state.files.filter(row => row.projectId === input.projectId && row.analysisKind === "iphan-influence" && row.vector);
+        if (!results.length) throw Error("Execute primeiro o cruzamento dos sítios IPHAN com a ADA, AID e AII.");
+        const paper = text.match(/\ba[0-4]\b/)?.[0].toUpperCase() ?? defaultStudioPaper;
+        const orientation = /\b(retrato|vertical)\b/.test(text) ? "portrait" : "landscape";
+        if (method === "atena.previewPlan") return {
+          summary:"Montar o atlas de localização dos sítios IPHAN nas áreas ADA, AID e AII, em "+paper+
+            (orientation === "portrait" ? " retrato" : " paisagem")+", com grade e escala automática para cobrir o recorte.",
+        };
+        const query = new URLSearchParams({modelo:"atlas",papel:paper,orientacao:orientation,foco:"sitios-influencia"});
+        return {studioUrl:"/projects/11?tab=products&"+query,message:"Atlas de localização dos sítios preparado para revisão."};
+      }
       // Pedidos livres de atlas usam o corredor da ADA. A grade explícita continua no fluxo próprio.
       const atlasCorridor = /\b(montar modelo corredor|atlas por corredor)\b/.test(text) ||
         (/\batlas\b/.test(text) && !/^montar modelo /.test(text) && !/\b\d+\s*[x×]\s*\d+\b/.test(text));

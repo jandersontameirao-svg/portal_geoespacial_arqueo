@@ -15,7 +15,7 @@ type Product = {
 };
 type Review = { scale: number; insetScales: Record<"brasil" | "regional", number>; sheets: number; warnings: string[]; widthKm: number; heightKm: number };
 type Brand = { id:number; name:string; kind:"empresa"|"cliente" };
-type Layer = { id: number; name: string; area?: boolean; line?:boolean; point?:boolean; color?: string };
+type Layer = { id: number; name: string; area?: boolean; line?:boolean; point?:boolean; iphanInfluence?:boolean; color?: string };
 const mapFrames = ["principal","brasil","regional"] as const;
 type MapFrame = typeof mapFrames[number];
 const elements = Object.keys(names) as ElementId[];
@@ -115,12 +115,16 @@ export default function PreviewMapProducts() {
       const product = data.products.find((item:Product) => item.id === params.get("modelo"));
       const paper = params.get("papel"), orientation = params.get("orientacao");
       const focusAda = product?.id === "corredor" && params.get("foco") === "ada";
+      const focusSites = product?.id === "atlas" && params.get("foco") === "sitios-influencia";
       const scale = Number(params.get("escala"));
       if (product && papers.includes(paper as Paper) && (orientation === "landscape" || orientation === "portrait")) {
         setDrafts(current => ({ ...current,[product.id]:{ ...product,paper:paper as Paper,orientation,
           layout:product.orientation === orientation ? product.layout : orientation === "portrait" ? portraitLayout : defaultLayout,
           marks:params.has("empresa") && params.has("cliente")
             ? {empresa:Number(params.get("empresa")),cliente:Number(params.get("cliente"))} : product.marks,
+          ...(focusSites ? {title:"Atlas de localização dos sítios IPHAN · LT Angicos",
+            layerIds:[12,13,14,15,...data.layers.filter((layer:Layer) => layer.iphanInfluence).map((layer:Layer) => layer.id)],
+            scale:undefined} : {}),
           ...(focusAda ? {layerIds:[14,15], scale:Number.isInteger(scale) && scale >= 1000 && scale <= 10000000 ? scale : linearAtlasScale} : {}),
         } }));
       }

@@ -461,7 +461,11 @@ export async function atlasView(layers: Layer[], columns: number, rows: number, 
   const width = (lastX-west)/metres + frame.w/2, height = (north-lastY)/metres + frame.h/2;
   const position = ([x,y]: Point) => [(x-west)/metres,(north-y)/metres];
   const outlines = layers.flatMap(layer => layer.layerData.features.flatMap(feature => paths(feature.geometry)
-    .filter(part => part.rings[0].length > 1).map(part => {
+    .map(part => {
+      if (!part.closed && part.rings[0]?.length === 1) {
+        const [x,y] = position(utm.forward(part.rings[0][0]));
+        return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.5" fill="${layer.defaultStyle?.color ?? "#334155"}"/>`;
+      }
       const d = part.rings.map(ring => ring.map((p,i) => (i ? "L" : "M") + position(utm.forward(p)).map(v => v.toFixed(2)).join(",")).join("") + (part.closed ? "Z" : "")).join("");
       return `<path d="${d}" fill="none" stroke="${layer.defaultStyle?.color ?? "#334155"}" stroke-width="2"/>`;
     })));
