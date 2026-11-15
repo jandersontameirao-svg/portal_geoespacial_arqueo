@@ -191,7 +191,8 @@ const demoApi = {
         }
         return;
       }
-      if (/^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo|(?:guardar|consultar)\\\\s+s[ií]tio|(?:criar|crie|gere|gerar)\\s+(?:a\\s+)?(?:ada|aid|aii|ponto|linha|pol[ií]gono))\\b/i.test(text.trim()) ||
+      const newLocationMap = /^(?:crie|criar|gere|gerar|monte|montar)\\s+(?:(?:um|o)\\s+)?mapa\\s+(?:novo\\s+)?de\\s+localiza[çc][ãa]o\\b/i.test(text.trim());
+      if (newLocationMap || /^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo|(?:guardar|consultar)\\\\s+s[ií]tio|(?:criar|crie|gere|gerar)\\s+(?:a\\s+)?(?:ada|aid|aii|ponto|linha|pol[ií]gono))\\b/i.test(text.trim()) ||
         (/\\b(buffer|malha|a2|atlas)\\b/i.test(text) && !/^abrir atlas[.!]?$/i.test(text))) {
         if (!projectId) { await showProjects(); return; }
         const result = await localAtena("previewPlan", projectId, text);

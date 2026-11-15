@@ -998,6 +998,24 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       }
       if (/^(?:criar|crie)\s+(ponto|linha|poligono)\b/.test(text))
         throw Error('Informe a feição, o nome entre aspas e as coordenadas [longitude, latitude]. Exemplo: criar ponto "Amostra" com coordenadas [-37.3,-5.2].');
+      // Confirmed location requests create a standalone Studio document rather than replacing the template.
+      if (/^(?:crie|criar|gere|gerar|monte|montar)\s+(?:(?:um|o)\s+)?mapa\s+(?:novo\s+)?de\s+localizacao\b/.test(text.trim())) {
+        if (input.projectId !== 11) throw Error("A criação de mapas pelo Estúdio está disponível na prévia da LT Angicos.");
+        const project = state.projects.find(item => item.id === input.projectId);
+        if (!project) throw Error("Projeto indisponível.");
+        const paper = readPaper(text.match(/\ba[0-4]\b/)?.[0].toUpperCase() ?? defaultStudioPaper);
+        const orientation = /\b(retrato|vertical)\b/.test(text) ? "portrait" : "landscape";
+        const layerIds = state.files.filter(item => item.projectId === input.projectId && item.vector && [12,13,14,15].includes(item.id)).map(item => item.id);
+        if (!layerIds.length) throw Error("O projeto precisa de camadas de referência para criar o mapa.");
+        if (method === "atena.previewPlan") return {summary:"Criar e salvar um novo mapa de localização em "+paper+
+          (orientation === "portrait" ? " retrato" : " paisagem")+", com o eixo e as áreas de influência disponíveis, e abrir no Estúdio."};
+        const product = await workflow("previewProducts.save",{projectId:input.projectId,copy:true,product:{
+          id:"mapa",title:("Mapa de localização · "+project.name+" · Atena").slice(0,85),paper,orientation,
+          layerIds,columns:1,rows:1,overlap:0,grid:25000,
+        }},true);
+        return {studioUrl:"/projects/"+input.projectId+"?tab=products&modelo="+encodeURIComponent(product.id),
+          message:"Mapa de localização salvo como novo produto e aberto no Estúdio."};
+      }
       const siteLocationAtlas = /\batlas\b/.test(text) && /\blocalizacao\b/.test(text) &&
         /\bsitios?\b/.test(text) && /\b(influencia|ada|aid|aii)\b/.test(text);
       if (siteLocationAtlas) {
