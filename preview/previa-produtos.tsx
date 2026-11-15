@@ -101,6 +101,14 @@ export default function PreviewMapProducts() {
   const drag = useRef<{ x:number; y:number; kind:"move"|"resize"|"pan"; id:ElementId; initial:Product; scale:number } | null>(null);
   const latestGesture = useRef<typeof gesture>();
   useEffect(() => {
+    try {
+      const key = "preview-atena-studio-result";
+      const result = JSON.parse(sessionStorage.getItem(key) ?? "null");
+      if (result?.url === location.pathname+location.search && typeof result.message === "string") {
+        sessionStorage.removeItem(key);
+        setNotice(result.message);
+      }
+    } catch { /* The atlas remains available without session storage. */ }
     request("list").then(data => {
       setProducts(data.products); setBrands(data.brands ?? []);
       const params = initialParams;

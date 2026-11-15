@@ -93,8 +93,14 @@ const demoApi = {
     try {
       const result = await localAtena("previewRun", action.projectId, action.text);
       if (result.iphanCrossing) {
-        await Promise.all([utils.gisAnalysis.list.invalidate(),utils.files.list.invalidate(),utils.layers.list.invalidate()]);
         append(result.message);
+        if (result.studioUrl) {
+          try { sessionStorage.setItem("preview-atena-studio-result", JSON.stringify({url:result.studioUrl,message:result.message})); }
+          catch { /* Studio navigation also works without session storage. */ }
+          window.location.assign(result.studioUrl);
+        } else {
+          await Promise.all([utils.gisAnalysis.list.invalidate(),utils.files.list.invalidate(),utils.layers.list.invalidate()]);
+        }
         return;
       }
       if (result.knowledgeMessage) {

@@ -348,6 +348,22 @@ async function officialSiteTypology(id:number, code:string) {
   }
 }
 
+function prepareCorridorAtlas(projectId:number,text:string) {
+  if (projectId !== 11) throw Error("O Estúdio do atlas por corredor está disponível na prévia da LT Angicos.");
+  const requestedScale = text.match(/\b1\s*:\s*(\d+(?:\.\d{3})*)\b/)?.[1];
+  const scale = requestedScale ? readScale(Number(requestedScale.replaceAll(".",""))) ?? linearAtlasScale : linearAtlasScale;
+  const paper = text.match(/\ba[0-4]\b/)?.[0].toUpperCase() ?? defaultStudioPaper;
+  const portrait = /\b(retrato|vertical)\b/.test(text);
+  const available = state.files.filter(row => row.projectId === projectId && row.vector);
+  if (![14,15].every(id => available.some(row => row.id === id))) throw Error("O atlas por corredor precisa da ADA e do eixo da LT.");
+  const query = new URLSearchParams({modelo:"corredor",papel:paper,
+    orientacao:portrait ? "portrait" : "landscape",foco:"ada",escala:String(scale)});
+  return {
+    studioUrl:`/projects/${projectId}?tab=products&${query}`,
+    description:`${paper} ${portrait ? "retrato" : "paisagem"}, a 1:${scale.toLocaleString("pt-BR")}`,
+  };
+}
+
 async function crossIphanInfluence(projectId:number, areas:ReturnType<typeof iphanInfluenceLayers>) {
   const turfBbox = require("@turf/bbox").default;
   const intersect = require("@turf/intersect").default;
@@ -676,9 +692,14 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       if (/\b(cruzar|cruze|cruzamento|intersectar|intersecte)\b/.test(text) && /\biphan\b/.test(text) && /\b(ada|aid|aii)\b/.test(text)) {
         if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra o projeto para cruzar as áreas.");
         const areas = iphanInfluenceLayers(input.projectId);
-        return method === "atena.previewPlan"
-          ? {summary:"Cruzar pontos e polígonos do SICG com ADA, AID e AII. Mostrar as áreas no mapa e guardar os sítios com fonte e estado da tipologia na ficha oficial."}
-          : crossIphanInfluence(input.projectId,areas);
+        // Resolve the atlas settings before saving any crossing results.
+        const atlas = /\batlas\b/.test(text) ? prepareCorridorAtlas(input.projectId,text) : undefined;
+        const summary = "Cruzar pontos e polígonos do SICG com ADA, AID e AII, mostrar as camadas no mapa e guardar os sítios no acervo.";
+        if (method === "atena.previewPlan") return {
+          summary:summary + (atlas ? " Em seguida, abrir o atlas da ADA em "+atlas.description+" no Estúdio." : ""),
+        };
+        const result = await crossIphanInfluence(input.projectId,areas);
+        return atlas ? {...result,studioUrl:atlas.studioUrl} : result;
       }
       const iphan = request.match(/^(guardar|consultar|conferir tipologia d[eo]|qual a tipologia d[eo])\s+s[ií]tio(?:\s+do)?\s+IPHAN\s+([\p{L}\d._/-]{1,100})[!?]?$/iu);
       if (iphan) {
@@ -751,18 +772,11 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       const atlasCorridor = /\b(montar modelo corredor|atlas por corredor)\b/.test(text) ||
         (/\batlas\b/.test(text) && !/^montar modelo /.test(text) && !/\b\d+\s*[x×]\s*\d+\b/.test(text));
       if (input.projectId === 11 && atlasCorridor && !(text.startsWith("montar modelo ") && /\scom .+ e .+/.test(text))) {
-        const requestedScale = text.match(/\b1\s*:\s*(\d+(?:\.\d{3})*)\b/)?.[1];
-        const scale = requestedScale ? readScale(Number(requestedScale.replaceAll(".",""))) ?? linearAtlasScale : linearAtlasScale;
-        const paper = text.match(/\ba[0-4]\b/)?.[0].toUpperCase() ?? defaultStudioPaper;
-        const portrait = /\b(retrato|vertical)\b/.test(text);
-        const available = state.files.filter(row => row.projectId === 11 && row.vector);
-        if (![14,15].every(id => available.some(row => row.id === id))) throw Error("O atlas por corredor precisa da ADA e do eixo da LT.");
+        const atlas = prepareCorridorAtlas(input.projectId,text);
         if (method === "atena.previewPlan") return {
-          summary: `Atlas por corredor com foco na ADA e eixo como referência, em ${paper} ${portrait ? "retrato" : "paisagem"}, a 1:${scale.toLocaleString("pt-BR")}. Abrir para revisão no Estúdio.`,
+          summary:`Atlas por corredor com foco na ADA e eixo como referência, em ${atlas.description}. Abrir para revisão no Estúdio.`,
         };
-        const query = new URLSearchParams({ modelo:"corredor", papel:paper,
-          orientacao:portrait ? "portrait" : "landscape", foco:"ada", escala:String(scale) });
-        return {studioUrl:"/projects/11?tab=products&"+query, message:"Atlas da ADA preparado para revisão."};
+        return {studioUrl:atlas.studioUrl,message:"Atlas da ADA preparado para revisão."};
       }
       if (input.projectId === 11 && text.startsWith("montar modelo ")) {
         const command = text.match(/^montar modelo (.+?)(?: em (a[0-4]) (paisagem|horizontal|retrato|vertical))?(?: com (.+?) e (.+?))?[.!]?$/);
