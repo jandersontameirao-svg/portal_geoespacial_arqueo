@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { studioLayerRequirements, readLayout, readOrientation, readPaper, readScale, readStudioView } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
-import { atlasAngicos, atlasView, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas, printTerrain, prepareStudioBases } from "./previa-raster/angicos/prancha.mts";
+import { atlasAngicos, atlasView, planSheets, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas, printTerrain, prepareStudioBases } from "./previa-raster/angicos/prancha.mts";
 
 const arqueoA2Renderer = readFileSync(new URL("./previa-raster/composicao-a2.ts.txt", import.meta.url), "utf8");
 const arqueoA2Seeds = [
@@ -795,7 +795,7 @@ const demoApi = {
         if (url.pathname.endsWith(".json")) {
           res.setHeader("Content-Type", "application/json");
           res.setHeader("Cache-Control", "no-store");
-          res.end(JSON.stringify(studioReview(layers, corridor, options)));
+          res.end(JSON.stringify(studioReview(layers, corridor ?? (atlas ? planSheets(layers, columns, rows, overlap, grid, options) : undefined), options)));
           return;
         }
         if (model === "uso-solo") options.raster = await printMapBiomas(layers, options);

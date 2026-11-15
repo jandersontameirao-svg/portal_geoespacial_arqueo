@@ -344,8 +344,12 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   detailLabel(321,"1:" + scale.toLocaleString("pt-BR"),3.5,true);
   detailLabel(333,"Identificação da folha",4,true);
   detailLabel(341,"Projeto  LT Angicos–Jaguaruana II");
-  detailLabel(348,`Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
-  detailLabel(355,"Fontes  Camadas do projeto · IBGE 2024",3.25);
+  detailLabel(348,sheet?.number === 0 ? `Mapa índice · ${paper}` :
+    `Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
+  const sourceText = layers.some(layer => layer.name.startsWith("Sítios IPHAN"))
+    ? "Fontes  Camadas do projeto · IBGE 2024 · IPHAN/SICG"
+    : "Fontes  Camadas do projeto · IBGE 2024";
+  detailLabel(355,sourceText,3.25);
   detailLabel(362,options.raster ? (options.model === "uso-solo" ? "MapBiomas 2024 · Imagem/ArcGIS · CC BY 4.0" : "Copernicus DEM GLO-30 · recorte da LT") : "Responsável  __________________",3.25);
   const sources = [options.view?.background,options.view?.insets.brasil.background,options.view?.insets.regional.background];
   if (sources.includes("esri-imagery")) detailLabel(366,"Satélite: Esri, Vantor, Earthstar Geographics e comunidade GIS",2.1);
@@ -367,7 +371,7 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
 
 // Each sheet covers frame size × scale in UTM metres. Rows run north to south.
 // The configured overlap repeats part of the previous sheet without changing scale.
-function planSheets(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, options: Options): Sheet[] {
+export function planSheets(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, options: Options): Sheet[] {
   const frame = options.layout?.principal ?? defaultFrame;
   if (![columns, rows].every(n => Number.isInteger(n) && n >= 1 && n <= 8) ||
       columns * rows > 24 || !Number.isFinite(overlap) || overlap < 0 || overlap > 30 ||
@@ -442,9 +446,22 @@ export async function corridorAtlas(layers: Layer[], sheets: Sheet[], pdf: boole
 }
 
 export async function atlasAngicos(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, title?: string, options: Options = {}) {
+  const sheets = planSheets(layers, columns, rows, overlap, grid, options);
   const document = newPdf(options.paper, options.orientation);
-  for (const sheet of planSheets(layers, columns, rows, overlap, grid, options)) {
-    if (sheet.number > 1) document.addPage(paperSize(options.paper ?? 'A2', options.orientation), options.orientation ?? 'landscape');
+  // Index scale fits the entire sheet grid including the outer footprints.
+  const frame = options.layout?.principal ?? defaultFrame;
+  const [west,north] = sheets[0].center;
+  const [east,south] = sheets.at(-1)!.center;
+  const factor = paperFactor(options.paper ?? "A2");
+  const required = sheets[0].scale + 1000 * Math.max((east-west)/(frame.w*factor),(north-south)/(frame.h*factor));
+  const index:Sheet = {
+    center:[(west+east)/2,(north+south)/2], scale:Math.ceil(required*1.08/25000)*25000,
+    number:0, total:sheets.length, grid:25000, document,
+  };
+  pranchaAngicos(layers,true,index,"Mapa índice · "+(title ?? "Atlas da LT Angicos"),
+    {...await prepareStudioBases(layers,options,index),index:sheets});
+  for (const sheet of sheets) {
+    document.addPage(paperSize(options.paper ?? 'A2', options.orientation), options.orientation ?? 'landscape');
     pranchaAngicos(layers, true, { ...sheet, document }, title, await prepareStudioBases(layers,options,sheet));
   }
   return Buffer.from(document.output("arraybuffer"));

@@ -123,7 +123,9 @@ export default function PreviewMapProducts() {
           marks:params.has("empresa") && params.has("cliente")
             ? {empresa:Number(params.get("empresa")),cliente:Number(params.get("cliente"))} : product.marks,
           ...(focusSites ? {title:"Atlas de localização dos sítios IPHAN · LT Angicos",
-            layerIds:[12,13,14,15,...data.layers.filter((layer:Layer) => layer.iphanInfluence).map((layer:Layer) => layer.id)],
+            layerIds:[12,13,14,15,...data.layers.filter((layer:Layer) => layer.iphanInfluence).sort((a:Layer,b:Layer) =>
+              ["AII","AID","ADA"].findIndex(area => a.name.endsWith(area+".geojson")) -
+              ["AII","AID","ADA"].findIndex(area => b.name.endsWith(area+".geojson"))).map((layer:Layer) => layer.id)],
             scale:undefined} : {}),
           ...(focusAda ? {layerIds:[14,15], scale:Number.isInteger(scale) && scale >= 1000 && scale <= 10000000 ? scale : linearAtlasScale} : {}),
         } }));
