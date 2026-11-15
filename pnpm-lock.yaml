@@ -127,6 +127,9 @@ importers:
       '@turf/bbox':
         specifier: ^7.3.1
         version: 7.3.1
+      '@turf/boolean-intersects':
+        specifier: ^7.4.0
+        version: 7.4.0
       '@turf/buffer':
         specifier: ^7.3.1
         version: 7.4.0

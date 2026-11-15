@@ -134,7 +134,7 @@ const demoApi = {
       const iphanCrossing = /\\b(cruzar|cruze|cruzamento|intersectar|intersecte)\\b/i.test(text) &&
         /\\biphan\\b/i.test(text) && /\\b(ada|aid|aii)\\b/i.test(text);
       const regionalSelection = /\\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\\b/i.test(text) &&
-        /\\bprojetos\\b/i.test(text) && /regi[aã]o|entorno|vizinhos|pr[oó]ximos/i.test(text);
+        /\\bprojetos\\b/i.test(text) && /regi[aã]o|entorno|vizinhos|pr[oó]ximos|\\baii\\b/i.test(text);
       if (regionalSelection) {
         const id = projectId ?? 0;
         const result = await localAtena("previewRun",id,text);

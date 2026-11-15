@@ -491,7 +491,7 @@ function annotateIphanVector(file:Row) {
 }
 
 type PreviewBounds = [number,number,number,number];
-function regionalProjectSelection(projectId:number) {
+function regionalProjectSelection(projectId:number, requireAii = false) {
   const bbox = require("@turf/bbox").default;
   const valid = (box:unknown): box is PreviewBounds => Array.isArray(box) && box.length === 4 &&
     box.every(Number.isFinite) && box[0] <= box[2] && box[1] <= box[3] &&
@@ -521,14 +521,56 @@ function regionalProjectSelection(projectId:number) {
   const reference = state.projects.find(project => project.id === projectId);
   if (!reference) throw Error("Indique o projeto usado como referência.");
   const aii = filesFor(projectId).find(file => /^AII\.geojson$/i.test(file.name) && file.vector?.features.length);
-  const extents = aii ? [bbox(aii.vector)].filter(valid) : boundsFor(reference);
+  if (requireAii && !aii) throw Error("O projeto de referência não tem uma camada AII.");
+  if (aii) {
+    const aiiFeatures:Row[] = aii.vector.features.filter((feature:Row) =>
+      /^(Multi)?Polygon$/.test(feature.geometry?.type));
+    if (aiiFeatures.length !== aii.vector.features.length || !aiiFeatures.length)
+      throw Error("A AII precisa conter geometrias poligonais válidas.");
+    const intersects = require("@turf/boolean-intersects").default;
+    const areaBounds = bbox(aii.vector,{recompute:true});
+    if (!valid(areaBounds)) throw Error("A geometria da AII está fora dos limites válidos.");
+    const overlaps = ([w,s,e,n]:PreviewBounds) => w <= areaBounds[2] && e >= areaBounds[0] && s <= areaBounds[3] && n >= areaBounds[1];
+
+    const projects = state.projects.filter(project => {
+      const geometries:Row[] = filesFor(project.id).flatMap(file =>
+        (file.vector?.features ?? []).flatMap((feature:Row) => feature.geometry ? [feature.geometry] : []));
+      if (project.aoiBounds) {
+        try {
+          const aoi = typeof project.aoiBounds === "string" ? JSON.parse(project.aoiBounds) : project.aoiBounds;
+          const candidates = aoi?.type === "FeatureCollection" ? aoi.features.map((feature:Row) => feature.geometry)
+            : [aoi?.type === "Feature" ? aoi.geometry : aoi];
+          geometries.push(...candidates);
+        } catch { /* An invalid AOI contributes no geometry. */ }
+      }
+      for (const drawing of state.geometries ?? []) {
+        if (drawing.projectId !== project.id) continue;
+        try {
+          const coordinates = checkedDrawing(drawing.type,drawing.coordinates);
+          const lngLat = ([lat,lng]:number[]) => [lng,lat];
+          if (drawing.type === "marker") geometries.push({type:"Point",coordinates:lngLat(coordinates as number[])});
+          if (drawing.type === "polyline") geometries.push({type:"LineString",coordinates:(coordinates as number[][]).map(lngLat)});
+          if (drawing.type === "polygon") geometries.push({type:"Polygon",coordinates:(coordinates as number[][][]).map(ring => ring.map(lngLat))});
+        } catch { /* A malformed drawing contributes no geometry. */ }
+      }
+      // Bounding boxes reject distant candidates only. Membership requires topology against the AII.
+      return geometries.some(geometry => {
+        if (!geometry || !/^(Multi)?(Point|LineString|Polygon)$|^GeometryCollection$/.test(geometry.type)) return false;
+        const box = bbox(geometry,{recompute:true});
+        return valid(box) && overlaps(box) && aiiFeatures.some(area => intersects(area.geometry,geometry));
+      });
+    });
+    if (projects.length > 500) throw Error("A seleção excede 500 projetos.");
+    return {reference,projects,basis:"interseção com a geometria da AII"};
+  }
+  const extents = boundsFor(reference);
   if (!extents.length) throw Error("O projeto de referência ainda não tem um recorte geográfico válido.");
   const region = extents.reduce<PreviewBounds>((a,b) =>
     [Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])],extents[0]);
   const projects = state.projects.filter(project => boundsFor(project).some(([w,s,e,n]) =>
     w <= region[2] && e >= region[0] && s <= region[3] && n >= region[1]));
   if (projects.length > 500) throw Error("O recorte excede o limite de 500 projetos exibidos. Selecione um recorte menor.");
-  return {reference, projects, basis:aii ? "envolvente da AII" : "envolvente das feições e áreas cadastradas"};
+  return {reference, projects, basis:"envolvente das feições e áreas cadastradas"};
 }
 
 export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
@@ -757,7 +799,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         return atlas ? {...result,studioUrl:atlas.studioUrl} : result;
       }
       if (/\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\b/.test(text) && /\bprojetos\b/.test(text) &&
-          /\b(regiao|entorno|vizinhos|proximos)\b/.test(text)) {
+          /\b(regiao|entorno|vizinhos|proximos|aii)\b/.test(text)) {
         const normalize = (value:string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
           .toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
         const query = " "+normalize(request)+" ";
@@ -769,9 +811,9 @@ export async function workflow(method: string, input: Row = {}, write = false, v
             (short.startsWith("lt ") && query.includes(" "+short+" "));
         });
         if (named.length > 1) throw Error("Há mais de um projeto de referência. Informe o código do projeto.");
-        const {reference,projects,basis} = regionalProjectSelection(named[0]?.id ?? input.projectId);
+        const {reference,projects,basis} = regionalProjectSelection(named[0]?.id ?? input.projectId,/\baii\b/.test(text));
         const names = projects.map(project => project.name).join(", ");
-        const message = `${projects.length} projeto(s) no recorte de ${reference.name}, usando a ${basis}: ${names}.`;
+        const message = `${projects.length} projeto(s) no recorte de ${reference.name}, por ${basis}: ${names}.`;
         if (method === "atena.previewPlan") return {summary:message};
         const ids = projects.map(project => project.id);
         await workflow("projectSelection.set",{projectIds:ids},true);
