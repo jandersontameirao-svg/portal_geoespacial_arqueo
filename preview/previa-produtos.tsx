@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock, Unlock, Magnet, Maximize, Minus, Plus, Redo2, Save, Undo2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Layers3, Lock, Unlock, Magnet, Maximize, Minus, Plus, Redo2, Save, Sparkles, Undo2 } from "lucide-react";
 
 type Box = { x: number; y: number; w: number; h: number };
 const names = { principal: "Mapa principal", legenda: "Legenda", norte: "Norte", brasil: "Situação nacional", regional: "Situação regional" };
@@ -79,11 +79,12 @@ export default function PreviewMapProducts() {
   const [initialParams] = useState(() => new URLSearchParams(location.search));
   const [active, setActive] = useState(() => initialParams.get("modelo") ?? "mapa");
   const [library,setLibrary] = useState(false);
+  const [settings, setSettings] = useState<"sheet" | "layers" | null>(null);
   const [brands,setBrands] = useState<Brand[]>([]);
   const [element, setElement] = useState<ElementId>("principal");
   const [selectedElements, setSelectedElements] = useState<ElementId[]>(["principal"]);
   const multiple = selectedElements.length > 1;
-  const [mode, setMode] = useState<"layout" | "view" | "proof">("layout");
+  const [mode, setMode] = useState<"layout" | "view" | "proof">("proof");
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(100);
   const [snap, setSnap] = useState(true);
@@ -452,18 +453,19 @@ export default function PreviewMapProducts() {
 
   function openModel(id:string) {
     setActive(id); setLibrary(false); setPage(0); selectElement("principal");
-    setReview(undefined); setError(""); setNotice(""); setMode("layout");
+    setReview(undefined); setError(""); setNotice(""); setMode("proof");
   }
   return <section onKeyDown={keyboard} aria-label="Estúdio Cartográfico" className="overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
     <style>{`
-      .arqueo-studio-workspace { display:grid; }
+      .arqueo-studio-workspace { display:grid; grid-template-areas:"canvas" "settings"; }
+      .arqueo-studio-workspace > aside { grid-area:settings; min-width:0; }
+      .arqueo-studio-workspace > div { grid-area:canvas; }
       .arqueo-studio-canvas { background-image:radial-gradient(#94a3b860 1px, transparent 1px); background-size:14px 14px; }
       @media (min-width: 1024px) {
-        .arqueo-studio-workspace { grid-template-columns:190px minmax(0,1fr) 230px; }
-        .arqueo-studio-workspace > aside:first-child { border-right-width:1px; }
-        .arqueo-studio-workspace > aside:last-child { border-left-width:1px; }
+        .arqueo-studio-workspace { grid-template-columns:minmax(0,1fr); grid-template-areas:"canvas"; }
+        .arqueo-studio-workspace[data-settings] { grid-template-columns:minmax(0,1fr) 290px; grid-template-areas:"canvas settings"; }
+        .arqueo-studio-workspace > aside { border-left-width:1px; max-height:80vh; overflow:auto; }
       }
-      @media (max-width:1023px) { .arqueo-studio-workspace > div { grid-row:1; } }
     `}</style>
     <header className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 text-white" style={{ background: "#182523" }}>
       <div>
@@ -479,6 +481,10 @@ export default function PreviewMapProducts() {
         </select>
       </label>
       <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => window.dispatchEvent(new Event("studio-open-atena"))}
+          className="inline-flex items-center gap-2 rounded-md border border-emerald-200/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-white/10">
+          <Sparkles size={16} aria-hidden="true"/> Trabalhar com a Atena
+        </button>
         <button type="button" aria-expanded={library} className="rounded-md border border-white/30 px-3 py-2 text-sm" onClick={() => setLibrary(!library)}>Biblioteca de modelos</button>
         <button type="button" className="inline-flex items-center gap-2 rounded-md border border-white/30 px-3 py-2 text-sm disabled:opacity-50" disabled={!draft || saving || !dirty || !!error || proof?.for !== previewUrl || !draft.title.trim()} onClick={() => void save()}><Save size={16} /> Salvar produto</button>
         <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-950 disabled:opacity-50"
@@ -495,10 +501,6 @@ export default function PreviewMapProducts() {
         <h3 className="mb-2 text-sm font-semibold">{group}</h3>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{studioModels.filter(model => model.group === group).map(model =>
           <button type="button" key={model.id} className="rounded-lg border p-3 text-left hover:border-emerald-600" onClick={() => openModel(model.id)}>
-            <span aria-hidden="true" className="mb-2 flex h-12 w-20 gap-1 rounded border bg-slate-100 p-1">
-              <span className="flex min-w-0 flex-1 items-center justify-center rounded bg-emerald-100 text-emerald-800"><Layers3 size={16}/></span>
-              <span className="w-4 rounded border bg-white" />
-            </span>
             <span className="block text-sm font-semibold">{model.title}</span>
             <span className="block text-xs">{model.summary}</span>
             <span className="mt-1 block text-xs text-slate-500">Requer {model.needs.toLowerCase()}</span>
@@ -506,9 +508,16 @@ export default function PreviewMapProducts() {
       </div>)}
     </div>}
     {draft && selection && <fieldset disabled={saving} className="min-w-0">
-      <div className="arqueo-studio-workspace">
-        <aside className={panel + " border-slate-200 xl:border-r dark:border-slate-700"}>
-          <div className="flex items-center gap-2 text-sm font-semibold"><Layers3 size={16} /> Camadas</div>
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2 dark:border-slate-700">
+        <p className="mr-auto text-sm font-medium">{draft.paper} {portrait ? "vertical" : "horizontal"}{review && " · 1:" + number(review.scale)}</p>
+        {([["sheet","Configurar folha"],["layers","Camadas e símbolos"]] as const).map(([key,label]) =>
+          <button key={key} type="button" className={button + (settings === key ? " bg-emerald-100 dark:bg-emerald-900" : "")}
+            aria-expanded={settings === key} aria-controls={"studio-" + key}
+            onClick={() => setSettings(current => current === key ? null : key)}>{label}</button>)}
+      </div>
+      <div className="arqueo-studio-workspace" data-settings={settings ?? undefined}>
+        <aside id="studio-layers" aria-label="Camadas e símbolos" hidden={settings !== "layers"} className={panel + " border-slate-200 dark:border-slate-700"}>
+          <div className="flex items-center gap-2 text-sm font-semibold"><Layers3 size={16} aria-hidden="true"/> Camadas e símbolos</div>
           <label className="block text-xs">Quadro de edição
             <select className={input} value={inset ?? "principal"} onChange={event => selectElement(event.target.value as ElementId)}>
               <option value="principal">Mapa principal</option><option value="brasil">Brasil</option><option value="regional">Região do empreendimento</option>
@@ -640,9 +649,9 @@ export default function PreviewMapProducts() {
         </aside>
         <div className="min-w-0 bg-slate-100 dark:bg-slate-800">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-            {(["layout","view","proof"] as const).map(tab => <button key={tab} type="button" className={button + (mode === tab ? " bg-emerald-100 text-emerald-950 dark:text-white dark:bg-emerald-900" : "")}
+            {(["proof","layout","view"] as const).map(tab => <button key={tab} type="button" className={button + (mode === tab ? " bg-emerald-100 text-emerald-950 dark:text-white dark:bg-emerald-900" : "")}
               aria-pressed={mode === tab} disabled={tab === "view" && active === "atlas" && currentPage === 0} onClick={() => { setMode(tab); if (tab === "view" && !inset) selectElement("principal"); }}>
-              {{ layout:"Layout", view:"Enquadrar", proof:"Prova" }[tab]}
+              {{ layout:"Editar elementos", view:"Enquadrar mapa", proof:"Prévia" }[tab]}
             </button>)}
             <button type="button" className={button} aria-label="Desfazer" disabled={!entries.past.length} onClick={() => undo()}><Undo2 size={15} /></button>
             <button type="button" className={button} aria-label="Refazer" disabled={!entries.future.length} onClick={() => undo(true)}><Redo2 size={15} /></button>
@@ -714,8 +723,8 @@ export default function PreviewMapProducts() {
             </> : <span>{draft.paper} · {portrait ? "Vertical" : "Horizontal"}</span>}
           </div>
         </div>
-        <aside className={panel + " border-slate-200 xl:border-l dark:border-slate-700"}>
-          <div className="text-sm font-semibold">Propriedades da prancha</div>
+        <aside id="studio-sheet" aria-label="Configurar folha" hidden={settings !== "sheet"} className={panel + " border-slate-200 dark:border-slate-700"}>
+          <div className="text-sm font-semibold">Configurar folha</div>
           <div className="grid grid-cols-2 gap-2">
           <label className="block text-xs">Formato da folha<select className={input} value={draft.paper} onChange={event => change({ ...draft, paper:event.target.value as Paper })}>
             {papers.map(paper => <option key={paper}>{paper}</option>)}
@@ -758,11 +767,14 @@ export default function PreviewMapProducts() {
           <label className="block text-xs">Escala do mapa principal 1:<input className={input} type="number" min={1000} max={10000000} placeholder="Automática"
             value={draft.scale ?? ""} onChange={event => change({ ...draft, scale:event.target.value ? event.target.valueAsNumber : undefined })} /></label>
           {corridor && atlasDefault && <button type="button" className="text-xs underline" onClick={() => change({ ...draft, scale: atlasDefault })}>Usar escala padrão 1:{number(atlasDefault)}</button>}
+          <details className="space-y-2 text-xs">
+            <summary className="cursor-pointer font-semibold">{atlas ? "Grade, folhas e rótulos" : "Grade e rótulos"}</summary>
           {([["columns","Colunas",1,8],["rows","Linhas",1,8],["overlap","Sobreposição (%)",0,30],["grid","Grade UTM (m)",corridor ? 100 : 1000,50000]] as const)
             .filter(([key]) => key === "grid" || (atlas && (!corridor || key === "overlap"))).map(([key,label,min,max]) => <label key={key} className="block text-xs">{label}
               <input className={input} type="number" min={min} max={max} value={Number.isFinite(draft[key]) ? draft[key] : ""} onChange={event => change({ ...draft, [key]:event.target.valueAsNumber })} />
             </label>)}
           <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.view.labels} onChange={event => change({ ...draft, view:{ ...draft.view, labels:event.target.checked } })}/> Rótulos municipais</label>
+          </details>
           <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
             {mode === "layout" && !(active === "atlas" && currentPage === 0) && <details className="mb-3 text-xs" open={multiple || undefined}>
               <summary className="cursor-pointer font-medium">Seleção e distribuição · {selectedElements.length} {multiple ? "elementos" : "elemento"}</summary>
