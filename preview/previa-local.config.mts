@@ -538,6 +538,42 @@ const demoApi = {
     return () => window.removeEventListener("preview-project-selection", updateFromAtena);
   }, []);
   const [selectionError, setSelectionError]`)
+      .replace('  const selectionMutation = trpc.projectSelection.set.useMutation();', `  const selectionMutation = trpc.projectSelection.set.useMutation();
+  const [clearRevision, setClearRevision] = useState(0);
+  const [clearingMap, setClearingMap] = useState(false);
+  const [clearMessage, setClearMessage] = useState("");
+  async function clearMainMap() {
+    setClearingMap(true);
+    setClearMessage("");
+    try {
+      const response = await fetch("/api/trpc/previewMap.clear", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({json:{}}),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.result?.data?.json?.success) throw Error();
+      setSelectedIds([]);
+      setSelectionError(undefined);
+      utils.projectSelection.get.setData(undefined, []);
+      void utils.projectSelection.get.invalidate();
+      // Reset temporary overlays, queries and open popups with the map providers.
+      setClearRevision(value => value + 1);
+      window.dispatchEvent(new Event("preview-connections-changed"));
+      setClearMessage("Mapa limpo.");
+    } catch {
+      setClearMessage("Não foi possível limpar o mapa. Tente novamente.");
+    } finally {
+      setClearingMap(false);
+    }
+  }`)
+      .replace('<InstitutionalLayersProvider viewMode={viewMode}>', '<InstitutionalLayersProvider key={clearRevision} viewMode={viewMode}>')
+      .replace('      <GlobalMapPanels', `      {!requestedProjectId && <div className="absolute left-4 top-4 z-[1001]">
+        <button type="button" className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow hover:bg-slate-100 disabled:opacity-60"
+          disabled={clearingMap || selectionMutation.isPending} onClick={() => void clearMainMap()}>
+          {clearingMap ? "Limpando…" : "Limpar mapa"}
+        </button>
+        {clearMessage && <p role="status" className="mt-1 w-fit rounded bg-white/95 px-2 py-1 text-xs text-slate-900">{clearMessage}</p>}
+      </div>}
+      <GlobalMapPanels`)
       .replace('useState<"2d" | "3d">("3d")', 'useState<"2d" | "3d">("2d")')
       .concat(`\nfunction PreviewProjectExtent({ projectId }: { projectId: number }) {
   const map = useMapEvents({});

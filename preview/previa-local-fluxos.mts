@@ -626,6 +626,18 @@ function regionalProjectSelection(projectId:number, requireAii = false) {
 }
 
 export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
+  if (method === "previewMap.clear" && write) {
+    // Store project and source visibility together. Keep registrations and sublayer choices.
+    const connections = [...(state.connections ?? [])];
+    for (const source of listConnections().filter(item => item.enabled)) {
+      const index = connections.findIndex(item => item.id === source.id);
+      const hidden = { ...(connections[index] ?? source), enabled:false };
+      if (index === -1) connections.push(hidden);
+      else connections[index] = hidden;
+    }
+    save({...state,mapProjectIds:[],connections});
+    return {success:true};
+  }
   if (method === "projectSelection.get" && !write) {
     return state.mapProjectIds ?? state.projects.filter(project =>
       state.files.some(file => file.projectId === project.id && file.vector)).slice(0,500).map(project => project.id);
