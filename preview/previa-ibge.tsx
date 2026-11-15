@@ -425,7 +425,50 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
   </details></>;
 }
 
-type IphanSite = { id:number; nome:string; codigo:string; classificacao:string; sintese:string };
+type IphanSite = {
+  id:number; nome:string; codigo:string; classificacao:string; sintese:string;
+  tipoBem?:string; tipologia?:string; descricaoTipologicaSicg?:string; cadastro?:string; ficha?:string; areas?:string; fonte?:string;
+};
+
+function siteType(site:IphanSite) {
+  const type = site.tipologia || site.descricaoTipologicaSicg;
+  return type || "Tipologia não informada";
+}
+
+export function iphanResultPopup(site:IphanSite) {
+  const popup=document.createElement("article");
+  popup.style.maxWidth="320px";
+  const title=document.createElement("strong");
+  title.textContent=site.nome || "Sítio arqueológico sem nome informado";
+  popup.append(title);
+  const details=document.createElement("details");
+  const toggle=document.createElement("summary");
+  toggle.textContent="Ver dados do sítio";
+  details.append(toggle);
+  const field=(parent:HTMLElement,label:string,value?:string) => {
+    if (!value) return;
+    const line=document.createElement("div");
+    line.textContent=label+": "+value;
+    parent.append(line);
+  };
+  field(popup,"Tipo",siteType(site));
+  if (!site.tipologia && site.descricaoTipologicaSicg) field(popup,"Evidência","descrição do SICG");
+  field(popup,"Áreas",site.areas);
+  field(details,"Código IPHAN",site.codigo);
+  field(details,"Classificação",site.classificacao);
+  field(details,"Cadastro",site.cadastro);
+  field(details,"Síntese",site.sintese);
+  field(details,"Categoria do bem",site.tipoBem);
+  field(details,"Fonte",site.fonte ?? "IPHAN / SICG");
+  const official=document.createElement("a");
+  official.href="https://sicg.iphan.gov.br/sicg/pesquisarBem";
+  official.target="_blank";
+  official.rel="noreferrer";
+  official.textContent="Pesquisar no SICG";
+  details.append(official);
+  popup.append(details);
+  return popup;
+}
 
 export function PreviewIphanSites({projectId = 0}:{projectId?:number}) {
   const map = useMap();
@@ -479,13 +522,19 @@ export function PreviewIphanSites({projectId = 0}:{projectId?:number}) {
       eventHandlers={{remove:() => {current.current?.abort();setResult(undefined);}}}>
       {result.status && <div role="status">{result.status}</div>}
       {result.sites.map(site => <article key={site.id} className="space-y-2 border-b pb-3 pt-2">
-        <strong className="block">{site.nome || "Sítio arqueológico"}</strong>
-        <div>Código IPHAN: {site.codigo || "Não informado"}</div>
-        <div>Classificação: {site.classificacao || "Não informada"}</div>
-        <div><b>Síntese:</b> {site.sintese || "Não publicada"}</div>
-        <div>Tipologia: pendente de conferência na ficha oficial.</div>
+        <strong className="block">{site.nome || "Sítio arqueológico sem nome informado"}</strong>
+        <div>Tipo: {siteType(site)}{!site.tipologia && site.descricaoTipologicaSicg ? " (descrição do SICG)" : ""}</div>
+        <details className="space-y-1">
+          <summary className="cursor-pointer font-semibold">Ver dados do sítio</summary>
+          <div>Código IPHAN: {site.codigo || "Não informado"}</div>
+          <div>Classificação: {site.classificacao || "Não informada"}</div>
+          {site.cadastro && <div>Cadastro: {site.cadastro}</div>}
+          <div><b>Síntese:</b> {site.sintese || "Não publicada"}</div>
+          {site.tipoBem && <div>Categoria do bem: {site.tipoBem}</div>}
+          <div>Fonte: IPHAN / SICG</div>
+        </details>
         <div className="flex flex-wrap items-center gap-2">
-          <a href="https://sicg.iphan.gov.br/sicg/pesquisarBem" target="_blank" rel="noreferrer">Pesquisar ficha no SICG</a>
+          <a href={site.ficha ?? "https://sicg.iphan.gov.br/sicg/pesquisarBem"} target="_blank" rel="noreferrer">Consultar fonte no SICG</a>
           <button type="button" className="rounded border px-2 py-1"
             onClick={() => window.dispatchEvent(new CustomEvent("studio-open-atena",{detail:"Guardar sítio IPHAN "+site.id}))}>Guardar com a Atena</button>
         </div>

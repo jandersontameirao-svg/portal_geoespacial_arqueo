@@ -258,7 +258,7 @@ const demoApi = {
     return bounds.isValid() ? bounds.pad(.15).toBBoxString() : "";
   }, [projectVectorLayers, rasterLayers, geometries]);
   const selectedVectorFeatures = useMemo`)
-        .concat('\nimport PreviewIbgeLayers, { PreviewIphanSites } from "./PreviewIbgeLayers.tsx";')
+        .concat('\nimport PreviewIbgeLayers, { PreviewIphanSites, iphanResultPopup } from "./PreviewIbgeLayers.tsx";')
         .replace('<CardContent className="space-y-3">{geometriesLoading', `<CardContent className="space-y-3">{canEdit && projectVectorLayers.length > 0 && <details className="rounded-lg border p-3">
           <summary className="cursor-pointer text-sm font-medium">Editar simbologia</summary>
           {projectVectorLayers.map(layer => <form key={layer.id} className="mt-3 grid gap-2 border-t pt-2 text-sm" onSubmit={async event => {
@@ -292,6 +292,7 @@ const demoApi = {
                   ? L.circleMarker(point,{radius:5,color:layer.defaultStyle?.color ?? "#2563eb",weight:2,fillOpacity:.85,
                       pane:thematicPaneName("vector-"+layer.id)})
                   : L.marker(point)}`)
+        .replace('onEachFeature={(feature, leafletLayer) => leafletLayer.bindPopup(', 'onEachFeature={(feature, leafletLayer) => feature.properties?.id_sicg && feature.properties?.nome ? leafletLayer.bindPopup(iphanResultPopup(feature.properties),{maxHeight:320}) : leafletLayer.bindPopup(')
         .replace('import { FeatureGroup, GeoJSON,', 'import { Tooltip, FeatureGroup, GeoJSON,')
         .replace('<FeatureGroup ref={setEditableLayers}>', `{projectVectorLayers.filter(layer => layer.isVisible).flatMap(layer =>
               layer.layerData.features.flatMap(feature => {

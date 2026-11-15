@@ -251,7 +251,7 @@ function validRemoteSelection(values: unknown[], type: string) {
 }
 
 const iphanSiteEndpoint = "https://geoserver.iphan.gov.br/geoserver/SICG/wfs";
-const iphanFields = "id_bem,identificacao_bem,co_iphan,codigo_iphan,ds_classificacao,sintese_bem,dt_cadastro";
+const iphanFields = "id_bem,identificacao_bem,co_iphan,codigo_iphan,ds_tipo_bem,ds_classificacao,sintese_bem,dt_cadastro";
 
 async function iphanRecords(filter: {bbox:string} | {id:number} | {code:string}, includeGeometry = false) {
   // The endpoint is fixed. The viewport and numeric record ID are validated before use.
@@ -299,7 +299,7 @@ async function iphanRecords(filter: {bbox:string} | {id:number} | {code:string},
       if (!Number.isSafeInteger(p?.id_bem) || p.id_bem < 1) return [];
       return [{id:p.id_bem, nome:plain(p.identificacao_bem,300),
         codigo:plain(p.co_iphan || p.codigo_iphan,100), classificacao:plain(p.ds_classificacao,150),
-        sintese:plain(p.sintese_bem,12000), cadastro:plain(p.dt_cadastro,24),
+        sintese:plain(p.sintese_bem,12000), cadastro:plain(p.dt_cadastro,24), tipoBem:plain(p.ds_tipo_bem,150),
         fonte:"GeoServer IPHAN / SICG", camada:"SICG:"+layer, tipologia:null,
         ...(includeGeometry ? {geometry} : {})}];
     });
@@ -451,6 +451,29 @@ function saveIphanKnowledge(record:Row, projectId:number, consultadoEm:string) {
     ficha:"https://sicg.iphan.gov.br/sicg/pesquisarBem"}]});
 }
 
+function iphanPopupFields(record:Row) {
+  const saved = (state.iphanKnowledge ?? []).findLast(row => row.id === record.id);
+  return {
+    ...record,
+    tipoBem:record.tipoBem || saved?.tipoBem || "Sítio arqueológico",
+    tipologia:saved?.tipologia ?? record.tipologia ?? null,
+    descricaoTipologicaSicg:saved?.descricaoTipologicaSicg,
+    ficha:saved?.fonteTipologia ?? saved?.fonteDescricaoTipologica ??
+      "https://sicg.iphan.gov.br/sicg/pesquisarBem",
+  };
+}
+function annotateIphanVector(file:Row) {
+  if (file.analysisKind !== "iphan-influence") return file.vector;
+  return {...file.vector,features:file.vector.features.map((feature:Row) => {
+    const props = feature.properties;
+    const saved = (state.iphanKnowledge ?? []).findLast(row => row.id === props.id_sicg);
+    return {...feature,properties:{...props,...iphanPopupFields({
+      id:props.id_sicg,nome:saved?.nome ?? props.name,codigo:props.codigo_iphan,
+      classificacao:saved?.classificacao,sintese:saved?.sintese,cadastro:saved?.cadastro,
+    })}};
+  })};
+}
+
 export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
   if (method === "previewIphan.identify" && !write) {
     if (input.projectId !== 0 && !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
@@ -459,7 +482,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         box[0] < -180 || box[2] > 180 || box[1] < -90 || box[3] > 90 ||
         box[2] <= box[0] || box[3] <= box[1] || box[2]-box[0] > .15 || box[3]-box[1] > .15)
       throw Error("Aproxime o mapa para identificar um sítio.");
-    return iphanRecords({bbox:box.join(",")});
+    return (await iphanRecords({bbox:box.join(",")})).map(row => iphanPopupFields(row));
   }
   if (method === "previewConnections.list" && !write) return listConnections();
   if (method === "previewConnections.save" && write) {
@@ -598,7 +621,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       }));
       case "geometries.list": return projectRows(state.geometries ?? [], input);
       case "gisAnalysis.list": return projectRows(state.files, input).filter(file => file.vector).map(file => ({
-        id: file.id, name: file.name, projectId: file.projectId, layerType: "vector", layerData: file.vector, metadata: { kind: "vector", featureCount: file.vector.features.length },
+        id: file.id, name: file.name, projectId: file.projectId, layerType: "vector", layerData: annotateIphanVector(file), metadata: { kind: "vector", featureCount: file.vector.features.length },
         isVisible: file.isVisible ?? true,
         ...(file.projectId === 11 && file.name === "AII.geojson" ? {
           layerData: { ...file.vector, features: file.vector.features.map((feature: Row) => ({
