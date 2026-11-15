@@ -869,6 +869,16 @@ export async function workflow(method: string, input: Row = {}, write = false, v
           const aii = state.files.find(file => file.projectId === referenceId && /^AII\.geojson$/i.test(file.name) && file.vector?.features.length);
           if (!aii || !aii.vector.features.every((feature:Row) => /^(Multi)?Polygon$/.test(feature.geometry?.type)))
             throw Error("Selecione um projeto com uma camada AII poligonal.");
+          if (/\b(pdf|tabela)\b/.test(text)) {
+            if (referenceId !== 11) throw Error("O PDF de empreendimentos está disponível na prévia da LT Angicos.");
+            const layer = state.files.find(file => file.projectId === referenceId &&
+              file.analysisKind === "iphan-empreendimentos-aii" && file.areaSourceId === aii.id);
+            if (!layer) throw Error("Identifique primeiro os empreendimentos na AII.");
+            if (method === "atena.previewPlan") return {summary:"Gerar o mapa A3 paisagem da AII com os "+layer.vector.features.length+
+              " empreendimentos do IPHAN e a tabela de nomes e processos no mesmo PDF."};
+            return {projectId:referenceId,url:"/previa/prancha/11.pdf?relatorio=empreendimentos-aii",
+              name:"Abrir PDF · Empreendimentos do IPHAN na AII",inline:true};
+          }
           if (/\bmapa principal\b/.test(text)) {
             const layer = state.files.find(file => file.projectId === referenceId && file.analysisKind === "iphan-empreendimentos-aii" && file.areaSourceId === aii.id);
             if (!layer) throw Error("Primeiro identifique os empreendimentos do IPHAN na AII para criar a camada.");

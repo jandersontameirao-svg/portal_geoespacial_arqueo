@@ -346,7 +346,9 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
   detailLabel(341,"Projeto  LT Angicos–Jaguaruana II");
   detailLabel(348,sheet?.number === 0 ? `Mapa índice · ${paper}` :
     `Folha  ${paper} · ${String(sheet?.number ?? 1).padStart(2,"0")}/${String(sheet?.total ?? 1).padStart(2,"0")}`);
-  const sourceText = layers.some(layer => layer.name.startsWith("Sítios IPHAN"))
+  const sourceText = layers.some(layer => layer.name.startsWith("Empreendimentos IPHAN"))
+    ? "Fontes  IBGE 2024 · IPHAN/DBGEO"
+    : layers.some(layer => layer.name.startsWith("Sítios IPHAN"))
     ? "Fontes  Camadas do projeto · IBGE 2024 · IPHAN/SICG"
     : "Fontes  Camadas do projeto · IBGE 2024";
   detailLabel(355,sourceText,3.25);
@@ -371,6 +373,53 @@ export function pranchaAngicos(layers: Layer[], asPdf: boolean, sheet?: Sheet, t
 
 // Each sheet covers frame size × scale in UTM metres. Rows run north to south.
 // The configured overlap repeats part of the previous sheet without changing scale.
+export function developmentsAiiPdf(aii:Layer, developments:Layer) {
+  const paper="A3", orientation="landscape";
+  const options:Options={paper,orientation};
+  const layers=[aii,developments];
+  const map = mapView(layers,options);
+  const document = newPdf(paper,orientation);
+  pranchaAngicos(layers,true,{...map,document,number:1,total:1,grid:25000},
+    "Empreendimentos do IPHAN na AII · LT Angicos–Jaguaruana II",options);
+  const rows = developments.layerData.features.map(feature => {
+    const properties = feature.properties as {projeto?:string;processo?:string} | undefined;
+    return {name:String(properties?.projeto || "Nome não informado"),process:String(properties?.processo || "Não informado")};
+  }).sort((a,b) => a.name.localeCompare(b.name,"pt-BR") || a.process.localeCompare(b.process,"pt-BR"));
+  const headers = () => {
+    document.addPage(paperSize(paper,orientation),orientation);
+    document.setTextColor("#252525").setFont("helvetica","bold").setFontSize(17);
+    document.text("Empreendimentos do IPHAN na AII · LT Angicos–Jaguaruana II",16,18);
+    document.setFont("helvetica","normal").setFontSize(10);
+    document.text(rows.length+" registros · Fonte: GeoServer IPHAN / DBGEO:Empreendimentos",16,26);
+    document.setFillColor("#ede9fe").rect(16,32,388,9,"F");
+    document.setFont("helvetica","bold").setFontSize(10);
+    document.text("Nº",19,38);
+    document.text("Nome do empreendimento",32,38);
+    document.text("Processo IPHAN",324,38);
+    document.setFont("helvetica","normal").setFontSize(10);
+    return 41;
+  };
+  let y=headers();
+  rows.forEach(({name,process},i) => {
+    const names:string[] = document.splitTextToSize(name,284);
+    const processes:string[] = document.splitTextToSize(process,76);
+    const height = Math.max(7,3+Math.max(names.length,processes.length)*4.2);
+    if (y+height>280) y=headers();
+    if (i%2===0) document.setFillColor("#f7f6fb").rect(16,y,388,height,"F");
+    document.text(String(i+1),19,y+5);
+    document.text(names,32,y+5,{lineHeightFactor:1.16});
+    document.text(processes,324,y+5,{lineHeightFactor:1.16});
+    y+=height;
+  });
+  const pages=document.getNumberOfPages();
+  for (let page=2;page<=pages;page++) {
+    document.setPage(page);
+    document.setFont("helvetica","normal").setFontSize(9);
+    document.text("Tabela · "+(page-1)+"/"+(pages-1),404,288,{align:"right"});
+  }
+  return Buffer.from(document.output("arraybuffer"));
+}
+
 export function planSheets(layers: Layer[], columns: number, rows: number, overlap: number, grid: number, options: Options): Sheet[] {
   const frame = options.layout?.principal ?? defaultFrame;
   if (![columns, rows].every(n => Number.isInteger(n) && n >= 1 && n <= 8) ||

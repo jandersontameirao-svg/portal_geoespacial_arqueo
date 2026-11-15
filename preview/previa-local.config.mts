@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { studioLayerRequirements, readLayout, readOrientation, readPaper, readScale, readStudioView } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
-import { atlasAngicos, atlasView, planSheets, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas, printTerrain, prepareStudioBases } from "./previa-raster/angicos/prancha.mts";
+import { atlasAngicos, atlasView, developmentsAiiPdf, planSheets, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas, printTerrain, prepareStudioBases } from "./previa-raster/angicos/prancha.mts";
 
 const arqueoA2Renderer = readFileSync(new URL("./previa-raster/composicao-a2.ts.txt", import.meta.url), "utf8");
 const arqueoA2Seeds = [
@@ -76,7 +76,7 @@ const demoApi = {
       return source
         .replace("  const interpret = trpc.atena.interpret.useMutation();", `  const utils = trpc.useUtils();
   const [previewPlan, setPreviewPlan] = useState<{ projectId: number; text: string; summary: string } | null>(null);
-  const [previewDownload, setPreviewDownload] = useState<{ projectId: number; url: string; name: string } | null>(null);
+  const [previewDownload, setPreviewDownload] = useState<{ projectId: number; url: string; name: string; inline?:boolean } | null>(null);
   const localAtena = async (method: "previewPlan" | "previewRun", id: number, text: string) => {
     const response = await fetch("/api/trpc/atena." + method, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -188,7 +188,7 @@ const demoApi = {
         return;
       }
       const command = classifyAtenaChatCommand(text);`)
-        .replace('        {visiblePlan &&', `        {previewDownload && previewDownload.projectId === projectId && <Button asChild size="sm"><a href={previewDownload.url} download>{previewDownload.name}</a></Button>}
+        .replace('        {visiblePlan &&', `        {previewDownload && previewDownload.projectId === projectId && <Button asChild size="sm"><a href={previewDownload.url} download={!previewDownload.inline} target={previewDownload.inline ? "_blank" : undefined} rel={previewDownload.inline ? "noopener" : undefined}>{previewDownload.name}</a></Button>}
         {previewPlan?.projectId === (projectId ?? 0) && previewPlan && <div className="space-y-2 rounded border bg-card p-3 text-sm">
           <p>{previewPlan.summary}</p>
           <Button size="sm" disabled={busy} onClick={() => void runPreviewPlan()}>Confirmar e executar</Button>
@@ -855,6 +855,16 @@ function PreviewDevelopmentsMap({projectId,layerId,basemapUrl}:{projectId:number
         const requested = url.searchParams.get("camadas");
         const ids = requested === null ? null : [...new Set(requested.split(",").filter(Boolean).map(Number))];
         const available = await workflow("gisAnalysis.list", { projectId: 11 });
+        if (pdf && url.searchParams.get("relatorio") === "empreendimentos-aii") {
+          const aii = available.find(layer => layer.name === "AII.geojson");
+          const developments = available.find(layer => layer.name === "Empreendimentos IPHAN · AII.geojson");
+          if (!aii || !developments) throw Error("A AII ou a camada dos empreendimentos não está disponível.");
+          res.setHeader("Content-Type","application/pdf");
+          res.setHeader("Content-Disposition",'inline; filename="lt-angicos-empreendimentos-aii-A3.pdf"');
+          res.setHeader("Cache-Control","no-store");
+          res.end(developmentsAiiPdf(aii,developments));
+          return;
+        }
         const layers = ids ? ids.flatMap(id => available.filter(layer => layer.id === id)) : available.filter(layer => layer.isVisible);
         const modelId = url.searchParams.get("modelo") ?? "";
         const required = studioLayerRequirements(modelId,layers);
