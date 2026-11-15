@@ -106,10 +106,14 @@ export default function PreviewMapProducts() {
       const params = initialParams;
       const product = data.products.find((item:Product) => item.id === params.get("modelo"));
       const paper = params.get("papel"), orientation = params.get("orientacao");
+      const focusAda = product?.id === "corredor" && params.get("foco") === "ada";
+      const scale = Number(params.get("escala"));
       if (product && papers.includes(paper as Paper) && (orientation === "landscape" || orientation === "portrait")) {
         setDrafts(current => ({ ...current,[product.id]:{ ...product,paper:paper as Paper,orientation,
           layout:product.orientation === orientation ? product.layout : orientation === "portrait" ? portraitLayout : defaultLayout,
-          marks:{empresa:Number(params.get("empresa")),cliente:Number(params.get("cliente"))},
+          marks:params.has("empresa") && params.has("cliente")
+            ? {empresa:Number(params.get("empresa")),cliente:Number(params.get("cliente"))} : product.marks,
+          ...(focusAda ? {layerIds:[14,15], scale:Number.isInteger(scale) && scale >= 1000 && scale <= 10000000 ? scale : linearAtlasScale} : {}),
         } }));
       }
       setActive(current => data.products.some((product:Product) => product.id === current) ? current : "mapa"); setLayers(data.layers); setAtlasDefault(data.linearAtlasScale);
@@ -363,7 +367,7 @@ export default function PreviewMapProducts() {
       setDrafts(current => ({ ...current, [product.id]: product }));
       const params = new URLSearchParams(location.search);
       if (params.has("empresa") && params.get("modelo") === product.id) {
-        for (const key of ["papel","orientacao","empresa","cliente"]) params.delete(key);
+        for (const key of ["papel","orientacao","empresa","cliente","foco","escala"]) params.delete(key);
         window.history.replaceState(window.history.state,"",location.pathname+"?"+params);
       }
       setNotice("Produto salvo.");

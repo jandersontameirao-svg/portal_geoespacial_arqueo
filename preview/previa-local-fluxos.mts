@@ -356,6 +356,23 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       const text = String(input.text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const request = String(input.text ?? "").trim();
       if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra um projeto para executar o comando.");
+      // Pedidos livres de atlas usam o corredor da ADA. A grade explícita continua no fluxo próprio.
+      const atlasCorridor = /\b(montar modelo corredor|atlas por corredor)\b/.test(text) ||
+        (/\batlas\b/.test(text) && !/^montar modelo /.test(text) && !/\b\d+\s*[x×]\s*\d+\b/.test(text));
+      if (input.projectId === 11 && atlasCorridor && !(text.startsWith("montar modelo ") && /\scom .+ e .+/.test(text))) {
+        const requestedScale = text.match(/\b1\s*:\s*(\d+(?:\.\d{3})*)\b/)?.[1];
+        const scale = requestedScale ? readScale(Number(requestedScale.replaceAll(".",""))) ?? linearAtlasScale : linearAtlasScale;
+        const paper = text.match(/\ba[0-4]\b/)?.[0].toUpperCase() ?? defaultStudioPaper;
+        const portrait = /\b(retrato|vertical)\b/.test(text);
+        const available = state.files.filter(row => row.projectId === 11 && row.vector);
+        if (![14,15].every(id => available.some(row => row.id === id))) throw Error("O atlas por corredor precisa da ADA e do eixo da LT.");
+        if (method === "atena.previewPlan") return {
+          summary: `Atlas por corredor com foco na ADA e eixo como referência, em ${paper} ${portrait ? "retrato" : "paisagem"}, a 1:${scale.toLocaleString("pt-BR")}. Abrir para revisão no Estúdio.`,
+        };
+        const query = new URLSearchParams({ modelo:"corredor", papel:paper,
+          orientacao:portrait ? "portrait" : "landscape", foco:"ada", escala:String(scale) });
+        return {studioUrl:"/projects/11?tab=products&"+query, message:"Atlas da ADA preparado para revisão."};
+      }
       if (input.projectId === 11 && text.startsWith("montar modelo ")) {
         const command = text.match(/^montar modelo (.+?)(?: em (a[0-4]) (paisagem|horizontal|retrato|vertical))?(?: com (.+?) e (.+?))?[.!]?$/);
         if (!command) throw Error("Informe o modelo e, se desejar, o papel, a orientação e as duas marcas.");
