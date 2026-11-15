@@ -142,7 +142,7 @@ export const studioModels = [
   {id:"prospeccao", group:"Arqueologia", title:"Malha de poços-teste planejada", summary:"Pontos previstos e área de prospecção.", needs:"Malha de pontos planejados"},
   {id:"pocos", group:"Arqueologia", title:"Poços-teste executados", summary:"Pontos de campo com situação ou resultado.", needs:"Pontos executados com atributos de campo"},
   {id:"comparativo", group:"Arqueologia", title:"Planejado × executado", summary:"Comparação visual entre malha e execução.", needs:"Camadas planejada e executada"},
-  {id:"corredor", group:"Atlas", title:"Atlas por corredor", summary:"Índice e folhas ao longo do eixo.", needs:"Eixo contínuo do projeto"},
+  {id:"corredor", group:"Atlas", title:"Atlas por corredor", summary:"Índice e folhas de detalhe da ADA ao longo do eixo.", needs:"Eixo contínuo do projeto"},
   {id:"atlas", group:"Atlas", title:"Atlas por grade", summary:"Folhas por linhas e colunas.", needs:"Camadas do projeto"},
 ] as const;
 export const studioTerrain = [

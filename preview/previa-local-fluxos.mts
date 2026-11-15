@@ -253,6 +253,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
   }
   if (method === "previewProducts.list" || method === "previewProducts.save") {
     if (input.projectId !== 11 || !state.projects.some(project => project.id === input.projectId)) throw Error("Projeto indisponível.");
+    // Na LT Angicos, 14 é ADA e 15 é o eixo de referência do atlas.
     const defaults = [
       { id: "mapa", title: "Mapa de localização", columns: 1, rows: 1, overlap: 0, grid: 25000 },
       { id: "influencia", title: "Áreas de influência — ADA, AID e AII", columns: 1, rows: 1, overlap: 0, grid: 25000, layerIds: [12, 13, 14, 15] },
@@ -262,8 +263,8 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       { id:"relevo", title:"Relevo e hipsometria", columns:1, rows:1, overlap:0, grid:10000, layerIds:[-22,15] },
       { id:"topografia", title:"Topografia", columns:1, rows:1, overlap:0, grid:10000, layerIds:[-23,15] },
       ...["sitio","pocos","comparativo"].map(id => ({ id, title:studioModels.find(model => model.id === id)!.title, columns:1, rows:1, overlap:0, grid:1000, layerIds:[] })),
-      { id: "corredor", title: "Atlas por corredor", columns: 1, rows: 1, overlap: 15, grid: 500, scale: linearAtlasScale, layerIds: [13, 14, 15] },
-      { id: "atlas", title: "Atlas", columns: 3, rows: 2, overlap: 10, grid: 10000 },
+      { id: "corredor", title: "Atlas por corredor", columns: 1, rows: 1, overlap: 15, grid: 500, scale: linearAtlasScale, layerIds: [14, 15] },
+      { id: "atlas", title: "Atlas", columns: 3, rows: 2, overlap: 10, grid: 10000, layerIds: [14, 15] },
     ];
     const products = defaults.map(model => ({ ...model, ...state.products?.[11]?.find(item => item.id === model.id) }));
     const layers = state.files.filter(file => file.projectId === 11 && file.vector);
@@ -427,9 +428,9 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         const grid = Number(interval?.[1] ?? 10) * (interval?.[2] === "m" ? 1 : 1000);
         if (columns < 1 || rows < 1 || columns > 8 || rows > 8 || columns*rows > 24 ||
             overlap > 30 || grid < 1000 || grid > 50000) throw Error("Use até 24 folhas, sobreposição de 0 a 30% e grade UTM entre 1 e 50 km.");
-        const ids = state.files.filter(row => row.projectId === input.projectId && row.vector && row.isVisible !== false).map(row => row.id);
-        if (!ids.length) throw Error("Ative ao menos uma camada do projeto.");
-        return method === "atena.previewPlan" ? { summary: `Atlas A2: ${columns} colunas × ${rows} linhas, ${overlap}% de sobreposição, grade UTM de ${grid/1000} km.` } :
+        const ids = [14, 15].filter(id => state.files.some(row => row.id === id && row.projectId === input.projectId && row.vector));
+        if (!ids.includes(14)) throw Error("Adicione a camada ADA ao projeto para gerar o atlas.");
+        return method === "atena.previewPlan" ? { summary: `Atlas A2 com foco na ADA: ${columns} colunas × ${rows} linhas, ${overlap}% de sobreposição, grade UTM de ${grid/1000} km.` } :
           { name: "Baixar atlas A2 em PDF", url: `/previa/prancha/11.pdf?camadas=${ids.join(",")}&atlas=${columns},${rows},${overlap},${grid}` };
       }
       if (wantsShape && wantsA2) throw Error("Peça um arquivo por vez.");
