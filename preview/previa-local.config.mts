@@ -92,6 +92,11 @@ const demoApi = {
     working.current = true; setBusy(true); setPreviewPlan(null);
     try {
       const result = await localAtena("previewRun", action.projectId, action.text);
+      if (result.iphanCrossing) {
+        await Promise.all([utils.gisAnalysis.list.invalidate(),utils.files.list.invalidate(),utils.layers.list.invalidate()]);
+        append(result.message);
+        return;
+      }
       if (result.knowledgeMessage) {
         append(result.knowledgeMessage);
         return;
@@ -120,6 +125,14 @@ const demoApi = {
         .replace('const invalidateContext = () => { revision.current++;', 'const invalidateContext = () => { setPreviewPlan(null); setPreviewDownload(null); revision.current++;')
         .replace('setDraft(""); setPending(null); const token', 'setDraft(""); setPending(null); setPreviewPlan(null); const token')
         .replace('      const command = classifyAtenaChatCommand(text);', `      const iphanQuestion = /^(?:guardar|consultar|qual a tipologia d[eo])\\s+s[ií]tio\\b/i.test(text.trim());
+      const iphanCrossing = /\\b(cruzar|cruze|cruzamento|intersectar|intersecte)\\b/i.test(text) &&
+        /\\biphan\\b/i.test(text) && /\\b(ada|aid|aii)\\b/i.test(text);
+      if (iphanCrossing) {
+        if (!projectId) { await showProjects(); return; }
+        const result = await localAtena("previewPlan",projectId,text);
+        if (mounted.current && token === revision.current) setPreviewPlan({projectId,text,summary:result.summary});
+        return;
+      }
       if (iphanQuestion) {
         const id = projectId ?? 0;
         const saving = /^guardar\\b/i.test(text.trim());
@@ -274,6 +287,11 @@ const demoApi = {
           </form>)}
         </details>}{geometriesLoading`)
         .replace("  const mapRef = useRef", "  const rawStyleUtils = trpc.useUtils();\n  const mapRef = useRef")
+.replace('key={`file-vector-${layer.id}`}', `key={\`file-vector-\${layer.id}\`}
+                pointToLayer={(feature, point) => feature.properties?.id_sicg
+                  ? L.circleMarker(point,{radius:5,color:layer.defaultStyle?.color ?? "#2563eb",weight:2,fillOpacity:.85,
+                      pane:thematicPaneName("vector-"+layer.id)})
+                  : L.marker(point)}`)
         .replace('import { FeatureGroup, GeoJSON,', 'import { Tooltip, FeatureGroup, GeoJSON,')
         .replace('<FeatureGroup ref={setEditableLayers}>', `{projectVectorLayers.filter(layer => layer.isVisible).flatMap(layer =>
               layer.layerData.features.flatMap(feature => {

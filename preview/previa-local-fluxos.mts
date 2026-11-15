@@ -253,29 +253,184 @@ function validRemoteSelection(values: unknown[], type: string) {
 const iphanSiteEndpoint = "https://geoserver.iphan.gov.br/geoserver/SICG/wfs";
 const iphanFields = "id_bem,identificacao_bem,co_iphan,codigo_iphan,ds_classificacao,sintese_bem,dt_cadastro";
 
-async function iphanRecords(filter: {bbox:string} | {id:number} | {code:string}) {
+async function iphanRecords(filter: {bbox:string} | {id:number} | {code:string}, includeGeometry = false) {
   // The endpoint is fixed. The viewport and numeric record ID are validated before use.
   const plain = (value:unknown, limit:number) => String(value ?? "").slice(0,limit)
     .replace(/<\/?(?:p|div|br|li)\b[^>]*>/gi," ").replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim();
   const rows = await Promise.all(["sitios","sitios_pol"].map(async layer => {
     const params = new URLSearchParams({service:"WFS",version:"1.0.0",request:"GetFeature",typeName:"SICG:"+layer,
-      maxFeatures:"8",outputFormat:"application/json",propertyName:iphanFields});
+      maxFeatures:includeGeometry ? "501" : "8", outputFormat:"application/json", srsName:"EPSG:4326",
+      propertyName:includeGeometry ? iphanFields+","+(layer === "sitios" ? "ponto" : "poligono") : iphanFields});
     if ("bbox" in filter) params.set("bbox",filter.bbox+",EPSG:4326");
     else if ("id" in filter) params.set("CQL_FILTER","id_bem="+filter.id);
     else params.set("CQL_FILTER","codigo_iphan='"+filter.code+"' OR co_iphan='"+filter.code+"'");
-    const response = await fetch(iphanSiteEndpoint+"?"+params,{signal:AbortSignal.timeout(10000),redirect:"error"});
-    if (!response.ok) throw Error("O serviço de sítios do IPHAN não respondeu.");
-    const body = await response.json();
-    if (!Array.isArray(body.features)) throw Error("O IPHAN não retornou registros consultáveis.");
-    return body.features.flatMap(({properties:p}:Row) => {
+    const loadPage = async () => {
+      const response = await fetch(iphanSiteEndpoint+"?"+params,{signal:AbortSignal.timeout(15000),redirect:"error"});
+      if (!response.ok) throw Error("O serviço de sítios do IPHAN não respondeu.");
+      const body = await response.json();
+      if (!Array.isArray(body.features)) throw Error("O IPHAN não retornou registros consultáveis.");
+      return body;
+    };
+    if (includeGeometry && "bbox" in filter) {
+      params.set("version","2.0.0");
+      params.set("typeNames","SICG:"+layer);
+      params.delete("typeName");
+      params.delete("maxFeatures");
+      params.set("bbox",filter.bbox+",urn:ogc:def:crs:OGC:1.3:CRS84");
+      params.set("count","200");
+      params.set("sortBy","id_bem");
+    }
+    const first = await loadPage();
+    const features:Row[] = [...first.features];
+    if (includeGeometry) {
+      const total = first.numberMatched;
+      if (!Number.isSafeInteger(total) || total > 2500)
+        throw Error("O total de sítios não pôde ser verificado ou excede 2.500 feições por camada.");
+      while (features.length < total) {
+        params.set("startIndex",String(features.length));
+        const page = await loadPage();
+        if (!page.features.length || page.numberMatched !== total) throw Error("A paginação do IPHAN ficou incompleta. Tente novamente.");
+        features.push(...page.features);
+      }
+      if (features.length !== total || new Set(features.map(feature => feature.id)).size !== total)
+        throw Error("A paginação do IPHAN retornou feições repetidas ou incompletas.");
+    }
+    return features.flatMap(({properties:p,geometry}:Row) => {
       if (!Number.isSafeInteger(p?.id_bem) || p.id_bem < 1) return [];
       return [{id:p.id_bem, nome:plain(p.identificacao_bem,300),
-        codigo:plain(p.codigo_iphan || p.co_iphan,100), classificacao:plain(p.ds_classificacao,150),
+        codigo:plain(p.co_iphan || p.codigo_iphan,100), classificacao:plain(p.ds_classificacao,150),
         sintese:plain(p.sintese_bem,12000), cadastro:plain(p.dt_cadastro,24),
-        fonte:"GeoServer IPHAN / SICG", camada:"SICG:"+layer, tipologia:null}];
+        fonte:"GeoServer IPHAN / SICG", camada:"SICG:"+layer, tipologia:null,
+        ...(includeGeometry ? {geometry} : {})}];
     });
   }));
-  return [...new Map(rows.flat().map(record => [record.id,record])).values()];
+  return includeGeometry ? rows.flat() : [...new Map(rows.flat().map(record => [record.id,record])).values()];
+}
+
+const influenceKinds = ["ADA","AID","AII"] as const;
+const influenceColors = { ADA:"#dc2638", AID:"#a76400", AII:"#217a4b" };
+
+function iphanInfluenceLayers(projectId:number) {
+  const files = state.files.filter(file => file.projectId === projectId && file.vector);
+  return influenceKinds.map(kind => {
+    const layer = files.find(file => file.name === kind+".geojson");
+    if (!layer?.vector.features.length || !layer.vector.features.every((feature:Row) => /^(Multi)?Polygon$/.test(feature.geometry?.type)))
+      throw Error("A camada poligonal "+kind+" precisa estar disponível no projeto.");
+    return {kind,layer};
+  });
+}
+
+async function officialSiteTypology(id:number, code:string) {
+  const url = new URL("https://sicg.iphan.gov.br/sicg/pesquisarBem/detalharBem");
+  url.search = new URLSearchParams({"pesquisaBemVO.filtro":"BEM_MAT","pesquisaBemVO.idBem":String(id)}).toString();
+  const checkedAt = new Date().toISOString();
+  try {
+    const response = await fetch(url,{signal:AbortSignal.timeout(7500),redirect:"error"});
+    if (!response.ok) return {status:"ficha_indisponivel",checkedAt,url:url.href,http:response.status};
+    const body = await response.json();
+    // Only accept an explicit site typology from a record that identifies the same site.
+    // A classification or a word found in the synthesis is not a typology from the official record.
+    const records = [body?.sitioArqueologico,body?.bem?.sitioArqueologico,body?.bem,body].filter(Boolean);
+    const record = records.find(item =>
+      String(item.idBem ?? item.id_bem ?? "") === String(id) ||
+      (code && String(item.codigoIphan ?? item.codigo_iphan ?? "").toLowerCase() === code.toLowerCase()));
+    const value = record?.tipologiaSitio ?? record?.tipologiaArqueologica ??
+      (record && records.slice(0,2).includes(record) && (record === body?.sitioArqueologico || record === body?.bem?.sitioArqueologico) ? record.tipologia : undefined);
+    if (typeof value === "string" && value.trim() && value.length <= 1000)
+      return {status:"confirmada",checkedAt,url:url.href,value:value.trim()};
+    return {status:"sem_tipologia_estruturada",checkedAt,url:url.href};
+  } catch {
+    return {status:"ficha_indisponivel",checkedAt,url:url.href};
+  }
+}
+
+async function crossIphanInfluence(projectId:number, areas:ReturnType<typeof iphanInfluenceLayers>) {
+  const turfBbox = require("@turf/bbox").default;
+  const intersect = require("@turf/intersect").default;
+  const contains = require("@turf/boolean-point-in-polygon").default;
+  const bounds = turfBbox({type:"FeatureCollection",features:areas.flatMap(({layer}) => layer.vector.features)});
+  if (!bounds.every(Number.isFinite) || bounds[2]-bounds[0]>4 || bounds[3]-bounds[1]>4)
+    throw Error("O recorte das áreas de influência está inválido ou excede 4° por eixo.");
+  const geometries = await iphanRecords({bbox:bounds.join(",")},true);
+  const hits = new Map<number,{record:typeof geometries[number]; matches:Map<string,Row>}>();
+  for (const record of geometries) {
+    const geometry = record.geometry;
+    if (!geometry) continue;
+    const polygon = /^(Multi)?Polygon$/.test(geometry.type);
+    if (!polygon && geometry.type !== "Point") continue;
+    for (const {kind,layer} of areas) {
+      const site = {type:"Feature",properties:{},geometry};
+      const match = layer.vector.features.some((area:Row) => polygon
+        ? intersect({type:"FeatureCollection",features:[area,site]}) !== null
+        : contains(site,area));
+      if (!match) continue;
+      const hit = hits.get(record.id) ?? {record,matches:new Map<string,Row>()};
+      // One row per SICG site per area. Keep the polygon where both representations match.
+      if (!hit.matches.has(kind) || polygon) hit.matches.set(kind,geometry);
+      hits.set(record.id,hit);
+    }
+  }
+  const sites = [...hits.values()];
+  const volumes = Object.fromEntries(influenceKinds.map(kind => [kind,sites.filter(site => site.matches.has(kind)).length]));
+  const deadline = Date.now()+35000;
+  type TypologyCheck = Awaited<ReturnType<typeof officialSiteTypology>>;
+  const typologies = new Map<number,TypologyCheck>();
+  const observations = state.iphanKnowledge ?? [];
+  const isRecent = (check:TypologyCheck) => Date.now()-Date.parse(check.checkedAt) < 86400000;
+  let rateLimited = observations.some(row => row.verificacaoTipologia?.http === 429 && isRecent(row.verificacaoTipologia));
+  for (let index=0;index<sites.length;index+=5) {
+    await Promise.all(sites.slice(index,index+5).map(async ({record}) => {
+      const previous = observations.findLast(row => row.id === record.id && row.verificacaoTipologia?.checkedAt)?.verificacaoTipologia as TypologyCheck | undefined;
+      if (previous && isRecent(previous)) {
+        typologies.set(record.id,previous);
+      } else if (!rateLimited && Date.now() < deadline) {
+        const check = await officialSiteTypology(record.id,record.codigo);
+        typologies.set(record.id,check);
+        if (check.http === 429) rateLimited = true;
+      }
+    }));
+  }
+
+  const checkedAt = new Date().toISOString();
+  // The result layers and evidence are committed together only after both WFS layers were read completely.
+  let nextId = state.nextId;
+  const files = state.files.filter(file => !(file.projectId === projectId && file.analysisKind === "iphan-influence"));
+  const knowledge = [...(state.iphanKnowledge ?? [])];
+  for (const {record} of sites) {
+    const {geometry,...attrs} = record;
+    const check = typologies.get(record.id);
+    const prior = knowledge.findLast(item => item.id === record.id && item.tipologia);
+    // A temporary upstream failure must not discard an earlier confirmed observation.
+    knowledge.push({...attrs,projectId,consultadoEm:checkedAt,
+      tipologia:check?.value ?? prior?.tipologia ?? null,
+      verificacaoTipologia:check ?? {status:"consulta_pendente"},
+      fonteTipologia:check?.value ? check.url : prior?.fonteTipologia,
+      ficha:"https://sicg.iphan.gov.br/sicg/pesquisarBem"});
+  }
+  for (const {kind,layer} of areas) {
+    const features = sites.flatMap(({record,matches}) => {
+      const geometry = matches.get(kind);
+      if (!geometry) return [];
+      const memberships = influenceKinds.filter(area => matches.has(area)).join(", ");
+      return [{type:"Feature",geometry,properties:{
+        name:record.nome+" · "+(record.codigo || "sem código") + " · "+memberships,
+        codigo_iphan:record.codigo, id_sicg:record.id, areas:memberships, fonte:record.camada,
+      }}];
+    });
+    if (!features.length) continue;
+    const id = nextId++;
+    const vector = {type:"FeatureCollection",features};
+    const contents = Buffer.from(JSON.stringify(vector));
+    files.push({id,projectId,name:"Sítios IPHAN · "+kind+".geojson",fileType:"geojson",
+      fileSize:contents.length, isGeospatial:true, isVisible:true,currentVersion:1, uploadedAt:checkedAt,
+      s3Url:"/previa/download/arquivo/"+id,contents:contents.toString("base64"),vector,
+      analysisKind:"iphan-influence",areaSourceId:layer.id,consultadoEm:checkedAt,
+      defaultStyle:{color:influenceColors[kind],weight:3,fillOpacity:.2}});
+  }
+  save({...state,files,iphanKnowledge:knowledge,nextId});
+  const verified = [...typologies.values()].filter(check => check.status === "confirmada").length;
+  const unavailable = [...typologies.values()].filter(check => check.status === "ficha_indisponivel").length;
+  return {iphanCrossing:true, message:`IPHAN · ADA: ${volumes.ADA}; AID: ${volumes.AID}; AII: ${volumes.AII}. ${sites.length} sítio(s) distinto(s) guardado(s). As áreas podem se sobrepor. Tipologias confirmadas nas fichas: ${verified}. Fichas indisponíveis: ${unavailable}; sem tentativa registrada: ${sites.length-typologies.size}. As áreas com resultado têm camada própria em Mapa & Análise.`};
 }
 
 // Keep earlier source observations and avoid duplicating a record read twice.
@@ -283,7 +438,9 @@ function saveIphanKnowledge(record:Row, projectId:number, consultadoEm:string) {
   const records = state.iphanKnowledge ?? [];
   const latest = records.findLast(row => row.id === record.id);
   if (latest && Object.keys(record).every(key => record[key] === latest[key])) return;
+  const confirmed = records.findLast(row => row.id === record.id && row.tipologia);
   save({...state,iphanKnowledge:[...records,{...record,projectId,consultadoEm,
+    tipologia:record.tipologia ?? confirmed?.tipologia ?? null, fonteTipologia:confirmed?.fonteTipologia,
     ficha:"https://sicg.iphan.gov.br/sicg/pesquisarBem"}]});
 }
 
@@ -486,6 +643,13 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     case "atena.previewRun": {
       const text = String(input.text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const request = String(input.text ?? "").trim();
+      if (/\b(cruzar|cruze|cruzamento|intersectar|intersecte)\b/.test(text) && /\biphan\b/.test(text) && /\b(ada|aid|aii)\b/.test(text)) {
+        if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra o projeto para cruzar as áreas.");
+        const areas = iphanInfluenceLayers(input.projectId);
+        return method === "atena.previewPlan"
+          ? {summary:"Cruzar pontos e polígonos do SICG com ADA, AID e AII. Mostrar as áreas no mapa e guardar os sítios com fonte e estado da tipologia na ficha oficial."}
+          : crossIphanInfluence(input.projectId,areas);
+      }
       const iphan = request.match(/^(guardar|consultar|qual a tipologia d[eo])\s+s[ií]tio(?:\s+do)?\s+IPHAN\s+([\p{L}\d._/-]{1,100})[!?]?$/iu);
       if (iphan) {
         const [,verb,key] = iphan;
@@ -501,7 +665,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
           const date = record.consultadoEm ?? new Date().toISOString();
           if (method === "atena.previewPlan") return {summary:`Consultar “${record.nome}” ${previous ? "no acervo IPHAN da prévia" : "no GeoServer oficial e guardar o registro no acervo"}.`};
           if (!previous) saveIphanKnowledge(record,input.projectId,date);
-          const message = `${record.nome} · ${record.codigo || "sem código"} · ${record.classificacao || "sem classificação"}. ${record.sintese || "Sem síntese publicada"}. Tipologia oficial: pendente de conferência na ficha SICG. Fonte: ${record.camada}, consultada em ${date.slice(0,10)}.`;
+          const message = `${record.nome} · ${record.codigo || "sem código"} · ${record.classificacao || "sem classificação"}. ${record.sintese || "Sem síntese publicada"}. Tipologia oficial: ${record.tipologia ?? "pendente de conferência na ficha SICG"}. Fonte: ${record.camada}, consultada em ${date.slice(0,10)}.`;
           return {knowledgeMessage:message};
         }
         const id = Number(key);
