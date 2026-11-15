@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { ingestCog, renderCog } from "./previa-local-raster.mts";
 import { exportVector } from "./previa-exportar-vetor.mts";
+import { readIbgeLayer } from "./previa-ibge-dados.mts";
 import { defaultStudioPaper, linearAtlasScale, studioModels, studioTerrain, studioLayerRequirements, readPaper, readOrientation, restoreLegend, readLayout, readScale, readStudioView } from "./previa-layout.mts";
 
 const require = createRequire(new URL("../package.json", import.meta.url));
@@ -12,7 +13,7 @@ const municipalAnchors = JSON.parse(readFileSync(new URL("./previa-raster/angico
 const storePath = fileURLToPath(new URL("./previa-local-dados.json", import.meta.url));
 const seed = { id: 1, name: "Levantamento arqueológico demonstrativo", code: "DEMO-01", description: "Projeto fictício para explorar o Geoportal.", clientName: "Cliente fictício", status: "active", createdAt: "2026-11-12T12:00:00Z" };
 type Row = Record<string, any>;
-type State = { projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
+type State = { geometries?: Row[]; projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
 let state: State;
 try {
   state = JSON.parse(readFileSync(storePath, "utf8"));
@@ -82,7 +83,7 @@ function save(next: State) {
 
 function append(collection: Exclude<keyof State, "nextId">, values: Row) {
   const row = { ...values, id: state.nextId, createdAt: new Date().toISOString() };
-  save({ ...state, [collection]: [...state[collection], row], nextId: row.id + 1 });
+  save({ ...state, [collection]: [...(state[collection] ?? []), row], nextId: row.id + 1 });
   return row;
 }
 
@@ -99,6 +100,65 @@ export function* projectSearchEntries() {
 
 function projectRows(rows: Row[], input: Row) {
   return rows.filter(row => !input.projectId || row.projectId === input.projectId);
+}
+
+type DrawKind = "marker" | "polyline" | "polygon";
+function checkedDrawing(type: DrawKind, coordinates: unknown) {
+  if (typeof coordinates === "string") coordinates = JSON.parse(coordinates);
+  const point = (value: unknown): value is number[] => Array.isArray(value) && value.length === 2 &&
+    value.every(Number.isFinite) && Math.abs(value[0]) <= 90 && Math.abs(value[1]) <= 180;
+  if (type === "marker" && point(coordinates)) return coordinates;
+  const path = (value:unknown, minimum:number): value is number[][] =>
+    Array.isArray(value) && value.length <= 5000 && value.every(point) &&
+    new Set(value.map(p => p.join(","))).size >= minimum;
+  if (type === "polyline" && path(coordinates,2)) return coordinates;
+  if (type === "polygon") {
+    const rings = path(coordinates,3) ? [coordinates] : coordinates;
+    if (Array.isArray(rings) && rings.length && rings.length <= 20 && rings.every(ring => path(ring,3)))
+      return rings.map(ring => ring[0].join(",") === ring.at(-1).join(",") ? ring : [...ring,ring[0]]);
+  }
+  throw Error("Confira o tipo da feição e as coordenadas.");
+}
+
+function influenceGeometry(projectId: number, options: {kind: string; source: string; metres?: number}) {
+  const sourceName = options.source.replace(/\.geojson$/i, "");
+  const normalized = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const layers = state.files.filter(row => row.projectId === projectId && row.vector &&
+    normalized(row.name.replace(/\.geojson$/i,"")) === normalized(sourceName));
+  const drawings = (state.geometries ?? []).filter(row => row.projectId === projectId && normalized(row.name) === normalized(sourceName));
+  if (layers.length + drawings.length !== 1) throw Error("Informe o nome exato de uma única camada ou feição do projeto.");
+  const shape = drawings[0];
+  const features = layers[0]?.vector.features ?? (shape?.type === "polyline" ? [{
+    type:"Feature", properties:{}, geometry:{ type:"LineString",
+      coordinates:(checkedDrawing("polyline",shape.coordinates) as number[][]).map(([lat,lon]) => [lon,lat]),
+    },
+  }] : []);
+  if (!features.length || !features.every((feature: Row) =>
+    /^(Multi)?LineString$/.test(feature.geometry?.type) && paths(feature.geometry).every(line => line.length >= 2)))
+    throw Error("Use uma camada de linhas ou uma linha desenhada como eixo.");
+  const collection = { type:"FeatureCollection", features };
+  const radius = options.metres ?? (options.kind === "ADA" ? 30 : 250);
+  const buffered = bufferGeometry(collection, radius, { units:"meters" });
+  if (!buffered?.features.length) throw Error("O buffer não produziu áreas.");
+  const properties = { camada:options.kind, camada_origem:sourceName, buffer_m:radius };
+  if (options.kind !== "AII") return { ...buffered,
+    features:buffered.features.map((feature: Row) => ({...feature,properties})) };
+  const bounds = [Infinity,Infinity,-Infinity,-Infinity];
+  for (const feature of buffered.features) for (const ring of paths(feature.geometry)) for (const [x,y] of ring) {
+    bounds[0] = Math.min(bounds[0],x); bounds[1] = Math.min(bounds[1],y);
+    bounds[2] = Math.max(bounds[2],x); bounds[3] = Math.max(bounds[3],y);
+  }
+  const candidates = readIbgeLayer("municipios",bounds.join(","));
+  if (!candidates || candidates.zoomRequired) throw Error("Divida o eixo em trechos para consultar a malha municipal.");
+  const intersect = require("@turf/intersect").default;
+  const selected = candidates.features.filter(municipality => buffered.features.some((area:Row) =>
+    intersect({type:"FeatureCollection",features:[municipality,area]}) !== null));
+  if (!selected.length) throw Error("Nenhum município da malha IBGE disponível intercepta a AID.");
+  return {type:"FeatureCollection", features:selected.map(municipality => ({
+    ...municipality,
+    properties:{ ...properties, nome:municipality.properties.nome, uf:municipality.properties.uf,
+      codigo_ibge:municipality.properties.codigo, fonte:"IBGE 2024 · malha simplificada da prévia" },
+  }))};
 }
 
 function saveAnalysis(projectId: number, name: string, vector: Row) {
@@ -326,6 +386,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         ...file,
         exportFormats: vector ? ["shp", "kml", "geojson", ...(vector.features.every((feature: Row) => /^(Multi)?(Point|LineString)$/.test(feature.geometry.type)) ? ["gpx"] : [])] : [],
       }));
+      case "geometries.list": return projectRows(state.geometries ?? [], input);
       case "gisAnalysis.list": return projectRows(state.files, input).filter(file => file.vector).map(file => ({
         id: file.id, name: file.name, projectId: file.projectId, layerType: "vector", layerData: file.vector, metadata: { kind: "vector", featureCount: file.vector.features.length },
         isVisible: file.isVisible ?? true,
@@ -351,11 +412,62 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     return undefined;
   }
   switch (method) {
+    case "geometries.create": {
+      if (!state.projects.some(project => project.id === input.projectId)) throw Error("Projeto inexistente.");
+      const coordinates = checkedDrawing(input.type,input.coordinates);
+      if (typeof input.name !== "string" || !input.name.trim() || input.name.length > 120) throw Error("Informe um nome de até 120 caracteres.");
+      return append("geometries",{ projectId:input.projectId, name:input.name.trim(), type:input.type,
+        description:typeof input.description === "string" ? input.description.slice(0,1000) : null,
+        coordinates:JSON.stringify(coordinates), color:"#2563eb", opacity:100, visible:1 });
+    }
+    case "geometries.update":
+    case "geometries.updateVisibility":
+    case "geometries.delete": {
+      const rows = state.geometries ?? [];
+      const row = rows.find(item => item.id === input.id);
+      if (!row) throw Error("Feição não encontrada.");
+      if (method === "geometries.delete") {
+        save({...state,geometries:rows.filter(item => item.id !== row.id)});
+        return {success:true};
+      }
+      const updated = method === "geometries.updateVisibility"
+        ? {...row,visible:input.visible ? 1 : 0}
+        : {...row,coordinates:JSON.stringify(checkedDrawing(row.type,input.coordinates))};
+      save({...state,geometries:rows.map(item => item.id === row.id ? updated : item)});
+      return updated;
+    }
     case "atena.previewPlan":
     case "atena.previewRun": {
       const text = String(input.text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const request = String(input.text ?? "").trim();
       if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra um projeto para executar o comando.");
+      const influence = request.match(/^(?:criar|gere|gerar|crie)\s+(?:a\s+)?(ADA|AID|AII)(?:\s+(?:a partir d[eo]|d[eo]|n[eo])\s+"?([^"!.]+)(?:\.geojson)?"?)?[.!]?$/i);
+      if (influence) {
+        const kind = influence[1].toUpperCase();
+        const source = influence[2]?.trim() ?? "Eixo";
+        const vector = influenceGeometry(input.projectId,{kind,source});
+        const purpose = kind === "AII"
+          ? `selecionar ${vector.features.length} municípios da malha IBGE 2024 da prévia que interceptam a AID de 250 m`
+          : `criar faixa de ${kind === "ADA" ? 30 : 250} m de cada lado do eixo`;
+        if (method === "atena.previewPlan") return {summary:`${kind}: ${purpose}, usando “${source}”. Uma nova camada será salva no projeto.`};
+        const base = `${kind} · ${source}`;
+        let name = base, version = 2;
+        while (state.files.some(row => row.projectId === input.projectId && row.name === name+".geojson")) name = `${base} (${version++})`;
+        return saveAnalysis(input.projectId,name+".geojson",vector);
+      }
+      const drawing = request.match(/^(?:criar|crie)\s+(ponto|linha|pol[ií]gono)\s+"([^"]{1,120})"\s+com coordenadas\s+(\[[\s\S]+\])[.!]?$/i);
+      if (drawing) {
+        const [,shape,name,raw] = drawing;
+        const type = shape.toLowerCase() === "ponto" ? "marker" : shape.toLowerCase() === "linha" ? "polyline" : "polygon";
+        const points = JSON.parse(raw);
+        const swap = (point:unknown) => Array.isArray(point) && point.length === 2 ? [point[1],point[0]] : null;
+        const coordinates = checkedDrawing(type,type === "marker" ? swap(points) : Array.isArray(points) ? points.map(swap) : null);
+        if (method === "atena.previewPlan") return {summary:`Criar ${shape.toLowerCase()} “${name}” no mapa com as coordenadas informadas.`};
+        await workflow("geometries.create",{ projectId:input.projectId, name, type, coordinates },true);
+        return { drawingSaved:true, message:`Feição “${name}” salva no mapa do projeto.` };
+      }
+      if (/^(?:criar|crie)\s+(ponto|linha|poligono)\b/.test(text))
+        throw Error('Informe a feição, o nome entre aspas e as coordenadas [longitude, latitude]. Exemplo: criar ponto "Amostra" com coordenadas [-37.3,-5.2].');
       // Pedidos livres de atlas usam o corredor da ADA. A grade explícita continua no fluxo próprio.
       const atlasCorridor = /\b(montar modelo corredor|atlas por corredor)\b/.test(text) ||
         (/\batlas\b/.test(text) && !/^montar modelo /.test(text) && !/\b\d+\s*[x×]\s*\d+\b/.test(text));

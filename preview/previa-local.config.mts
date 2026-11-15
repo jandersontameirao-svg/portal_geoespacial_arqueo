@@ -92,6 +92,11 @@ const demoApi = {
     working.current = true; setBusy(true); setPreviewPlan(null);
     try {
       const result = await localAtena("previewRun", action.projectId, action.text);
+      if (result.drawingSaved) {
+        await utils.geometries.list.invalidate({projectId:action.projectId});
+        append(result.message);
+        return;
+      }
       if (result.connectionChanged) {
         window.dispatchEvent(new Event("preview-connections-changed"));
         append(result.message);
@@ -110,7 +115,7 @@ const demoApi = {
   const interpret = trpc.atena.interpret.useMutation();`)
         .replace('const invalidateContext = () => { revision.current++;', 'const invalidateContext = () => { setPreviewPlan(null); setPreviewDownload(null); revision.current++;')
         .replace('setDraft(""); setPending(null); const token', 'setDraft(""); setPending(null); setPreviewPlan(null); const token')
-        .replace('      const command = classifyAtenaChatCommand(text);', `      if (/^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo)\\b/i.test(text.trim()) ||
+        .replace('      const command = classifyAtenaChatCommand(text);', `      if (/^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo|(?:criar|crie|gere|gerar)\\s+(?:a\\s+)?(?:ada|aid|aii|ponto|linha|pol[ií]gono))\\b/i.test(text.trim()) ||
         (/\\b(buffer|malha|a2|atlas)\\b/i.test(text) && !/^abrir atlas[.!]?$/i.test(text))) {
         if (!projectId) { await showProjects(); return; }
         const result = await localAtena("previewPlan", projectId, text);
@@ -199,6 +204,16 @@ const demoApi = {
             <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">${name === "RasterIngestionPanel" ? "Importar GeoTIFF / COG" : "Exportar recorte raster"}</summary>
             ${component}
           </details>`))
+        .replace('Operação espacial</CardTitle>', `Operação espacial</CardTitle>
+            <div className="mt-2 grid gap-2">
+              <p className="text-xs text-muted-foreground">Peça à Atena para gerar áreas de influência a partir do eixo. Para desenhar à mão, use ponto, linha ou polígono na barra do mapa.</p>
+              <div className="flex flex-wrap gap-1">
+                {["ADA","AID","AII"].map(kind => <Button key={kind} type="button" size="sm" variant="outline" disabled={!canEdit}
+                  onClick={() => window.dispatchEvent(new CustomEvent("studio-open-atena",{detail:"Criar "+kind+" a partir do Eixo"}))}>{kind}</Button>)}
+                <Button type="button" size="sm" variant="outline" onClick={() => window.dispatchEvent(new Event("studio-open-atena"))}>Desenhar com a Atena</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setOperation("grid")}>Criar malha de pontos</Button>
+              </div>
+            </div>`)
         .replace('const [gridCode, setGridCode]', 'const [gridPattern, setGridPattern] = useState("quadrada");\n  const [gridCode, setGridCode]')
         .replace('spacingMeters: Number(gridSpacing),', 'spacingMeters: Number(gridSpacing), pattern: gridPattern,')
         .replace('grid: "Malha arqueológica"', 'grid: "Malha de pontos"')
@@ -206,7 +221,6 @@ const demoApi = {
           <label className="grid gap-1 text-sm">Formato da malha<select className="rounded-md border bg-background p-2" value={gridPattern} onChange={event => setGridPattern(event.target.value)}>
             <option value="quadrada">Quadrada</option><option value="triangular">Triangular (linhas alternadas)</option>
           </select></label>`)
-        .replace('Operação espacial</CardTitle></CardHeader>', 'Operação espacial</CardTitle><Button type="button" size="sm" variant="outline" onClick={() => setOperation("grid")}>Criar malha de pontos</Button></CardHeader>')
         .replace('<InvalidateMapOnResize />', '<InvalidateMapOnResize /><PreviewIbgeLayers projectBounds={municipalProjectBounds} />')
         .replace("  const selectedVectorFeatures = useMemo", `  const municipalProjectBounds = useMemo(() => {
     const bounds = L.latLngBounds([]);

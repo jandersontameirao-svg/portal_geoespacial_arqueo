@@ -29,7 +29,10 @@ function AtenaChatSession({ previewMode }: { previewMode: boolean }) {
   const search = useSearch();
   const [open, setOpen] = useState(previewMode);
   useEffect(() => {
-    const openFromStudio = () => setOpen(true);
+    const openFromStudio = (event: Event) => {
+      setOpen(true);
+      if (event instanceof CustomEvent && typeof event.detail === "string") setDraft(event.detail);
+    };
     window.addEventListener("studio-open-atena", openFromStudio);
     return () => window.removeEventListener("studio-open-atena", openFromStudio);
   }, []);
