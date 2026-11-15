@@ -249,7 +249,7 @@ const demoApi = {
           <label className="grid gap-1 text-sm">Formato da malha<select className="rounded-md border bg-background p-2" value={gridPattern} onChange={event => setGridPattern(event.target.value)}>
             <option value="quadrada">Quadrada</option><option value="triangular">Triangular (linhas alternadas)</option>
           </select></label>`)
-        .replace('<InvalidateMapOnResize />', '<InvalidateMapOnResize /><PreviewIbgeLayers projectBounds={municipalProjectBounds} /><PreviewIphanSites projectId={projectId} />')
+        .replace('<InvalidateMapOnResize />', '<InvalidateMapOnResize /><PreviewIbgeLayers projectBounds={municipalProjectBounds} projectId={projectId} />')
         .replace("  const selectedVectorFeatures = useMemo", `  const municipalProjectBounds = useMemo(() => {
     const bounds = L.latLngBounds([]);
     for (const layer of projectVectorLayers) bounds.extend(L.geoJSON(layer.layerData).getBounds());
@@ -258,7 +258,7 @@ const demoApi = {
     return bounds.isValid() ? bounds.pad(.15).toBBoxString() : "";
   }, [projectVectorLayers, rasterLayers, geometries]);
   const selectedVectorFeatures = useMemo`)
-        .concat('\nimport PreviewIbgeLayers, { PreviewIphanSites, iphanResultPopup } from "./PreviewIbgeLayers.tsx";')
+        .concat('\nimport PreviewIbgeLayers, { archaeologicalFeaturePopup } from "./PreviewIbgeLayers.tsx";')
         .replace('<CardContent className="space-y-3">{geometriesLoading', `<CardContent className="space-y-3">{canEdit && projectVectorLayers.length > 0 && <details className="rounded-lg border p-3">
           <summary className="cursor-pointer text-sm font-medium">Editar simbologia</summary>
           {projectVectorLayers.map(layer => <form key={layer.id} className="mt-3 grid gap-2 border-t pt-2 text-sm" onSubmit={async event => {
@@ -292,7 +292,7 @@ const demoApi = {
                   ? L.circleMarker(point,{radius:5,color:layer.defaultStyle?.color ?? "#2563eb",weight:2,fillOpacity:.85,
                       pane:thematicPaneName("vector-"+layer.id)})
                   : L.marker(point)}`)
-        .replace('onEachFeature={(feature, leafletLayer) => leafletLayer.bindPopup(', 'onEachFeature={(feature, leafletLayer) => feature.properties?.id_sicg && feature.properties?.nome ? leafletLayer.bindPopup(iphanResultPopup(feature.properties),{maxHeight:320}) : leafletLayer.bindPopup(')
+        .replace('onEachFeature={(feature, leafletLayer) => leafletLayer.bindPopup(', 'onEachFeature={(feature, leafletLayer) => leafletLayer.bindPopup(archaeologicalFeaturePopup(feature.properties,layer.name) ?? ')
         .replace('import { FeatureGroup, GeoJSON,', 'import { Tooltip, FeatureGroup, GeoJSON,')
         .replace('<FeatureGroup ref={setEditableLayers}>', `{projectVectorLayers.filter(layer => layer.isVisible).flatMap(layer =>
               layer.layerData.features.flatMap(feature => {
@@ -393,7 +393,7 @@ const demoApi = {
     const badge = /(\{\/\* Info Badge \*\/\}\r?\n)      (<div[^\n]+>[\s\S]*?^      <\/div>)/m;
     if (!badge.test(source)) return;
     return source.replace(badge, "")
-      .concat('\nimport PreviewIbgeLayers, { PreviewIphanSites } from "./PreviewIbgeLayers.tsx";')
+      .concat('\nimport PreviewIbgeLayers, { archaeologicalFeaturePopup } from "./PreviewIbgeLayers.tsx";')
       .replace('useState<"2d" | "3d">("3d")', 'useState<"2d" | "3d">("2d")')
       .concat(`\nfunction PreviewProjectExtent({ projectId }: { projectId: number }) {
   const map = useMapEvents({});
@@ -415,7 +415,10 @@ const demoApi = {
 }
 
 `)
-      .replace('<BaseLayerMapOverlays />', '{projectId && <PreviewProjectExtent key={projectId} projectId={projectId} />}\n          <BaseLayerMapOverlays /><PreviewIbgeLayers /><PreviewIphanSites projectId={projectId} /><PreviewScreenScale />')
+      .replace('onEachFeature={(_feature, leafletLayer) => {', `onEachFeature={(feature, leafletLayer) => {
+              const site = archaeologicalFeaturePopup(feature.properties,layer.name);
+              if (site) { leafletLayer.bindPopup(site,{maxHeight:320}); return; }`)
+      .replace('<BaseLayerMapOverlays />', '{projectId && <PreviewProjectExtent key={projectId} projectId={projectId} />}\n          <BaseLayerMapOverlays /><PreviewIbgeLayers projectId={projectId} /><PreviewScreenScale />')
       .replace("onNavigate={(lat, lng) =>", "onNavigate={(lat, lng, zoom = 14) =>")
       .replace("setMapZoom(14);\n            }}", "setMapZoom(zoom);\n            }}")
       .concat(`\nfunction PreviewScreenScale() {

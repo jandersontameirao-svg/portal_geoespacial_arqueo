@@ -611,7 +611,7 @@ export async function workflow(method: string, input: Row = {}, write = false, v
       }
       case "layers.list": return projectRows(state.files, input).filter(file => file.vector).map(file => ({
         id: file.id, projectId: file.projectId, name: file.name, layerType: "vector",
-        layerData: file.vector, isGroup: false, isVisible: file.isVisible ?? true, effectiveVisible: file.isVisible ?? true,
+        layerData: annotateIphanVector(file), isGroup: false, isVisible: file.isVisible ?? true, effectiveVisible: file.isVisible ?? true,
         defaultStyle: { color: ({ "AII.geojson": "#217a4b", "AID.geojson": "#da9800", "ADA.geojson": "#dc2638", "Eixo.geojson": "#58278d" } as Record<string, string>)[file.name] || "#2563eb" },
       }));
       case "files.list":

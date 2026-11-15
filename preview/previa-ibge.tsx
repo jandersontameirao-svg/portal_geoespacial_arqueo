@@ -241,7 +241,7 @@ function MapBiomasTiles({ url }: { url: string }) {
   return null;
 }
 
-export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: string }) {
+export default function PreviewIbgeLayers({ projectBounds, projectId }: { projectBounds?: string; projectId?: number }) {
   const map = useMap();
   const controlRef = useRef<HTMLDetailsElement>(null);
   const [connections, setConnections] = useState<MapSource[]>([]);
@@ -317,7 +317,14 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
   const sources = active.filter(source => source.type === "WMS" || (source.official && source.type === "ArcGIS REST"))
     .map(source => ({ ...source, layer: selectedFor(source).join(",") })).filter(source => source.layer);
 
-  return <>{active.some(source => source.id === -5 && selectedFor(source).includes("palmares")) && <OfficialLayer layer={palmaresLayer} />}
+  const iphan = sources.find(source => source.id === -1 && source.layer.split(",").some(layer => /^SICG:sitios(?:_pol)?$/.test(layer)));
+  const siteServices = sources.filter(source => source.type === "WMS" && source.id !== -1)
+    .map(source => ({...source,layer:source.layer.split(",").filter(id =>
+      isArchaeologyLayer(id) || isArchaeologyLayer(childNames[id] ?? "") ||
+      (source.layer.split(",").length === 1 && isArchaeologyLayer(source.name))
+    ).join(",")})).filter(source => source.layer);
+  return <><PreviewIphanSites projectId={projectId} layerAlreadyVisible={Boolean(iphan)} />
+  {siteServices.map(source => <ArchaeologicalWmsIdentify key={source.id} source={source} />)}{active.some(source => source.id === -5 && selectedFor(source).includes("palmares")) && <OfficialLayer layer={palmaresLayer} />}
   {sources.map(source => source.type === "ArcGIS REST"
     ? <ArcGisTiles key={source.id} source={source} />
     : <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
@@ -425,6 +432,50 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
   </details></>;
 }
 
+function ArchaeologicalWmsIdentify({source}:{source:MapSource}) {
+  const map = useMap();
+  useEffect(() => {
+    let request:AbortController | undefined;
+    const identify = async (event:L.LeafletMouseEvent) => {
+      if (map.getZoom() < 10 || (event.originalEvent.target as Element | null)?.closest?.(".leaflet-interactive")) return;
+      request?.abort();
+      const controller = new AbortController();
+      request = controller;
+      try {
+        const bounds = map.getBounds();
+        const sw = L.CRS.EPSG3857.project(bounds.getSouthWest());
+        const ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
+        const {x,y} = map.latLngToContainerPoint(event.latlng);
+        const size = map.getSize();
+        const endpoint = new URL(source.address);
+        const params = {
+          SERVICE:"WMS", VERSION:"1.1.1", REQUEST:"GetFeatureInfo",
+          SRS:"EPSG:3857", BBOX:[sw.x,sw.y,ne.x,ne.y].join(","),
+          WIDTH:size.x, HEIGHT:size.y, X:Math.round(x), Y:Math.round(y),
+          LAYERS:source.layer, QUERY_LAYERS:source.layer, STYLES:"",
+          FORMAT:"image/png", INFO_FORMAT:"application/json", FEATURE_COUNT:5,
+        };
+        for (const [key,value] of Object.entries(params)) endpoint.searchParams.set(key,String(value));
+        const response = await fetch(endpoint,{signal:controller.signal});
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!Array.isArray(result.features) || controller.signal.aborted) return;
+        const content = document.createElement("div");
+        for (const feature of result.features.slice(0,5)) {
+          const card = archaeologicalFeaturePopup(feature.properties,source.name+" · Sítios arqueológicos");
+          if (card) content.append(card);
+        }
+        if (content.childElementCount) L.popup({maxWidth:360,maxHeight:320}).setLatLng(event.latlng).setContent(content).openOn(map);
+      } catch {
+        // WMS sources that do not expose browser-readable attributes remain visible as map images.
+      }
+    };
+    map.on("click",identify);
+    return () => { request?.abort(); map.off("click",identify); };
+  },[map,source.address,source.layer,source.name]);
+  return null;
+}
+
 type IphanSite = {
   id:number; nome:string; codigo:string; classificacao:string; sintese:string;
   tipoBem?:string; tipologia?:string; descricaoTipologicaSicg?:string; cadastro?:string; ficha?:string; areas?:string; fonte?:string;
@@ -461,25 +512,74 @@ export function iphanResultPopup(site:IphanSite) {
   field(details,"Categoria do bem",site.tipoBem);
   field(details,"Fonte",site.fonte ?? "IPHAN / SICG");
   const official=document.createElement("a");
-  official.href="https://sicg.iphan.gov.br/sicg/pesquisarBem";
+  if (site.ficha) official.href=site.ficha;
   official.target="_blank";
   official.rel="noreferrer";
   official.textContent="Pesquisar no SICG";
-  details.append(official);
+  if (site.ficha) details.append(official);
   popup.append(details);
   return popup;
 }
 
-export function PreviewIphanSites({projectId = 0}:{projectId?:number}) {
+// Common field names seen in SICG, CNSA and imported feature collections.
+function archaeologyKey(value:string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+}
+
+function isArchaeologyLayer(name:string) {
+  return /sitios?\s*arqueolog|sitios?\s*iphan|iphan.*sitios?|\bcnsa\b/i.test(
+    name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[_-]/g," "));
+}
+
+export function archaeologicalFeaturePopup(properties:Record<string,unknown> | null | undefined, layerName:string) {
+  if (!properties) return null;
+  const fields = new Map(Object.entries(properties).map(([name,value]) => [archaeologyKey(name),value]));
+  const field = (...names:string[]) => {
+    for (const name of names) {
+      const value = fields.get(archaeologyKey(name));
+      if (typeof value === "string" && value.trim()) return value.trim();
+      if (typeof value === "number" && Number.isFinite(value)) return String(value);
+      if (Array.isArray(value) && value.length && value.every(item => typeof item === "string"))
+        return value.join(", ");
+    }
+  };
+  const category = field("tipoBem","ds_tipo_bem","categoria_bem","natureza","ds_natureza");
+  const code = field("co_iphan","codigo_iphan","cnsa","codigo_cnsa","registro_cnsa");
+  const namedSiteLayer = isArchaeologyLayer(layerName);
+  const explicitSiteName = field("nome_sitio","nome_do_sitio","nm_sitio","site_name");
+  const exactCategory = archaeologyKey(category ?? "");
+  const usable = properties.id_sicg || explicitSiteName || namedSiteLayer || field("tipo_sitio","tipologia_arqueologica","site_type") ||
+    exactCategory === "sitioarqueologico" || (!!code && exactCategory === "sitio");
+  if (!usable) return null;
+  const isIphan = Boolean(properties.id_sicg || code);
+  return iphanResultPopup({
+    id:0,
+    nome:field("nome","nome_sitio","nome_do_sitio","nm_sitio","site_name","identificacao_bem","denominacao_bem","name","titulo") ?? "",
+    codigo:code ?? field("codigo","id") ?? "",
+    classificacao:field("classificacao","ds_classificacao","categoria") ?? "",
+    sintese:field("sintese","sintese_bem","descricao","description") ?? "",
+    tipologia:field("tipologia","tipo_sitio","tipologia_arqueologica","site_type","tipo"),
+    descricaoTipologicaSicg:field("descricaoTipologicaSicg"),
+    cadastro:field("cadastro","dt_cadastro","data_cadastro"),
+    tipoBem:category,
+    areas:field("areas"),
+    fonte:field("fonte","source") ?? (isIphan ? "IPHAN / SICG ou CNSA" : layerName),
+    ficha:isIphan ? "https://sicg.iphan.gov.br/sicg/pesquisarBem" : undefined,
+  });
+}
+
+export function PreviewIphanSites({projectId = 0, layerAlreadyVisible = false}:{projectId?:number; layerAlreadyVisible?:boolean}) {
   const map = useMap();
-  const [active,setActive] = useState(false);
+  const [consult,setConsult] = useState(false);
+  const active = consult || layerAlreadyVisible;
   const [result,setResult] = useState<{point:L.LatLng; status:string; sites:IphanSite[]}>();
   const current = useRef<AbortController>();
   const control = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (control.current) L.DomEvent.disableClickPropagation(control.current); },[]);
+  useEffect(() => { if (control.current) L.DomEvent.disableClickPropagation(control.current); },[layerAlreadyVisible]);
   useEffect(() => {
     if (!active) return;
     const identify = async (event:L.LeafletMouseEvent) => {
+      if ((event.originalEvent.target as Element | null)?.closest?.(".leaflet-interactive") && !consult) return;
       current.current?.abort();
       const point = event.latlng;
       if (map.getZoom() < 10) {
@@ -507,16 +607,16 @@ export function PreviewIphanSites({projectId = 0}:{projectId?:number}) {
     };
     map.on("click",identify);
     return () => {map.off("click",identify);current.current?.abort();};
-  },[active,map,projectId]);
+  },[active,consult,map,projectId]);
 
   return <>
-    <div ref={control} className="absolute bottom-8 right-3 z-[1000]">
+    {!layerAlreadyVisible && <div ref={control} className="absolute bottom-8 right-3 z-[1000]">
       <button type="button" aria-pressed={active}
         className="rounded-md border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow aria-pressed:bg-emerald-100"
-        onClick={() => {setActive(value => !value);setResult(undefined);}}>Consultar sítios IPHAN</button>
+        onClick={() => {setConsult(value => !value);setResult(undefined);}}>Consultar sítios IPHAN</button>
       {active && <p className="mt-1 rounded bg-white px-2 py-1 text-xs text-slate-800">Clique sobre um sítio no mapa.</p>}
-    </div>
-    {active && <WMSTileLayer url="https://geoserver.iphan.gov.br/geoserver/SICG/wms"
+    </div>}
+    {consult && !layerAlreadyVisible && <WMSTileLayer url="https://geoserver.iphan.gov.br/geoserver/SICG/wms"
       params={{layers:"SICG:sitios_pol,SICG:sitios",format:"image/png",transparent:true}} />}
     {active && result && <Popup position={result.point} closeOnClick={false} maxWidth={360} maxHeight={320}
       eventHandlers={{remove:() => {current.current?.abort();setResult(undefined);}}}>
