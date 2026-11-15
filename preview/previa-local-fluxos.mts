@@ -491,6 +491,58 @@ function annotateIphanVector(file:Row) {
 }
 
 type PreviewBounds = [number,number,number,number];
+async function identifyIphanDevelopments(projectId:number, aii:Row) {
+  const bbox = require("@turf/bbox").default;
+  const intersects = require("@turf/boolean-intersects").default;
+  const bounds:number[] = bbox(aii.vector,{recompute:true});
+  if (!bounds.every(Number.isFinite)) throw Error("A AII não tem um recorte válido.");
+  const endpoint = "https://geoserver.iphan.gov.br/geoserver/wfs";
+  const source = "DBGEO:Empreendimentos";
+  const query = new URLSearchParams({
+    service:"WFS",version:"2.0.0",request:"GetFeature",typeNames:source,outputFormat:"application/json",
+    srsName:"EPSG:4326",bbox:bounds.join(",")+",urn:ogc:def:crs:OGC:1.3:CRS84",
+    count:"100",sortBy:"id",
+    propertyName:"geom,id,projeto,processo,ano,tipo_text,unidade",
+  });
+  const candidates:Row[] = [];
+  let total:number | undefined;
+  do {
+    query.set("startIndex",String(candidates.length));
+    const response = await fetch(endpoint+"?"+query,{signal:AbortSignal.timeout(18000),redirect:"error"});
+    if (!response.ok) throw Error("A camada de Empreendimentos do IPHAN está indisponível.");
+    const page = await response.json();
+    if (!Array.isArray(page.features) || !Number.isSafeInteger(page.numberMatched) || page.numberMatched < 0 ||
+        (total !== undefined && page.numberMatched !== total) || (page.numberMatched > candidates.length && !page.features.length))
+      throw Error("O IPHAN não retornou todas as feições do recorte.");
+    total = page.numberMatched as number;
+    if (total > 2500) throw Error("O recorte excede 2.500 empreendimentos. Use uma AII menor.");
+    candidates.push(...page.features);
+  } while (candidates.length < total);
+  if (candidates.length !== total || new Set(candidates.map(feature => feature.id)).size !== total)
+    throw Error("O IPHAN retornou feições repetidas ou incompletas.");
+  const features = candidates.flatMap(feature => {
+    if (!feature.geometry || !aii.vector.features.some((area:Row) => intersects(area.geometry,feature.geometry))) return [];
+    const {id,projeto,processo,ano,tipo_text,unidade} = feature.properties ?? {};
+    return [{type:"Feature",geometry:feature.geometry,properties:{
+      name:[projeto || "Empreendimento sem nome publicado",processo,tipo_text].filter(Boolean).join(" · "),
+      id_iphan:id ?? feature.id,projeto,processo,ano,tipo:tipo_text,unidade,fonte:source,
+    }}];
+  });
+  const name = "Empreendimentos IPHAN · AII.geojson";
+  const vector = {type:"FeatureCollection",features};
+  const contents = Buffer.from(JSON.stringify(vector));
+  const previous = state.files.find(file => file.projectId === projectId && file.analysisKind === "iphan-empreendimentos-aii");
+  const id = previous?.id ?? state.nextId;
+  const file = {...previous,id,projectId,name,vector,fileType:"geojson",fileSize:contents.length,
+    isGeospatial:true,isVisible:true,currentVersion:(previous?.currentVersion ?? 0)+1,
+    uploadedAt:new Date().toISOString(),s3Url:"/previa/download/arquivo/"+id,contents:contents.toString("base64"),
+    source,endpoint,areaSourceId:aii.id,analysisKind:"iphan-empreendimentos-aii",
+    defaultStyle:{color:"#7c3aed",weight:3,fillOpacity:.22}};
+  save({...state,files:[...state.files.filter(row => row.id !== id),file],nextId:previous ? state.nextId : id+1});
+  return {iphanDevelopments:true,projectId,count:features.length,candidates:candidates.length,
+    message:`${features.length} empreendimento(s) da camada oficial do IPHAN intersectam a AII. Camada salva em Mapa & Análise: “${name}”.`};
+}
+
 function regionalProjectSelection(projectId:number, requireAii = false) {
   const bbox = require("@turf/bbox").default;
   const valid = (box:unknown): box is PreviewBounds => Array.isArray(box) && box.length === 4 &&
@@ -798,8 +850,9 @@ export async function workflow(method: string, input: Row = {}, write = false, v
         const result = await crossIphanInfluence(input.projectId,areas);
         return atlas ? {...result,studioUrl:atlas.studioUrl} : result;
       }
-      if (/\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\b/.test(text) && /\bprojetos\b/.test(text) &&
-          /\b(regiao|entorno|vizinhos|proximos|aii)\b/.test(text)) {
+      const wantsDevelopments = /\bempreendimentos?\b/.test(text) && /\baii\b/.test(text);
+      if (wantsDevelopments || (/\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\b/.test(text) && /\bprojetos\b/.test(text) &&
+          /\b(regiao|entorno|vizinhos|proximos|aii)\b/.test(text))) {
         const normalize = (value:string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
           .toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
         const query = " "+normalize(request)+" ";
@@ -811,7 +864,15 @@ export async function workflow(method: string, input: Row = {}, write = false, v
             (short.startsWith("lt ") && query.includes(" "+short+" "));
         });
         if (named.length > 1) throw Error("Há mais de um projeto de referência. Informe o código do projeto.");
-        const {reference,projects,basis} = regionalProjectSelection(named[0]?.id ?? input.projectId,/\baii\b/.test(text));
+        const referenceId = named[0]?.id ?? input.projectId;
+        if (wantsDevelopments) {
+          const aii = state.files.find(file => file.projectId === referenceId && /^AII\.geojson$/i.test(file.name) && file.vector?.features.length);
+          if (!aii || !aii.vector.features.every((feature:Row) => /^(Multi)?Polygon$/.test(feature.geometry?.type)))
+            throw Error("Selecione um projeto com uma camada AII poligonal.");
+          if (method === "atena.previewPlan") return {summary:"Cruzar a AII com a camada oficial de Empreendimentos do IPHAN e salvar o resultado no mapa do projeto."};
+          return identifyIphanDevelopments(referenceId,aii);
+        }
+        const {reference,projects,basis} = regionalProjectSelection(referenceId,/\baii\b/.test(text));
         const names = projects.map(project => project.name).join(", ");
         const message = `${projects.length} projeto(s) no recorte de ${reference.name}, por ${basis}: ${names}.`;
         if (method === "atena.previewPlan") return {summary:message};

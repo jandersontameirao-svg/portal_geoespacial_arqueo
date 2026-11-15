@@ -92,6 +92,11 @@ const demoApi = {
     working.current = true; setBusy(true); setPreviewPlan(null);
     try {
       const result = await localAtena("previewRun", action.projectId, action.text);
+      if (result.iphanDevelopments) {
+        await Promise.all([utils.gisAnalysis.list.invalidate(),utils.files.list.invalidate(),utils.layers.list.invalidate()]);
+        append(result.message);
+        return;
+      }
       if (result.iphanCrossing) {
         append(result.message);
         if (result.studioUrl) {
@@ -135,6 +140,12 @@ const demoApi = {
         /\\biphan\\b/i.test(text) && /\\b(ada|aid|aii)\\b/i.test(text);
       const regionalSelection = /\\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\\b/i.test(text) &&
         /\\bprojetos\\b/i.test(text) && /regi[aã]o|entorno|vizinhos|pr[oó]ximos|\\baii\\b/i.test(text);
+      if (/\\bempreendimentos?\\b/i.test(text) && /\\baii\\b/i.test(text)) {
+        const id = projectId ?? 0;
+        const result = await localAtena("previewPlan",id,text);
+        if (mounted.current && token === revision.current) setPreviewPlan({projectId:id,text,summary:result.summary});
+        return;
+      }
       if (regionalSelection) {
         const id = projectId ?? 0;
         const result = await localAtena("previewRun",id,text);
