@@ -869,6 +869,12 @@ export async function workflow(method: string, input: Row = {}, write = false, v
           const aii = state.files.find(file => file.projectId === referenceId && /^AII\.geojson$/i.test(file.name) && file.vector?.features.length);
           if (!aii || !aii.vector.features.every((feature:Row) => /^(Multi)?Polygon$/.test(feature.geometry?.type)))
             throw Error("Selecione um projeto com uma camada AII poligonal.");
+          if (/\bmapa principal\b/.test(text)) {
+            const layer = state.files.find(file => file.projectId === referenceId && file.analysisKind === "iphan-empreendimentos-aii" && file.areaSourceId === aii.id);
+            if (!layer) throw Error("Primeiro identifique os empreendimentos do IPHAN na AII para criar a camada.");
+            return {mapUrl:"/?projectId="+referenceId+"&empreendimentosAii="+layer.id,
+              message:layer.vector.features.length+" empreendimentos IPHAN na AII."};
+          }
           if (method === "atena.previewPlan") return {summary:"Cruzar a AII com a camada oficial de Empreendimentos do IPHAN e salvar o resultado no mapa do projeto."};
           return identifyIphanDevelopments(referenceId,aii);
         }

@@ -142,8 +142,12 @@ const demoApi = {
         /\\bprojetos\\b/i.test(text) && /regi[aã]o|entorno|vizinhos|pr[oó]ximos|\\baii\\b/i.test(text);
       if (/\\bempreendimentos?\\b/i.test(text) && /\\baii\\b/i.test(text)) {
         const id = projectId ?? 0;
-        const result = await localAtena("previewPlan",id,text);
-        if (mounted.current && token === revision.current) setPreviewPlan({projectId:id,text,summary:result.summary});
+        const showOnMap = /\\bmapa principal\\b/i.test(text);
+        const result = await localAtena(showOnMap ? "previewRun" : "previewPlan",id,text);
+        if (mounted.current && token === revision.current) {
+          if (result.mapUrl) window.location.assign(result.mapUrl);
+          else setPreviewPlan({projectId:id,text,summary:result.summary});
+        }
         return;
       }
       if (regionalSelection) {
@@ -460,6 +464,53 @@ const demoApi = {
 }
 
 `)
+      .concat(`
+function PreviewDevelopmentExtent({data}:{data:import("geojson").FeatureCollection}) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    const bounds = L.geoJSON(data).getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds,{padding:[28,28],maxZoom:15});
+  },[map,data]);
+  return null;
+}
+
+function PreviewDevelopmentsMap({projectId,layerId,basemapUrl}:{projectId:number;layerId:number;basemapUrl:string}) {
+  const query = trpc.layers.list.useQuery({projectId},{retry:false});
+  const layer = query.data?.find(item => item.id === layerId && item.name === "Empreendimentos IPHAN · AII.geojson");
+  const data = isWorkspaceFeatureCollection(layer?.layerData) ? layer.layerData as import("geojson").FeatureCollection : undefined;
+  return <div className="relative flex h-full min-h-[420px] w-full flex-col">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2 text-sm">
+      <span role="status">{data ? data.features.length+" empreendimentos IPHAN na AII" :
+        query.isLoading ? "Carregando empreendimentos…" : "Camada de empreendimentos indisponível."}</span>
+      <a href={"/?projectId="+projectId} className="underline">Voltar à vista geral</a>
+    </div>
+    <MapContainer center={[-5.3,-37.2]} zoom={8} className="min-h-[380px] flex-1" aria-label="Empreendimentos IPHAN na AII">
+      <TileLayer url={basemapUrl}/>
+      {data && <>
+        <PreviewDevelopmentExtent data={data}/>
+        <GeoJSON data={data} style={{color:"#7c3aed",weight:2,fillOpacity:.3}}
+          pointToLayer={(_,point) => L.circleMarker(point,{radius:5,color:"#7c3aed",fillOpacity:.8})}
+          onEachFeature={(feature,item) => {
+            const props=feature.properties;
+            const popup=document.createElement("div");
+            const title=document.createElement("strong");
+            title.textContent=String(props?.projeto || "Empreendimento sem nome publicado");
+            const procedure=document.createElement("div");
+            procedure.textContent="Processo IPHAN: "+String(props?.processo || "Não informado");
+            popup.append(title,procedure);
+            item.bindPopup(popup);
+          }}/>
+      </>}
+    </MapContainer>
+  </div>;
+}
+`)
+      .replace(/  return \(\r?\n    <InstitutionalLayersProvider viewMode=\{viewMode\}>/, match => `  const developmentLayerId = Number(new URLSearchParams(window.location.search).get("empreendimentosAii"));
+  if (projectId && Number.isSafeInteger(developmentLayerId) && developmentLayerId > 0) {
+    return <PreviewDevelopmentsMap projectId={projectId} layerId={developmentLayerId}
+      basemapUrl={activeBasemap.url ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png"}/>;
+  }
+` + match)
       .replace('onEachFeature={(_feature, leafletLayer) => {', `onEachFeature={(feature, leafletLayer) => {
               const site = archaeologicalFeaturePopup(feature.properties,layer.name);
               if (site) { leafletLayer.bindPopup(site,{maxHeight:320}); return; }`)
