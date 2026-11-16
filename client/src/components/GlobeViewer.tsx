@@ -285,6 +285,16 @@ export default function GlobeViewer({
       ]);
     } catch { /* o mapa permanece como está se o reset falhar */ }
   };
+  const [selectingIntersecting, setSelectingIntersecting] = useState(false);
+  const selectIntersectingProjects = async (focusProjectId: number) => {
+    setSelectingIntersecting(true);
+    try {
+      const { projectIds } = await utils.projectSelection.intersecting.fetch({ projectId: focusProjectId });
+      await selectionMutation.mutateAsync({ projectIds });
+      await utils.projectSelection.get.invalidate();
+    } catch { /* seleção mantida se a interseção falhar */ }
+    finally { setSelectingIntersecting(false); }
+  };
   const enabledIds = useMemo(
     () =>
       projectsError
@@ -1031,6 +1041,19 @@ export default function GlobeViewer({
             aria-label="Limpar mapa"
           >
             <Eraser className="w-5 h-5" />
+          </Button>
+        )}
+        {viewMode === "2d" && projectId && (
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => void selectIntersectingProjects(projectId)}
+            disabled={selectingIntersecting || selectionMutation.isPending}
+            className="bg-white/90 hover:bg-white shadow-lg"
+            title="Selecionar projetos que cruzam este"
+            aria-label="Selecionar projetos que cruzam este"
+          >
+            <Layers className="w-5 h-5" />
           </Button>
         )}
         {/* Toggle 2D/3D */}

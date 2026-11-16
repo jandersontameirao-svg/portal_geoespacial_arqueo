@@ -430,6 +430,10 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
     },
     onError: (error) => toast.error(error.message),
   });
+  const crossIphanSites = trpc.iphanSites.crossLayer.useMutation({
+    onSuccess: (result) => { void utils.gisAnalysis.list.invalidate({ projectId }); toast.success(`${result.count} sítio(s) do IPHAN na área, salvos como camada.`); },
+    onError: (error) => toast.error(error.message || "Não foi possível cruzar os sítios do IPHAN"),
+  });
   const importWfsLayer = trpc.ogcCatalog.importWfsToProject.useMutation({
     onSuccess: async (result) => {
       await invalidate();
@@ -628,7 +632,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
         </SidePanel>
         <SidePanel title="Árvore temática e legenda">
           <p className="mb-2 text-xs text-muted-foreground">Olho controla visualização; “usar na análise” é independente e só se aplica a vetores próprios.</p>
-          <div className="space-y-3">{geometriesLoading || layersLoading || rastersLoading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : <ThematicLayerTree items={thematicItems} order={thematicOrder} disabled={!canEdit} onVisibilityChange={toggleThematicVisibility} onAnalysisSelectionChange={toggleThematicAnalysis} onMove={moveThematicLayer} />}{selectedVectorLayerIds.length > 0 && <div className="space-y-1"><p className="text-xs font-medium">Exportar primeiro vetor selecionado</p><div className="grid grid-cols-2 gap-1.5">{([["geojson", "GeoJSON"], ["shp", "Shapefile"], ["kml", "KML"], ["gpx", "GPX"]] as const).map(([format, label]) => <Button key={format} size="sm" variant="outline" disabled={exportVectorFile.isPending} onClick={() => exportVectorFile.mutate({ projectId, layerId: selectedVectorLayerIds[0], format })}><Download className="mr-1.5 h-3.5 w-3.5" />{label}</Button>)}</div></div>}<p className="text-xs text-muted-foreground">A ordem é visual nesta sessão; visibilidade de camadas próprias é persistida e auditada. WFS exige importação controlada antes de análise.</p></div>
+          <div className="space-y-3">{geometriesLoading || layersLoading || rastersLoading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : <ThematicLayerTree items={thematicItems} order={thematicOrder} disabled={!canEdit} onVisibilityChange={toggleThematicVisibility} onAnalysisSelectionChange={toggleThematicAnalysis} onMove={moveThematicLayer} />}{selectedVectorLayerIds.length > 0 && <div className="space-y-1"><p className="text-xs font-medium">Exportar primeiro vetor selecionado</p><div className="grid grid-cols-2 gap-1.5">{([["geojson", "GeoJSON"], ["shp", "Shapefile"], ["kml", "KML"], ["gpx", "GPX"]] as const).map(([format, label]) => <Button key={format} size="sm" variant="outline" disabled={exportVectorFile.isPending} onClick={() => exportVectorFile.mutate({ projectId, layerId: selectedVectorLayerIds[0], format })}><Download className="mr-1.5 h-3.5 w-3.5" />{label}</Button>)}</div><Button size="sm" variant="outline" className="w-full" disabled={!canEdit || crossIphanSites.isPending} onClick={() => crossIphanSites.mutate({ projectId, layerId: selectedVectorLayerIds[0] })}>{crossIphanSites.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}Cruzar sítios IPHAN com a área</Button></div>}<p className="text-xs text-muted-foreground">A ordem é visual nesta sessão; visibilidade de camadas próprias é persistida e auditada. WFS exige importação controlada antes de análise.</p></div>
         </SidePanel>
 
         {hasIbgeWfs && <Card><CardHeader className="pb-3"><CardTitle className="text-base">IBGE WFS · consulta temporária</CardTitle></CardHeader><CardContent><p className="text-xs text-muted-foreground">Use o painel GeoServer do globo em 2D e clique em Consultar recorte. As feições ficam apenas em memória; importação persistente e análise de IBGE não estão disponíveis neste workspace.</p></CardContent></Card>}
