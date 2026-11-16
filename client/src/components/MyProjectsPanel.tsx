@@ -139,6 +139,14 @@ export default function MyProjectsPanel({
           {onCount}/{all.length}
         </span>
       </div>
+      <div className="flex flex-wrap gap-2" aria-label="Visibilidade dos projetos">
+        <Button type="button" variant="outline" size="sm"
+          disabled={busy || !all.length || onCount === all.length || all.length > SELECTION_LIMIT}
+          onClick={() => onChange(all.map(project => project.id))}>Ligar todos</Button>
+        <Button type="button" variant="outline" size="sm"
+          disabled={busy || onCount === 0}
+          onClick={() => onChange([])}>Desligar todos</Button>
+      </div>
       <Input
         value={filter}
         onChange={event => setFilter(event.target.value)}

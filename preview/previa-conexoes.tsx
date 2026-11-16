@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-type Connection = { id?: number; name: string; type: string; address: string; status?: string; layer?: string; enabled?: boolean };
+type Connection = { id?: number; name: string; type: string; address: string; status?: string; layer?: string; enabled?: boolean; official?: boolean };
 const blank: Connection = { name: "", type: "WMS", address: "" };
 async function request(connection?: Connection) {
   const response = await fetch("/api/trpc/previewConnections." + (connection ? "save" : "list"), connection ? {
@@ -21,6 +21,7 @@ export default function PreviewConnections() {
     try {
       const saved: Connection = await request(connection);
       setItems(current => [...current.filter(item => item.id !== saved.id), saved]);
+      window.dispatchEvent(new Event("preview-connections-changed"));
       setDraft(undefined); setNotice("Fonte atualizada.");
     } catch (error) { setNotice((error as Error).message); }
     finally { setBusy(false); }
@@ -49,10 +50,12 @@ export default function PreviewConnections() {
     </form>}
     {!items.length && <p className="text-sm text-muted-foreground">Nenhuma fonte cadastrada.</p>}
     <ul className="space-y-2">{items.map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
-      <div><strong>{item.name}</strong><p className="break-all text-muted-foreground">{item.type} · {item.address}</p>
-        {item.type === "WMS" && item.layer ? <label className="flex gap-2"><input type="checkbox" disabled={busy || !!draft} checked={!!item.enabled} onChange={e => void save({ ...item, enabled: e.target.checked })} /> Exibir {item.name} no mapa</label> :
-          <span>{item.type === "WMS" ? "Informe a camada WMS para ligar a fonte." : "Cadastro para integração futura."}</span>}</div>
-      <button type="button" className="rounded border px-3 py-1" onClick={() => { setNotice(""); setDraft(item); }}>Editar fonte</button>
+      <div><strong>{item.name}</strong><p className="break-all text-muted-foreground">{item.type} · {item.official ?
+        <a href={item.address} target="_blank" rel="noreferrer" className="underline">{item.address}</a> : item.address}</p>
+        {(item.official || item.type === "WMS") && item.layer ? <label className="flex gap-2"><input type="checkbox" disabled={busy || !!draft} checked={!!item.enabled} onChange={e => void save({ ...item, enabled: e.target.checked })} /> Exibir {item.name} no mapa</label> :
+          <span>{item.status ?? (item.type === "WMS" ? "Informe a camada WMS para ligar a fonte." : "Cadastro para integração futura.")}</span>}
+        {item.layer && item.status && <p className="text-muted-foreground">{item.status}</p>}</div>
+      {!item.official && <button type="button" className="rounded border px-3 py-1" onClick={() => { setNotice(""); setDraft(item); }}>Editar fonte</button>}
     </li>)}</ul>
   </section>;
 }

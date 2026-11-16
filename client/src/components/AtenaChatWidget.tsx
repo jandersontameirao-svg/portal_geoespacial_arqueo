@@ -28,6 +28,14 @@ function AtenaChatSession({ previewMode }: { previewMode: boolean }) {
   const [location, navigate] = useLocation();
   const search = useSearch();
   const [open, setOpen] = useState(previewMode);
+  useEffect(() => {
+    const openFromStudio = (event: Event) => {
+      setOpen(true);
+      if (event instanceof CustomEvent && typeof event.detail === "string") setDraft(event.detail);
+    };
+    window.addEventListener("studio-open-atena", openFromStudio);
+    return () => window.removeEventListener("studio-open-atena", openFromStudio);
+  }, []);
   const [draft, setDraft] = useState("");
   const [selectedId, setSelectedId] = useState<number>();
   const [messages, setMessages] = useState<Message[]>(previewMode ? [{ id: "preview", role: "assistant", content: "Prévia sintética: nenhuma sessão, API, IA ou execução está habilitada." }] : welcome);

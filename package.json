@@ -54,6 +54,7 @@
     "@trpc/server": "^11.6.0",
     "@turf/area": "^7.3.1",
     "@turf/bbox": "^7.3.1",
+    "@turf/boolean-intersects": "^7.4.0",
     "@turf/buffer": "^7.3.1",
     "@turf/helpers": "^7.3.1",
     "@turf/intersect": "^7.3.1",

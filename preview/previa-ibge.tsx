@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { GeoJSON, WMSTileLayer, useMap } from "react-leaflet";
+import { GeoJSON, ImageOverlay, Popup, WMSTileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
-import { MapPinned, X } from "lucide-react";
+import { Layers, X } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 
 const layers = [
@@ -10,7 +10,9 @@ const layers = [
   { id: "localidades", label: "Localidades", color: "#f97316", zoom: 10 },
 ] as const;
 
-function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number]; projectBounds?: string }) {
+const palmaresLayer = { id: "palmares", label: "Municípios com comunidades certificadas", color: "#a855f7", zoom: 0 } as const;
+
+function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number] | typeof palmaresLayer; projectBounds?: string }) {
   const map = useMap();
   const [result, setResult] = useState<FeatureCollection>();
   const [status, setStatus] = useState("");
@@ -52,9 +54,11 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number];
     return () => { controller?.abort(); map.off("moveend", update); };
   }, [layer, map, projectBounds]);
   return <>
-    {status && <span className="block text-[11px] text-slate-600" role="status">{status}</span>}
+    {status && layer.id !== "palmares" && <span className="block text-[11px] text-slate-600" role="status">{status}</span>}
     {result && <GeoJSON key={showNames + JSON.stringify(result.features.map(feature => feature.properties?.codigo))} data={result}
-      style={{ color: layer.color, weight: layer.id === "estados" ? 2 : 1, fillOpacity: 0 }}
+      style={{ color: layer.color, weight: layer.id === "estados" ? 2 : 1,
+        fillOpacity: layer.id === "palmares" ? 0.35 : 0,
+        className: layer.id === "palmares" ? "preview-palmares-municipio" : undefined }}
       pointToLayer={(_, point) => L.circleMarker(point, { radius: 3, color: layer.color, fillOpacity: 0.9 })}
       onEachFeature={(feature, item) => {
         const label = document.createElement("span");
@@ -65,26 +69,203 @@ function OfficialLayer({ layer, projectBounds }: { layer: typeof layers[number];
           item.getTooltip()?.setLatLng([lat, lon]);
         } else item.bindTooltip(label, { sticky: true });
         const popup = document.createElement("span");
-        popup.textContent = label.textContent + " — IBGE " + (layer.id === "localidades" ? "2022" : "2024");
+        popup.textContent = label.textContent + (layer.id === "palmares"
+          ? " — Município com comunidade certificada pela Fundação Cultural Palmares. Limite municipal do IBGE."
+          : " — IBGE " + (layer.id === "localidades" ? "2022" : "2024"));
         item.bindPopup(popup);
       }} />}
   </>;
 }
 
-export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: string }) {
+type MapSource = { id: number; name: string; address: string; layer: string; type: string; official?: boolean; enabled: boolean; selectedLayers?: string[]; availableLayers?: string[]; group?: string };
+
+const childNames: Record<string, string> = {
+  canie_052026_p: "Cavidades naturais subterrâneas",
+  mapbiomas2024: "Cobertura e uso da terra · Brasil (2024)",
+  worldcover: "Classes de cobertura do solo · recorte da LT",
+  sombreado: "Relevo sombreado",
+  elevacao: "Elevação (m)",
+  declividade: "Declividade (graus)",
+  curvas: "Curvas de nível (20 m)",
+  "idesp_acervo:bem_tomb_a_2025_01_v0": "Bens tombados · estado de São Paulo (2025.01)",
+  "condephaat-capital": "Imóveis tombados · município de São Paulo",
+  "IDE:ide_2017_mg_tombamento_iepha_pto": "Bens culturais tombados",
+  "IDE:ide_2017_mg_ai_patrimonio_cultural_iepha_pol": "Áreas de influência do patrimônio cultural",
+  "IDE:ide_2017_mg_celebracoes_formas_expressao_iepha_pto": "Celebrações e formas de expressão",
+  "IDE:ide_2017_mg_lugares_iepha_pto": "Lugares de referência cultural",
+  "IDE:ide_2017_mg_saberes_iepha_pol": "Saberes",
+  "SICG:sitios": "Sítios arqueológicos · pontos",
+  "SICG:sitios_pol": "Sítios arqueológicos · polígonos",
+  "DBGEO:Empreendimentos": "Empreendimentos · FCA (grupo oficial)",
+  "fca:fca": "FCA · camada individual",
+  "CMR-PUBLICO:lim_terra_indigena_a": "Terras indígenas",
+  palmares: palmaresLayer.label,
+};
+
+function childrenFor(source: MapSource) {
+  if (source.id === -2) return layers.map(layer => ({ id: layer.id, label: layer.label }));
+  const hydroNames: Record<string, string> = {
+    "53": "Bacias hidrográficas · nível 1 (BHO 2017)",
+    "54": "Bacias hidrográficas · nível 2 (BHO 2017)",
+    "140": "Massas d’água",
+    "156": "Reservatórios do Nordeste · SAR",
+    "159": "Reservatórios do Sistema Interligado Nacional · SAR",
+    "154": "Estações da rede de qualidade da água (2020)",
+    "134": "Índice de Qualidade das Águas · IQA (2020)",
+    "141": "Outorgas de uso da água emitidas pela ANA",
+  };
+  return [...(source.availableLayers ?? []), ...(source.layer || "").split(",").filter(Boolean)].map(id => ({
+    id, label: source.group === "fundiario" ? source.name.split(" · ").slice(1).join(" · ")
+      : source.id === -13 ? "Trechos de drenagem" : source.id === -14 ? hydroNames[id] ?? id
+      : childNames[id] ?? (id === "0" ? source.name.split(" · ").slice(-1)[0] ?? id : id),
+  }));
+}
+
+function selectedFor(source: MapSource) {
+  return source.selectedLayers ?? (source.id === -2 ? ["municipios"] : (source.layer || "").split(",").filter(Boolean));
+}
+
+type CatalogLayer = { id: string; label: string };
+
+async function discoverLayers(source: MapSource): Promise<CatalogLayer[]> {
+  const url = new URL(source.address);
+  const options = { signal: AbortSignal.timeout(12000), credentials: "omit" as const };
+  if (source.type === "ArcGIS REST") {
+    url.searchParams.set("f", "json");
+    const response = await fetch(url, options);
+    if (!response.ok) throw Error();
+    const data = await response.json();
+    if (!Array.isArray(data.layers)) throw Error();
+    return data.layers.filter((layer: any) => Number.isInteger(layer.id) && !layer.subLayerIds?.length)
+      .map((layer: any) => ({ id: String(layer.id), label: String(layer.name) }));
+  }
+  url.search = new URLSearchParams({ service: "WMS", request: "GetCapabilities", version: "1.1.1" }).toString();
+  const response = await fetch(source.id === -1 || source.id === -3
+    ? "/previa/catalogo-wms?id=" + source.id : url.href, options);
+  if (!response.ok) throw Error();
+  const xml = new DOMParser().parseFromString(await response.text(), "application/xml");
+  if (!["WMT_MS_Capabilities", "WMS_Capabilities"].includes(xml.documentElement.localName)) throw Error();
+  return [...xml.getElementsByTagNameNS("*", "Layer")].flatMap(layer => {
+    const fields = [...layer.children];
+    const id = fields.find(field => field.localName === "Name")?.textContent?.trim();
+    const label = fields.find(field => field.localName === "Title")?.textContent?.trim();
+    return id && /^[\w.:-]{1,150}$/.test(id) ? [{ id, label: label || id }] : [];
+  });
+}
+
+const copernicusAttribution = "Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved";
+
+function CondephaatLayer() {
+  const [data, setData] = useState<FeatureCollection>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/previa/condephaat", { signal: controller.signal }).then(response => {
+      if (!response.ok) throw Error();
+      return response.json();
+    }).then(result => { if (!controller.signal.aborted) setData(result); })
+      .catch(() => { if (!controller.signal.aborted) setFailed(true); });
+    return () => controller.abort();
+  }, []);
+  if (failed) return <p role="status" className="px-2 text-xs">Não foi possível carregar a camada do Condephaat.</p>;
+  // SIRGAS 2000 longitude/latitude is used for visualization on the Leaflet map.
+  return data && <GeoJSON data={data} attribution="Condephaat / IDE-SP · URBIS (CC BY-SA 4.0)"
+    style={{ className: "preview-condephaat", color: "#f59e0b", weight: 2, fillOpacity: 0.3 }}
+    pointToLayer={(_, point) => L.circleMarker(point, { radius: 4, color: "#f59e0b", className: "preview-condephaat" })}
+    onEachFeature={(feature, layer) => {
+      const label = document.createElement("span");
+      label.textContent = feature.properties?.denominacao_bem || "Imóvel tombado · Condephaat";
+      layer.bindPopup(label);
+    }} />;
+}
+
+function ArcGisTiles({ source }: { source: MapSource }) {
+  const map = useMap();
+  useEffect(() => {
+    // ArcGIS export renders each Leaflet tile using the same Web Mercator extent.
+    const tileSize = 256;
+    const tiles = L.tileLayer(source.address + "/export", { tileSize, attribution: source.name });
+    tiles.getTileUrl = ({ x, y, z }: L.Coords) => {
+      const northwest = L.CRS.EPSG3857.project(map.unproject(L.point(x * tileSize, y * tileSize), z));
+      const southeast = L.CRS.EPSG3857.project(map.unproject(L.point((x + 1) * tileSize, (y + 1) * tileSize), z));
+      const url = new URL(source.address + "/export");
+      url.search = new URLSearchParams({
+        bbox: [northwest.x, southeast.y, southeast.x, northwest.y].join(","),
+        bboxSR: "3857", imageSR: "3857", size: "256,256", format: "png32",
+        transparent: "true", layers: "show:" + source.layer, f: "image",
+      }).toString();
+      return url.href;
+    };
+    tiles.addTo(map);
+    return () => { tiles.remove(); };
+  }, [map, source]);
+  return null;
+}
+
+function MapBiomasTiles({ url }: { url: string }) {
+  const map = useMap();
+  useEffect(() => {
+    const grid = L.gridLayer({ opacity: 0.72, noWrap: true, minNativeZoom: 4, maxNativeZoom: 9,
+      bounds: L.latLngBounds([-36.06, -79.12], [6.84, -32.39]),
+      attribution: "MapBiomas Brasil 2024 · Imagem/ArcGIS · CC BY 4.0" });
+    grid.createTile = ({ x, y, z }: L.Coords, done: L.DoneCallback) => {
+      const tile = document.createElement("canvas");
+      tile.width = tile.height = 256;
+      tile.className = "preview-mapbiomas";
+      const ctx = tile.getContext("2d")!;
+      ctx.imageSmoothingEnabled = false;
+      const rows = new Map<number, [number, number][]>();
+      // The geographic cache starts at (-180, 180). Longitude already aligns
+      // with Leaflet; sample latitude per pixel to reproject to Web Mercator.
+      for (let py = 0; py < 256; py++) {
+        const { lat } = map.unproject(L.point(x * 256, y * 256 + py + 0.5), z);
+        const sy = (180 - lat) * 2 ** z / 360;
+        const row = Math.floor(sy);
+        if (!rows.has(row)) rows.set(row, []);
+        rows.get(row)!.push([py, Math.floor((sy - row) * 256)]);
+      }
+      void Promise.all([...rows].map(([row, pixels]) => new Promise<boolean>(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          for (const [py, sy] of pixels) ctx.drawImage(img, 0, sy, 256, 1, 0, py, 256, 1);
+          resolve(true);
+        };
+        img.onerror = () => resolve(false);
+        img.src = url + "/tile/" + z + "/" + row + "/" + x;
+      }))).then(results => done(results.some(Boolean) ? undefined : new Error("MapBiomas: tile indisponível"), tile));
+      return tile;
+    };
+    grid.addTo(map);
+    return () => { grid.remove(); };
+  }, [map, url]);
+  return null;
+}
+
+export default function PreviewIbgeLayers({ projectBounds, projectId }: { projectBounds?: string; projectId?: number }) {
   const map = useMap();
   const controlRef = useRef<HTMLDetailsElement>(null);
-  const [enabled, setEnabled] = useState<Record<string, boolean>>({ municipios: true });
-  const [sources, setSources] = useState<{ id: number; address: string; layer: string }[]>([]);
+  const [connections, setConnections] = useState<MapSource[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [catalogs, setCatalogs] = useState<Record<string, CatalogLayer[] | "loading" | "error">>({});
+  const loadingCatalogs = useRef(new Set<string>());
   useEffect(() => {
     const controller = new AbortController();
     const refresh = () => fetch("/api/trpc/previewConnections.list", { signal: controller.signal, cache: "no-store" })
       .then(r => r.json()).then(data => {
-        if (!controller.signal.aborted) setSources((data.result?.data?.json ?? []).filter((source: any) => source.type === "WMS" && source.enabled && source.layer));
-      }).catch(() => {});
+        if (controller.signal.aborted) return;
+        const connections: MapSource[] = data.result?.data?.json ?? [];
+        setConnections(connections);
+        setError("");
+      }).catch(() => { if (!controller.signal.aborted) setError("Não foi possível carregar as camadas."); });
     void refresh();
     window.addEventListener("focus", refresh);
-    return () => { controller.abort(); window.removeEventListener("focus", refresh); };
+    window.addEventListener("preview-connections-changed", refresh);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("preview-connections-changed", refresh);
+    };
   }, []);
   useEffect(() => {
     const control = controlRef.current;
@@ -97,35 +278,367 @@ export default function PreviewIbgeLayers({ projectBounds }: { projectBounds?: s
     control.querySelector("summary")?.focus();
   }
 
-  return <>{sources.map(source => <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
+  async function saveVisibility(source: MapSource, enabled: boolean, selectedLayers?: string[]) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/trpc/previewConnections.save", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ json: { ...source, enabled, selectedLayers } }),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.error) throw Error();
+      const saved: MapSource = payload.result.data.json;
+      setConnections(current => current.map(item => item.id === saved.id ? saved : item));
+      window.dispatchEvent(new Event("preview-connections-changed"));
+    } catch {
+      setError("Não foi possível salvar a visibilidade.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadCatalog(source: MapSource, key: string) {
+    if (loadingCatalogs.current.has(key) || Array.isArray(catalogs[key])) return;
+    loadingCatalogs.current.add(key);
+    setCatalogs(current => ({ ...current, [key]: "loading" }));
+    try {
+      const items = await discoverLayers(source);
+      setCatalogs(current => ({ ...current, [key]: items }));
+    } catch {
+      setCatalogs(current => ({ ...current, [key]: "error" }));
+    } finally {
+      loadingCatalogs.current.delete(key);
+    }
+  }
+
+  const active = connections.filter(source => source.enabled);
+  const ibge = active.find(source => source.id === -2);
+  const sources = active.filter(source => source.type === "WMS" || (source.official && source.type === "ArcGIS REST"))
+    .map(source => ({ ...source, layer: selectedFor(source).join(",") })).filter(source => source.layer);
+
+  const iphan = sources.find(source => source.id === -1 && source.layer.split(",").some(layer => /^SICG:sitios(?:_pol)?$/.test(layer)));
+  const siteServices = sources.filter(source => source.type === "WMS" && source.id !== -1)
+    .map(source => ({...source,layer:source.layer.split(",").filter(id =>
+      isArchaeologyLayer(id) || isArchaeologyLayer(childNames[id] ?? "") ||
+      (source.layer.split(",").length === 1 && isArchaeologyLayer(source.name))
+    ).join(",")})).filter(source => source.layer);
+  return <><PreviewIphanSites projectId={projectId} layerAlreadyVisible={Boolean(iphan)} />
+  {siteServices.map(source => <ArchaeologicalWmsIdentify key={source.id} source={source} />)}{active.some(source => source.id === -5 && selectedFor(source).includes("palmares")) && <OfficialLayer layer={palmaresLayer} />}
+  {sources.map(source => source.type === "ArcGIS REST"
+    ? <ArcGisTiles key={source.id} source={source} />
+    : <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
+  {active.filter(source => source.type === "ArcGIS cache SIRGAS 2000" && selectedFor(source).includes("mapbiomas2024")).map(source =>
+    <MapBiomasTiles key={source.id} url={source.address} />)}
   <details ref={controlRef} className="preview-ibge-control" onKeyDown={event => {
     if (event.key === "Escape" && event.currentTarget.open) {
       event.stopPropagation();
       closePanel();
     }
   }}>
-    <summary aria-label="Camadas IBGE" title="Camadas IBGE">
-      <MapPinned size={20} aria-hidden="true" />
+    <summary aria-label="Camadas do mapa" title="Camadas do mapa">
+      <Layers size={20} aria-hidden="true" />
     </summary>
     <div className="preview-ibge-panel rounded-lg border bg-white p-2 shadow-lg">
     <div className="flex items-center justify-between gap-2 pl-2">
-      <h3 className="text-xs font-semibold">Camadas IBGE</h3>
-      <button type="button" onClick={closePanel} aria-label="Fechar Camadas IBGE" title="Fechar Camadas IBGE"
+      <h3 className="text-sm font-semibold">Camadas do mapa</h3>
+      <button type="button" onClick={closePanel} aria-label="Fechar camadas do mapa" title="Fechar camadas do mapa"
         className="grid size-7 shrink-0 place-items-center rounded-md text-slate-700 hover:bg-slate-100 focus-visible:outline-2">
         <X size={16} aria-hidden="true" />
       </button>
     </div>
-    {layers.map(layer => <div key={layer.id} className="rounded px-2 py-1.5 text-xs hover:bg-slate-50">
-      <label className="flex cursor-pointer items-center gap-2">
-        <input type="checkbox" checked={!!enabled[layer.id]} onChange={event => {
-          const checked = event.target.checked;
-          setEnabled(current => ({ ...current, [layer.id]: checked }));
-        }} />
-        <span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: layer.color }} />
-        {layer.label}
-      </label>
-      {enabled[layer.id] && <OfficialLayer layer={layer} projectBounds={projectBounds} />}
-    </div>)}
+    {error && <p role="alert" className="px-2 text-xs text-red-700">{error}</p>}
+    {(() => {
+    const renderSource = (source: MapSource) => {
+      const key = source.id + ":" + source.address;
+      const catalog = catalogs[key];
+      const remote = !source.group && (source.type === "WMS" || source.type === "ArcGIS REST");
+      const children = [...new Map([
+        ...(Array.isArray(catalog) ? catalog : []),
+        ...childrenFor(source),
+      ].map(child => [child.id, child])).values()];
+      children.sort((a, b) => Number((source.availableLayers ?? []).includes(b.id)) - Number((source.availableLayers ?? []).includes(a.id)));
+      const selected = selectedFor(source);
+      for (const id of selected) if (!children.some(child => child.id === id)) children.push({ id, label: id });
+      const groupOn = source.enabled && selected.length > 0;
+      return <details key={key} className="border-t py-1 text-sm" onToggle={event => {
+        if (event.currentTarget.open && remote) void loadCatalog(source, key);
+      }}>
+        <summary className="cursor-pointer px-2 py-1">
+          <input type="checkbox" aria-label={source.name} disabled={busy} checked={groupOn}
+            className="ml-1 mr-2" onClick={event => event.stopPropagation()}
+            ref={input => { if (input) input.indeterminate = groupOn && selected.length < children.length; }}
+            onChange={() => void saveVisibility(source, !groupOn, !groupOn && !selected.length
+              ? childrenFor(source).filter(child => !source.availableLayers?.includes(child.id)).map(child => child.id) : selected)} />
+          <span>{source.group ? source.name : source.name.split(" · ")[0]}</span>
+        </summary>
+        {catalog === "loading" && <p role="status" className="ml-5 text-xs">Carregando subcamadas…</p>}
+        {catalog === "error" && <button type="button" className="ml-5 text-xs underline" onClick={() => void loadCatalog(source, key)}>Catálogo indisponível · tentar novamente</button>}
+        {children.map(child => <label key={child.id} className="ml-5 flex cursor-pointer items-center gap-2 px-2 py-1 text-xs">
+          <input type="checkbox" disabled={busy} checked={source.enabled && selected.includes(child.id)}
+            onChange={event => {
+              const selection = source.enabled ? selected : [];
+              const next = event.target.checked ? [...selection, child.id] : selection.filter(id => id !== child.id);
+              if (next.length > 40) { setError("Selecione até 40 subcamadas por fonte."); return; }
+              void saveVisibility(source, next.length > 0, next);
+            }} />
+          {child.label}
+        </label>)}
+      </details>;
+    };
+    const mapped = connections.filter(source => source.layer && (source.official || source.type === "WMS"));
+    return <>
+      {mapped.filter(source => !source.group).map(renderSource)}
+      {active.some(source => source.id === -20 && selectedFor(source).includes("worldcover")) &&
+        <ImageOverlay url="/previa/uso-solo/worldcover.png" bounds={[[-5.75, -37.85], [-4.75, -36.38]]}
+          opacity={0.72} className="preview-worldcover" attribution="ESA WorldCover 2021 v200 · CC BY 4.0" />}
+      {[
+        ["cavidades", "Cavidades naturais"],
+        ["fundiario", "Imóveis rurais e fundiário"],
+        ["uso-solo", "Uso e cobertura do solo"],
+        ["infraestrutura-eletrica", "Infraestrutura elétrica"],
+      ].filter(([group]) => mapped.some(source => source.group === group)).map(([group, title]) =>
+        <details key={group} className="border-t py-1 text-sm">
+          <summary className="cursor-pointer px-2 py-1">{title}</summary>
+          <div className="ml-3">{mapped.filter(source => source.group === group).map(renderSource)}</div>
+        </details>)}
+      <details className="border-t py-1 text-sm">
+        <summary className="cursor-pointer px-2 py-1">Relevo e topografia</summary>
+        <div className="ml-3">
+          {mapped.filter(source => source.group === "relevo").map(renderSource)}
+          <p className="px-2 text-xs text-slate-600">Recorte da LT · modelo de superfície de 30 m</p>
+          {active.filter(source => source.group === "relevo").flatMap(source => selectedFor(source)).map(id =>
+            <ImageOverlay key={id}
+              url={"/previa/relevo/" + id + ".png"} bounds={[[-5.75, -37.85], [-4.75, -36.38]]}
+              opacity={0.72} className={"preview-glo30-" + id} attribution={copernicusAttribution} />)}
+        </div>
+      </details>
+      <details className="border-t py-1 text-sm">
+        <summary className="cursor-pointer px-2 py-1">Recursos hídricos</summary>
+        <div className="ml-3">{mapped.filter(source => source.group === "recursos-hidricos").map(renderSource)}</div>
+      </details>
+      <details className="border-t py-1 text-sm">
+        <summary className="cursor-pointer px-2 py-1">Patrimônio cultural estadual</summary>
+        <div className="ml-3">
+          {mapped.filter(source => source.group === "patrimonio-estadual").map(renderSource)}
+          {active.some(source => source.id === -8 && selectedFor(source).includes("condephaat-capital")) && <CondephaatLayer />}
+        </div>
+      </details>
+    </>;
+    })()}
+    {ibge && layers.filter(layer => selectedFor(ibge).includes(layer.id)).map(layer =>
+      <OfficialLayer key={layer.id} layer={layer} projectBounds={projectBounds} />)}
     </div>
   </details></>;
+}
+
+function ArchaeologicalWmsIdentify({source}:{source:MapSource}) {
+  const map = useMap();
+  useEffect(() => {
+    let request:AbortController | undefined;
+    const identify = async (event:L.LeafletMouseEvent) => {
+      if (map.getZoom() < 10 || (event.originalEvent.target as Element | null)?.closest?.(".leaflet-interactive")) return;
+      request?.abort();
+      const controller = new AbortController();
+      request = controller;
+      try {
+        const bounds = map.getBounds();
+        const sw = L.CRS.EPSG3857.project(bounds.getSouthWest());
+        const ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
+        const {x,y} = map.latLngToContainerPoint(event.latlng);
+        const size = map.getSize();
+        const endpoint = new URL(source.address);
+        const params = {
+          SERVICE:"WMS", VERSION:"1.1.1", REQUEST:"GetFeatureInfo",
+          SRS:"EPSG:3857", BBOX:[sw.x,sw.y,ne.x,ne.y].join(","),
+          WIDTH:size.x, HEIGHT:size.y, X:Math.round(x), Y:Math.round(y),
+          LAYERS:source.layer, QUERY_LAYERS:source.layer, STYLES:"",
+          FORMAT:"image/png", INFO_FORMAT:"application/json", FEATURE_COUNT:5,
+        };
+        for (const [key,value] of Object.entries(params)) endpoint.searchParams.set(key,String(value));
+        const response = await fetch(endpoint,{signal:controller.signal});
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!Array.isArray(result.features) || controller.signal.aborted) return;
+        const content = document.createElement("div");
+        for (const feature of result.features.slice(0,5)) {
+          const card = archaeologicalFeaturePopup(feature.properties,source.name+" · Sítios arqueológicos");
+          if (card) content.append(card);
+        }
+        if (content.childElementCount) L.popup({maxWidth:360,maxHeight:320}).setLatLng(event.latlng).setContent(content).openOn(map);
+      } catch {
+        // WMS sources that do not expose browser-readable attributes remain visible as map images.
+      }
+    };
+    map.on("click",identify);
+    return () => { request?.abort(); map.off("click",identify); };
+  },[map,source.address,source.layer,source.name]);
+  return null;
+}
+
+type IphanSite = {
+  id:number; nome:string; codigo:string; classificacao:string; sintese:string;
+  tipoBem?:string; tipologia?:string; descricaoTipologicaSicg?:string; cadastro?:string; ficha?:string; areas?:string; fonte?:string;
+};
+
+function siteType(site:IphanSite) {
+  const type = site.tipologia || site.descricaoTipologicaSicg;
+  return type || "Tipologia não informada";
+}
+
+export function iphanResultPopup(site:IphanSite) {
+  const popup=document.createElement("article");
+  popup.style.maxWidth="320px";
+  const title=document.createElement("strong");
+  title.textContent=site.nome || "Sítio arqueológico sem nome informado";
+  popup.append(title);
+  const details=document.createElement("details");
+  const toggle=document.createElement("summary");
+  toggle.textContent="Ver dados do sítio";
+  details.append(toggle);
+  const field=(parent:HTMLElement,label:string,value?:string) => {
+    if (!value) return;
+    const line=document.createElement("div");
+    line.textContent=label+": "+value;
+    parent.append(line);
+  };
+  field(popup,"Tipo",siteType(site));
+  if (!site.tipologia && site.descricaoTipologicaSicg) field(popup,"Evidência","descrição do SICG");
+  field(popup,"Áreas",site.areas);
+  field(details,"Código IPHAN",site.codigo);
+  field(details,"Classificação",site.classificacao);
+  field(details,"Cadastro",site.cadastro);
+  field(details,"Síntese",site.sintese);
+  field(details,"Categoria do bem",site.tipoBem);
+  field(details,"Fonte",site.fonte ?? "IPHAN / SICG");
+  const official=document.createElement("a");
+  if (site.ficha) official.href=site.ficha;
+  official.target="_blank";
+  official.rel="noreferrer";
+  official.textContent="Pesquisar no SICG";
+  if (site.ficha) details.append(official);
+  popup.append(details);
+  return popup;
+}
+
+// Common field names seen in SICG, CNSA and imported feature collections.
+function archaeologyKey(value:string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+}
+
+function isArchaeologyLayer(name:string) {
+  return /sitios?\s*arqueolog|sitios?\s*iphan|iphan.*sitios?|\bcnsa\b/i.test(
+    name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[_-]/g," "));
+}
+
+export function archaeologicalFeaturePopup(properties:Record<string,unknown> | null | undefined, layerName:string) {
+  if (!properties) return null;
+  const fields = new Map(Object.entries(properties).map(([name,value]) => [archaeologyKey(name),value]));
+  const field = (...names:string[]) => {
+    for (const name of names) {
+      const value = fields.get(archaeologyKey(name));
+      if (typeof value === "string" && value.trim()) return value.trim();
+      if (typeof value === "number" && Number.isFinite(value)) return String(value);
+      if (Array.isArray(value) && value.length && value.every(item => typeof item === "string"))
+        return value.join(", ");
+    }
+  };
+  const category = field("tipoBem","ds_tipo_bem","categoria_bem","natureza","ds_natureza");
+  const code = field("co_iphan","codigo_iphan","cnsa","codigo_cnsa","registro_cnsa");
+  const namedSiteLayer = isArchaeologyLayer(layerName);
+  const explicitSiteName = field("nome_sitio","nome_do_sitio","nm_sitio","site_name");
+  const exactCategory = archaeologyKey(category ?? "");
+  const usable = properties.id_sicg || explicitSiteName || namedSiteLayer || field("tipo_sitio","tipologia_arqueologica","site_type") ||
+    exactCategory === "sitioarqueologico" || (!!code && exactCategory === "sitio");
+  if (!usable) return null;
+  const isIphan = Boolean(properties.id_sicg || code);
+  return iphanResultPopup({
+    id:0,
+    nome:field("nome","nome_sitio","nome_do_sitio","nm_sitio","site_name","identificacao_bem","denominacao_bem","name","titulo") ?? "",
+    codigo:code ?? field("codigo","id") ?? "",
+    classificacao:field("classificacao","ds_classificacao","categoria") ?? "",
+    sintese:field("sintese","sintese_bem","descricao","description") ?? "",
+    tipologia:field("tipologia","tipo_sitio","tipologia_arqueologica","site_type","tipo"),
+    descricaoTipologicaSicg:field("descricaoTipologicaSicg"),
+    cadastro:field("cadastro","dt_cadastro","data_cadastro"),
+    tipoBem:category,
+    areas:field("areas"),
+    fonte:field("fonte","source") ?? (isIphan ? "IPHAN / SICG ou CNSA" : layerName),
+    ficha:isIphan ? "https://sicg.iphan.gov.br/sicg/pesquisarBem" : undefined,
+  });
+}
+
+export function PreviewIphanSites({projectId = 0, layerAlreadyVisible = false}:{projectId?:number; layerAlreadyVisible?:boolean}) {
+  const map = useMap();
+  const [consult,setConsult] = useState(false);
+  const active = consult || layerAlreadyVisible;
+  const [result,setResult] = useState<{point:L.LatLng; status:string; sites:IphanSite[]}>();
+  const current = useRef<AbortController>();
+  const control = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (control.current) L.DomEvent.disableClickPropagation(control.current); },[layerAlreadyVisible]);
+  useEffect(() => {
+    if (!active) return;
+    const identify = async (event:L.LeafletMouseEvent) => {
+      if ((event.originalEvent.target as Element | null)?.closest?.(".leaflet-interactive") && !consult) return;
+      current.current?.abort();
+      const point = event.latlng;
+      if (map.getZoom() < 10) {
+        setResult({point,status:"Aproxime o mapa e clique sobre um sítio.",sites:[]});
+        return;
+      }
+      const container = map.latLngToContainerPoint(point);
+      const sw = map.containerPointToLatLng(container.add([-9,9]));
+      const ne = map.containerPointToLatLng(container.add([9,-9]));
+      const box = [sw.lng,sw.lat,ne.lng,ne.lat];
+      const controller = new AbortController();
+      current.current = controller;
+      setResult({point,status:"Consultando o IPHAN…",sites:[]});
+      try {
+        const input = encodeURIComponent(JSON.stringify({json:{projectId,box}}));
+        const response = await fetch("/api/trpc/previewIphan.identify?input="+input,{signal:controller.signal});
+        const data = await response.json();
+        if (!response.ok || data.error) throw Error(data.error?.json?.message ?? "Consulta indisponível.");
+        if (controller.signal.aborted) return;
+        const sites:IphanSite[] = data.result.data.json;
+        setResult({point,sites,status:sites.length ? "" : "Nenhum sítio retornado neste ponto do mapa."});
+      } catch (error) {
+        if (!controller.signal.aborted) setResult({point,sites:[],status:error instanceof Error ? error.message : "Consulta indisponível."});
+      }
+    };
+    map.on("click",identify);
+    return () => {map.off("click",identify);current.current?.abort();};
+  },[active,consult,map,projectId]);
+
+  return <>
+    {!layerAlreadyVisible && <div ref={control} className="absolute bottom-8 right-3 z-[1000]">
+      <button type="button" aria-pressed={active}
+        className="rounded-md border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow aria-pressed:bg-emerald-100"
+        onClick={() => {setConsult(value => !value);setResult(undefined);}}>Consultar sítios IPHAN</button>
+      {active && <p className="mt-1 rounded bg-white px-2 py-1 text-xs text-slate-800">Clique sobre um sítio no mapa.</p>}
+    </div>}
+    {consult && !layerAlreadyVisible && <WMSTileLayer url="https://geoserver.iphan.gov.br/geoserver/SICG/wms"
+      params={{layers:"SICG:sitios_pol,SICG:sitios",format:"image/png",transparent:true}} />}
+    {active && result && <Popup position={result.point} closeOnClick={false} maxWidth={360} maxHeight={320}
+      eventHandlers={{remove:() => {current.current?.abort();setResult(undefined);}}}>
+      {result.status && <div role="status">{result.status}</div>}
+      {result.sites.map(site => <article key={site.id} className="space-y-2 border-b pb-3 pt-2">
+        <strong className="block">{site.nome || "Sítio arqueológico sem nome informado"}</strong>
+        <div>Tipo: {siteType(site)}{!site.tipologia && site.descricaoTipologicaSicg ? " (descrição do SICG)" : ""}</div>
+        <details className="space-y-1">
+          <summary className="cursor-pointer font-semibold">Ver dados do sítio</summary>
+          <div>Código IPHAN: {site.codigo || "Não informado"}</div>
+          <div>Classificação: {site.classificacao || "Não informada"}</div>
+          {site.cadastro && <div>Cadastro: {site.cadastro}</div>}
+          <div><b>Síntese:</b> {site.sintese || "Não publicada"}</div>
+          {site.tipoBem && <div>Categoria do bem: {site.tipoBem}</div>}
+          <div>Fonte: IPHAN / SICG</div>
+        </details>
+        <div className="flex flex-wrap items-center gap-2">
+          <a href={site.ficha ?? "https://sicg.iphan.gov.br/sicg/pesquisarBem"} target="_blank" rel="noreferrer">Consultar fonte no SICG</a>
+          <button type="button" className="rounded border px-2 py-1"
+            onClick={() => window.dispatchEvent(new CustomEvent("studio-open-atena",{detail:"Guardar sítio IPHAN "+site.id}))}>Guardar com a Atena</button>
+        </div>
+      </article>)}
+    </Popup>}
+  </>;
 }

@@ -2,9 +2,10 @@ import config from "../vite.local-visual.config";
 import { download, downloadVector, projectSearchEntries, workflow } from "./previa-local-fluxos.mts";
 import { rasterArtifact } from "./previa-local-raster.mts";
 import { readFileSync } from "node:fs";
-import { readLayout, readScale } from "./previa-layout.mts";
+import { fileURLToPath } from "node:url";
+import { studioLayerRequirements, readLayout, readOrientation, readPaper, readScale, readStudioView } from "./previa-layout.mts";
 import { ibgeSearchEntries, readIbgeLayer } from "./previa-ibge-dados.mts";
-import { atlasAngicos, atlasView, pranchaAngicos } from "./previa-raster/angicos/prancha.mts";
+import { atlasAngicos, atlasView, developmentsAiiPdf, planSheets, corridorAtlas, corridorSheets, studioReview, pranchaAngicos, printMapBiomas, printTerrain, prepareStudioBases } from "./previa-raster/angicos/prancha.mts";
 
 const arqueoA2Renderer = readFileSync(new URL("./previa-raster/composicao-a2.ts.txt", import.meta.url), "utf8");
 const arqueoA2Seeds = [
@@ -39,12 +40,21 @@ const responses: Record<string, unknown> = {
 const demoApi = {
   name: "geoportal-local-demo",
   enforce: "pre" as const,
-  load(id: string) {
+  load(this: { addWatchFile(path: string): void }, id: string) {
     if (id.replaceAll("\\", "/").endsWith("/pages/PreviewConnections.tsx")) {
       return readFileSync(new URL("./previa-conexoes.tsx", import.meta.url), "utf8");
     }
+    if (id.replaceAll("\\", "/").endsWith("/pages/PreviewPlants.tsx")) {
+      const source = new URL("./previa-plantas.tsx", import.meta.url);
+      const model = new URL("./previa-plantas.mts", import.meta.url);
+      this.addWatchFile(fileURLToPath(source));
+      this.addWatchFile(fileURLToPath(model));
+      return readFileSync(model,"utf8")+"\n"+readFileSync(source,"utf8");
+    }
     if (id.replaceAll("\\", "/").endsWith("/pages/PreviewMapProducts.tsx")) {
-      return readFileSync(new URL("./previa-produtos.tsx", import.meta.url), "utf8");
+      const source = new URL("./previa-produtos.tsx", import.meta.url);
+      this.addWatchFile(fileURLToPath(source));
+      return readFileSync(new URL("./previa-layout.mts", import.meta.url), "utf8") + "\n" + readFileSync(source, "utf8");
     }
     if (id.replaceAll("\\", "/").endsWith("/components/PreviewIbgeLayers.tsx")) {
       return readFileSync(new URL("./previa-ibge.tsx", import.meta.url), "utf8");
@@ -52,6 +62,7 @@ const demoApi = {
   },
   resolveId(id: string, importer?: string) {
     if (id === "./PreviewConnections.tsx" && importer) return importer.replace(/[^/\\]+$/, "PreviewConnections.tsx");
+    if (id === "./PreviewPlants.tsx" && importer) return importer.replace(/[^/\\]+$/, "PreviewPlants.tsx");
     if (id === "./PreviewMapProducts.tsx" && importer) return importer.replace(/[^/\\]+$/, "PreviewMapProducts.tsx");
     if (id === "./PreviewIbgeLayers.tsx" && importer) return importer.replace(/[^/\\]+$/, "PreviewIbgeLayers.tsx");
   },
@@ -61,36 +72,76 @@ const demoApi = {
       return readFileSync(new URL("./previa-busca.tsx", import.meta.url), "utf8");
     }
     if (path.endsWith("/pages/BaseLayers.tsx")) {
-      return source.concat('\nimport PreviewConnections from "./PreviewConnections.tsx";')
-        .replace(">Camadas Base</h1>", ">Gestão e Conexões</h1>")
-        .replace("Gerencie camadas de dados geoespaciais de fontes oficiais brasileiras", "Gerencie fontes de dados geoespaciais e consulte as bases oficiais.")
-        .replace('<div className="mb-6"><IbgeSourceCard />', '<PreviewConnections /><h2 className="mb-4 text-xl font-semibold">Bases oficiais</h2><div className="mb-6"><IbgeSourceCard />');
+      return `import PreviewConnections from "./PreviewConnections.tsx";
+        export default function BaseLayers() {
+          return <main className="container mx-auto px-4 py-6">
+            <h1 className="mb-4 text-2xl font-bold">Gestão e Conexões</h1>
+            <PreviewConnections />
+          </main>;
+        }`;
     }
     if (path.endsWith("/components/AtenaChatWidget.tsx")) {
       return source
         .replace("  const interpret = trpc.atena.interpret.useMutation();", `  const utils = trpc.useUtils();
   const [previewPlan, setPreviewPlan] = useState<{ projectId: number; text: string; summary: string } | null>(null);
-  const [previewDownload, setPreviewDownload] = useState<{ projectId: number; url: string; name: string } | null>(null);
+  const [previewResult,setPreviewResult] = useState<{projectId:number; url:string}>();
+  const workspaceParams = new URLSearchParams(search);
+  const workspaceTab = workspaceParams.get("tab");
+  const [previewDownload, setPreviewDownload] = useState<{ projectId: number; url: string; name: string; inline?:boolean } | null>(null);
   const localAtena = async (method: "previewPlan" | "previewRun", id: number, text: string) => {
     const response = await fetch("/api/trpc/atena." + method, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ json: { projectId: id, text } }),
+      body: JSON.stringify({ json: { projectId: id, text, workspace:{tab:workspaceTab,layerId:Number(workspaceParams.get("camada")),modelId:workspaceParams.get("modelo")} } }),
     });
     const payload = await response.json();
     if (!response.ok || payload.error) throw new Error(payload.error?.json?.message ?? "Operação indisponível.");
     return payload.result.data.json;
   };
   const runPreviewPlan = async () => {
-    if (!previewPlan || working.current || previewPlan.projectId !== currentProject.current) return;
+    if (!previewPlan || working.current || previewPlan.projectId !== (currentProject.current ?? 0)) return;
     const action = previewPlan;
     working.current = true; setBusy(true); setPreviewPlan(null);
     try {
       const result = await localAtena("previewRun", action.projectId, action.text);
+      if (result.iphanDevelopments) {
+        setPreviewResult({projectId:action.projectId,url:"/projects/"+action.projectId+"?tab=map&painel=resultados"});
+        await Promise.all([utils.gisAnalysis.list.invalidate(),utils.files.list.invalidate(),utils.layers.list.invalidate()]);
+        append(result.message);
+        return;
+      }
+      if (result.iphanCrossing) {
+        append(result.message);
+        if (result.studioUrl) {
+          try { sessionStorage.setItem("preview-atena-studio-result", JSON.stringify({url:result.studioUrl,message:result.message})); }
+          catch { /* Studio navigation also works without session storage. */ }
+          window.location.assign(result.studioUrl);
+        } else {
+          setPreviewResult({projectId:action.projectId,url:"/projects/"+action.projectId+"?tab=map&painel=resultados"});
+          await Promise.all([utils.gisAnalysis.list.invalidate(),utils.files.list.invalidate(),utils.layers.list.invalidate()]);
+        }
+        return;
+      }
+      if (result.knowledgeMessage) {
+        append(result.knowledgeMessage);
+        return;
+      }
+      if (result.drawingSaved) {
+        await utils.geometries.list.invalidate({projectId:action.projectId});
+        append(result.message);
+        return;
+      }
+      if (result.connectionChanged) {
+        window.dispatchEvent(new Event("preview-connections-changed"));
+        append(result.message);
+        return;
+      }
+      if (result.studioUrl) { append(result.message); window.location.assign(result.studioUrl); return; }
       if (result.url) {
         if (currentProject.current === action.projectId) setPreviewDownload({ ...result, projectId: action.projectId });
         return;
       }
       await Promise.all([utils.gisAnalysis.list.invalidate(), utils.files.list.invalidate(), utils.layers.list.invalidate()]);
+      if (Number.isSafeInteger(result.id)) setPreviewResult({projectId:action.projectId,url:"/projects/"+action.projectId+"?tab=map&painel=resultados&camada="+result.id});
       append(result.name + " — " + result.result.output.features.length + " feição(ões) salvas no projeto.");
     } catch (error) { append(errorText(error)); }
     finally { working.current = false; if (mounted.current) setBusy(false); }
@@ -98,15 +149,68 @@ const demoApi = {
   const interpret = trpc.atena.interpret.useMutation();`)
         .replace('const invalidateContext = () => { revision.current++;', 'const invalidateContext = () => { setPreviewPlan(null); setPreviewDownload(null); revision.current++;')
         .replace('setDraft(""); setPending(null); const token', 'setDraft(""); setPending(null); setPreviewPlan(null); const token')
-        .replace('      const command = classifyAtenaChatCommand(text);', `      if (/\\b(buffer|malha|a2|atlas)\\b/i.test(text) && !/^abrir atlas[.!]?$/i.test(text)) {
+        .replace('      const command = classifyAtenaChatCommand(text);', `      const iphanQuestion = /^(?:guardar|consultar|conferir tipologia d[eo]|qual a tipologia d[eo])\\s+s[ií]tio\\b/i.test(text.trim());
+      if (projectId && /^(?:qual|que) (?:camada|produto|mapa) .*(?:abert[oa]|selecionad[oa])/i.test(text.trim())) {
+        const result = await localAtena("previewRun",projectId,text);
+        if (mounted.current && token === revision.current) append(result.knowledgeMessage);
+        return;
+      }
+      const iphanCrossing = /\\b(cruzar|cruze|cruzamento|intersectar|intersecte)\\b/i.test(text) &&
+        /\\biphan\\b/i.test(text) && /\\b(ada|aid|aii)\\b/i.test(text);
+      const regionalSelection = /\\b(selecione|selecionar|mostre|mostrar|exiba|exibir)\\b/i.test(text) &&
+        /\\bprojetos\\b/i.test(text) && /regi[aã]o|entorno|vizinhos|pr[oó]ximos|\\baii\\b/i.test(text);
+      if (/\\bempreendimentos?\\b/i.test(text) && /\\baii\\b/i.test(text)) {
+        const id = projectId ?? 0;
+        const showOnMap = /\\bmapa principal\\b/i.test(text);
+        const result = await localAtena(showOnMap ? "previewRun" : "previewPlan",id,text);
+        if (mounted.current && token === revision.current) {
+          if (result.mapUrl) window.location.assign(result.mapUrl);
+          else setPreviewPlan({projectId:id,text,summary:result.summary});
+        }
+        return;
+      }
+      if (regionalSelection) {
+        const id = projectId ?? 0;
+        const result = await localAtena("previewRun",id,text);
+        if (mounted.current && token === revision.current) {
+          append(result.message);
+          utils.projectSelection.get.setData(undefined,result.ids);
+          if (window.location.pathname === "/") {
+            window.dispatchEvent(new CustomEvent("preview-project-selection",{detail:result.ids}));
+          } else {
+            window.location.assign("/?projectId="+result.referenceId);
+          }
+        }
+        return;
+      }
+      if (iphanCrossing) {
+        if (!projectId) { await showProjects(); return; }
+        const result = await localAtena("previewPlan",projectId,text);
+        if (mounted.current && token === revision.current) setPreviewPlan({projectId,text,summary:result.summary});
+        return;
+      }
+      if (iphanQuestion) {
+        const id = projectId ?? 0;
+        const saving = /^guardar\\b/i.test(text.trim());
+        const result = await localAtena(saving ? "previewPlan" : "previewRun", id, text);
+        if (mounted.current && token === revision.current) {
+          if (result.knowledgeMessage) append(result.knowledgeMessage);
+          else setPreviewPlan({ projectId:id, text, summary:result.summary });
+        }
+        return;
+      }
+      const newLocationMap = /^(?:crie|criar|gere|gerar|monte|montar)\\s+(?:(?:um|o)\\s+)?mapa\\s+(?:novo\\s+)?de\\s+localiza[çc][ãa]o\\b/i.test(text.trim());
+      if (/^(?:criar|crie) planta fict[ií]cia/i.test(text.trim()) || newLocationMap || /^(criar camada|cadastrar fonte|ligar fonte|desligar fonte|montar modelo|(?:guardar|consultar)\\\\s+s[ií]tio|(?:criar|crie|gere|gerar)\\s+(?:a\\s+)?(?:ada|aid|aii|ponto|linha|pol[ií]gono))\\b/i.test(text.trim()) ||
+        (/\\b(buffer|malha|a2|atlas)\\b/i.test(text) && !/^abrir atlas[.!]?$/i.test(text))) {
         if (!projectId) { await showProjects(); return; }
         const result = await localAtena("previewPlan", projectId, text);
         if (mounted.current && token === revision.current) setPreviewPlan({ projectId, text, summary: result.summary });
         return;
       }
       const command = classifyAtenaChatCommand(text);`)
-        .replace('        {visiblePlan &&', `        {previewDownload && previewDownload.projectId === projectId && <Button asChild size="sm"><a href={previewDownload.url} download>{previewDownload.name}</a></Button>}
-        {previewPlan?.projectId === projectId && previewPlan && <div className="space-y-2 rounded border bg-card p-3 text-sm">
+        .replace('        {visiblePlan &&', `        {previewDownload && previewDownload.projectId === projectId && <Button asChild size="sm"><a href={previewDownload.url} download={!previewDownload.inline} target={previewDownload.inline ? "_blank" : undefined} rel={previewDownload.inline ? "noopener" : undefined}>{previewDownload.name}</a></Button>}
+        {previewResult?.projectId === projectId && previewResult && <Button size="sm" variant="outline" onClick={() => {setOpen(false);navigate(previewResult.url);}}>Abrir resultado no mapa</Button>}
+        {previewPlan?.projectId === (projectId ?? 0) && previewPlan && <div className="space-y-2 rounded border bg-card p-3 text-sm">
           <p>{previewPlan.summary}</p>
           <Button size="sm" disabled={busy} onClick={() => void runPreviewPlan()}>Confirmar e executar</Button>
           <Button size="sm" variant="ghost" onClick={() => setPreviewPlan(null)}>Descartar plano</Button>
@@ -126,16 +230,52 @@ const demoApi = {
   const { data: members,`)
         .replace('<CardDescription>Usuários com acesso a este projeto</CardDescription>', `<CardDescription>Usuários com acesso a este projeto</CardDescription>
                     {user?.role === "admin" && <Link href={"/invitations?fromProject=" + projectId} className="mt-2 inline-block text-sm underline">Convidar novo usuário ao portal</Link>}`)
-        .concat('\nimport PreviewMapProducts from "./PreviewMapProducts.tsx";')
-        .replace('projectTabs.has(tab)', '(projectTabs.has(tab) || tab === "products")')
-        .replace('<TabsTrigger value="history"', '{projectId === 11 && <TabsTrigger value="products">Mapas e Atlas</TabsTrigger>}<TabsTrigger value="history"')
-        .replace('<TabsContent value="history"', '{projectId === 11 && <TabsContent value="products"><PreviewMapProducts /></TabsContent>}<TabsContent value="history"')
+        .concat('\nimport PreviewMapProducts from "./PreviewMapProducts.tsx";\nimport PreviewPlants from "./PreviewPlants.tsx";')
+        .replace('projectTabs.has(tab)', '(projectTabs.has(tab) || tab === "products" || tab === "plants")')
+        .replace(/        \{\/\* Header \*\/\}[\s\S]*?(?=        \{\/\* Tabs \*\/\})/, () => "        <div className=\"preview-project-header sticky top-0 z-30 mb-3 shrink-0 rounded-xl border border-white/10 px-4 py-3 text-white shadow-sm sm:px-5\">\n          <style>{\".preview-project-header{background:#182523}.preview-project-action{background:#b84c1b;color:white}.preview-project-action:hover{background:#a44115}.preview-file-card{padding:0;gap:0}.preview-file-row{display:grid;gap:8px}.preview-file-actions{display:flex;gap:8px;flex-wrap:wrap}@media(min-width:640px){.preview-file-row{grid-template-columns:minmax(0,1fr) auto;align-items:center}.preview-file-row>details{grid-column:1/-1}}@media(min-width:1024px){.preview-map-split{grid-template-columns:minmax(0,1fr) 300px}}\"}</style>\n          <div className=\"flex flex-wrap items-center justify-between gap-2\">\n            <Link href=\"/projects\" className=\"inline-flex items-center gap-1.5 text-xs font-medium text-emerald-100 hover:underline\"><ArrowLeft size={14}/> Projetos</Link>\n            <div className=\"flex flex-wrap items-center gap-2\">\n              <a className=\"rounded-md px-2 py-1.5 text-xs text-emerald-100 hover:bg-white/10\" href={\"/?projectId=\"+projectId+\"&voltar=\"+encodeURIComponent(activeTab)}>Ver no mapa geral</a>\n              <details className=\"relative\">\n                <summary className=\"cursor-pointer rounded-md border border-white/25 px-3 py-1.5 text-xs\">Gerenciar projeto</summary>\n                <div className=\"absolute right-0 top-full z-40 mt-2 grid min-w-44 rounded-lg border bg-background p-1 text-sm text-foreground shadow-lg\">\n                  {[[\"overview\",\"Informações\"],[\"members\",\"Membros\"],[\"history\",\"Histórico\"]].map(([id,label]) =>\n                    <button type=\"button\" key={id} aria-current={activeTab === id ? \"page\" : undefined}\n                      className=\"rounded px-3 py-2 text-left hover:bg-accent\"\n                      onClick={event => {event.currentTarget.closest(\"details\")?.removeAttribute(\"open\");handleTabChange(id);}}>{label}</button>)}\n                </div>\n              </details>\n              <button type=\"button\" className=\"inline-flex items-center gap-1.5 rounded-md preview-project-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#a44115]\"\n                onClick={() => window.dispatchEvent(new Event(\"studio-open-atena\"))}><Sparkles size={14}/> Atena</button>\n            </div>\n          </div>\n          <div className=\"mt-2 flex flex-wrap items-center gap-x-3 gap-y-1\">\n            <h1 className=\"text-xl font-semibold tracking-tight sm:text-2xl\">{project.name}</h1>\n            <Badge className=\"bg-white/10 text-white\">{project.status === \"active\" ? \"Ativo\" : project.status === \"completed\" ? \"Concluído\" : \"Arquivado\"}</Badge>\n            <span className=\"text-xs text-emerald-100\">{project.code}</span>\n          </div>\n        </div>\n")
+        .replace(/<TabsList[\s\S]*?<\/TabsList>/, () => "          <TabsList className=\"sticky top-[5.5rem] z-20 flex h-auto w-full shrink-0 justify-start gap-1 overflow-x-auto rounded-lg border bg-background p-1\">\n            <TabsTrigger value=\"files\" className=\"gap-2\"><Upload size={16}/> Arquivos</TabsTrigger>\n            <TabsTrigger value=\"map\" className=\"gap-2\"><Map size={16}/> Mapa &amp; Análise</TabsTrigger>\n            {projectId === 11 && <TabsTrigger value=\"products\" className=\"gap-2\"><FileText size={16}/> Mapas e Atlas</TabsTrigger>}\n            <TabsTrigger value=\"plants\" className=\"gap-2\"><FileText size={16}/> Estúdio de Plantas</TabsTrigger>\n          </TabsList>")
+        .replace(/<TabsContent value="files"[\s\S]*?<\/TabsContent>/, () => "          <TabsContent value=\"files\" className=\"mt-0\">\n            <section aria-label=\"Arquivos do projeto\" className=\"rounded-xl border bg-background p-4 sm:p-5\">\n              <div className=\"mb-4 flex flex-wrap items-center justify-between gap-3\">\n                <div><h2 className=\"text-lg font-semibold\">Arquivos</h2><p className=\"text-sm text-muted-foreground\">Documentos e dados geoespaciais do projeto</p></div>\n                {canEdit && <button type=\"button\" aria-expanded={previewUploadOpen} onClick={() => setPreviewUploadOpen(value => !value)}\n                  className=\"inline-flex items-center gap-2 rounded-md preview-project-action px-3 py-2 text-sm font-semibold text-white\"><Upload size={16}/>{previewUploadOpen ? \"Fechar envio\" : \"Adicionar arquivo\"}</button>}\n              </div>\n              {canEdit && previewUploadOpen && <div className=\"mb-4 rounded-lg border p-3\">\n                <FileUpload projectId={projectId} onUploadComplete={() => {\n                  void previewUtils.files.list.invalidate({projectId});\n                  void previewUtils.gisAnalysis.list.invalidate({projectId});\n                  void previewUtils.raster.listForMap.invalidate({projectId});\n                }}/>\n              </div>}\n              <FileList projectId={projectId} canEdit={canEdit} />\n            </section>\n          </TabsContent>")
+        .replace("  const { data: members,", "  const [previewUploadOpen,setPreviewUploadOpen] = useState(false);\n  const previewUtils = trpc.useUtils();\n  const { data: members,")
+        .replace('<TabsContent value="map" className={isMapWorkspace ? "mt-0 min-h-0 flex-1" : "space-y-6"}>', '<TabsContent forceMount value="map" className="mt-0 min-h-0 flex-1" style={{display:activeTab === "map" ? undefined : "none"}}>')
+        .replace('<TabsContent value="history"', '{projectId === 11 && <TabsContent forceMount value="products" className="mt-0" style={{display:activeTab === "products" ? undefined : "none"}}><PreviewMapProducts /></TabsContent>}<TabsContent value="plants"><PreviewPlants projectId={projectId}/></TabsContent><TabsContent value="history"')
         .replace(/<TabsTrigger value="overview" className="gap-2">([\s\S]*?)<\/TabsTrigger>/, '<a className="inline-flex flex-1 items-center justify-center gap-2 rounded-md px-2 py-1 text-sm font-medium hover:bg-background focus-visible:outline-ring" href={"/?projectId=" + projectId + "&voltar=" + encodeURIComponent(activeTab)}>$1</a>')
         .replace('new Date(project.updatedAt)', 'new Date(project.updatedAt ?? project.createdAt)');
     }
+    if (path.endsWith("/components/FileUpload.tsx")) {
+      return source
+        .replace('  const [tiffMode, setTiffMode]', '  const [pendingTiffBatch,setPendingTiffBatch] = useState<File[]>([]);\n  const [tiffMode, setTiffMode]')
+        .replace('(files: FileList | null)', '(files: FileList | File[] | null)')
+        .replace('    const files = e.dataTransfer.files;\n    handleFiles(files);', '    stageFiles(Array.from(e.dataTransfer.files));')
+        .replace('  const handleFileInputChange =', `  const stageFiles = (files:File[]) => {
+    if (files.some(file => resolveTiffUpload(file,tiffMode).isTiff)) setPendingTiffBatch(files);
+    else void handleFiles(files);
+  };
+  const handleFileInputChange =`)
+        .replace('    handleFiles(e.target.files);', '    stageFiles(Array.from(e.target.files ?? []));\n    e.target.value="";')
+        .replace('<div className="rounded border p-3 space-y-2">', '{pendingTiffBatch.length > 0 && <div className="rounded border p-3 space-y-2">')
+        .replace('      {/* Área de Drop */}', `      }
+      {pendingTiffBatch.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span>{pendingTiffBatch.length} arquivo(s) selecionado(s)</span>
+        <Button size="sm" onClick={() => {const files=pendingTiffBatch;setPendingTiffBatch([]);void handleFiles(files);}}>Enviar arquivos selecionados</Button>
+        <Button size="sm" variant="ghost" onClick={() => setPendingTiffBatch([])}>Cancelar seleção</Button>
+      </div>}
+      {/* Área de Drop */}`)
+        .replace('className="p-8 text-center"','className="p-4 text-center"');
+    }
     if (path.endsWith("/components/FileList.tsx")) {
-      return 'import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";\n' +
-        source.replace(/<Button\s+size="sm"\s+variant="outline"\s+className="flex-1"\s+onClick=\{\(\) => handleDownload\(file.id\)\}[\s\S]*?<\/Button>/, original => `{(file as { exportFormats?: string[] }).exportFormats?.length ? (
+      return 'import { Link } from "wouter";\nimport { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";\n' +
+        source.replace('  const downloadMutation', '  const [fileSearch,setFileSearch] = useState("");\n  const downloadMutation')
+        .replace('<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">', `<label className="block text-sm font-medium">Buscar arquivos
+          <input className="mt-1 block w-full rounded-md border bg-background px-3 py-2 sm:max-w-sm" value={fileSearch}
+            onChange={event => setFileSearch(event.target.value)} placeholder="Nome ou tipo de arquivo" />
+        </label><div className="mt-3 grid gap-2">`)
+        .replace('files.map((file)', 'files.filter(file => (file.name+" "+file.fileType).toLowerCase().includes(fileSearch.trim().toLowerCase())).map((file)')
+        .replace('className="hover:shadow-md transition-shadow"', 'className="preview-file-card shadow-none hover:bg-accent/30"')
+        .replace('<CardContent className="p-4">', '<CardContent className="preview-file-row p-3">')
+        .replace('<div className="mt-1 space-y-1">', '<div className="mt-1 flex flex-wrap items-center gap-2">')
+        .replace('<div className="mt-4 flex gap-2">', `<div className="preview-file-actions items-start">
+          {(file as {previewMapReady?:boolean}).previewMapReady && <Button asChild size="sm" variant="outline"><Link href={"/projects/"+projectId+"?tab=map&camada="+file.id}>Abrir no mapa</Link></Button>}`)
+        .replace(/<Button\s+size="sm"\s+variant="outline"\s+className="flex-1"\s+onClick=\{\(\) => handleDownload\(file.id\)\}[\s\S]*?<\/Button>/, original => `{(file as { exportFormats?: string[] }).exportFormats?.length ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" className="flex-1" aria-label={"Baixar " + file.name}>
@@ -171,21 +311,63 @@ const demoApi = {
         .replace('id="map-print-orientation"', 'id="map-print-orientation" disabled={layout.signature.startsWith("arqueo-a2-")}');
     }
     if (path.endsWith("/components/ProjectGeoWorkspace.tsx")) {
-      return source
+      return 'import { Link, useSearch } from "wouter";\n' + source
+        .replace('  const [printOpen, setPrintOpen]', `  const previewSearch = useSearch();
+  const [toolsPanel,setToolsPanel] = useState<"Camadas"|"Análises"|"Resultados"|null>("Camadas");
+  const requestedLayer = Number(new URLSearchParams(previewSearch).get("camada"));
+  const [focusedLayer,setFocusedLayer] = useState(0);
+  useEffect(() => {
+    if (new URLSearchParams(previewSearch).get("painel") === "resultados") setToolsPanel("Resultados");
+  },[previewSearch]);
+  const [printOpen, setPrintOpen]`)
+        .replace('className="grid min-h-[480px] gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden"', 'className={"grid min-h-[480px] gap-3 lg:h-full lg:min-h-0 lg:overflow-hidden " + (toolsPanel ? "preview-map-split" : "")}')
+        .replace('<CardDescription>Desenhe, edite, selecione e gere resultados espaciais persistidos com proveniência.</CardDescription>', `<div className="flex flex-wrap gap-2" aria-label="Ferramentas do mapa">
+            {(["Camadas","Análises","Resultados"] as const).map(panel =>
+              <Button key={panel} type="button" size="sm" variant={toolsPanel === panel ? "default" : "outline"}
+                aria-pressed={toolsPanel === panel} onClick={() => setToolsPanel(current => current === panel ? null : panel)}>{panel}</Button>)}
+          </div>`)
         .replace(/<aside className="min-h-0[\s\S]*?<\/aside>/, panel => panel.replace(
           /<Card>([\s\S]*?<CardTitle[^>]*>)([\s\S]*?)<\/CardTitle>([\s\S]*?)<\/Card>/g,
           (_, opening, title, body) => {
             const text = title.replace(/<[^>]*>/g, "").trim();
-            return `<details open className="rounded-xl border bg-card text-card-foreground shadow-sm">
+            const section = text === "Operação espacial" ? "Análises" : "Camadas";
+            return `<details open hidden={toolsPanel !== "${section}"} className="rounded-xl border bg-card text-card-foreground shadow-sm">
               <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">${text}</summary>
               <Card className="border-0 shadow-none">${opening}${title}</CardTitle>${body}</Card>
             </details>`;
           }
         ).replace(/<(RasterRealPixelExport|RasterIngestionPanel)\b[^>]*\/>/g, (component, name) => `
-          <details open className="rounded-xl border bg-card text-card-foreground shadow-sm">
+          <details open hidden={toolsPanel !== "${name === "RasterIngestionPanel" ? "Camadas" : "Análises"}"} className="rounded-xl border bg-card text-card-foreground shadow-sm">
             <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">${name === "RasterIngestionPanel" ? "Importar GeoTIFF / COG" : "Exportar recorte raster"}</summary>
             ${component}
           </details>`))
+        .replace('<aside className="min-h-0 space-y-4 overflow-y-auto pr-1 lg:pb-2">', `<aside hidden={!toolsPanel}
+          className="min-h-0 space-y-3 overflow-y-auto lg:pb-2">
+          {toolsPanel === "Resultados" && <section className="rounded-xl border bg-background p-3">
+            <h2 className="mb-2 font-semibold">Resultados do projeto</h2>
+            {projectVectorLayers.filter(layer => /^(Sítios IPHAN|Empreendimentos IPHAN|Buffer|Malha|ADA|AID|AII)/i.test(layer.name)).map(layer =>
+              <div key={layer.id} className="space-y-1 border-t py-2">
+                <p className="break-words text-sm font-medium">{layer.name.replace(/\\.geojson$/i,"")}</p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Link className="underline" href={"/projects/"+projectId+"?tab=map&camada="+layer.id}>Ver no mapa</Link>
+                  {projectId===11 && <Link className="underline" href={"/projects/"+projectId+"?tab=products&modelo=resultado-"+layer.id+"&camada="+layer.id}>Abrir no Estúdio</Link>}
+                  <a className="underline" href={"/previa/vetores/"+projectId+"/"+layer.id+"/geojson"} download>Baixar dados</a>
+                </div>
+              </div>)}
+          </section>}`)
+        .replace('projectVectorLayers.filter((layer) => layer.isVisible).map', 'projectVectorLayers.filter((layer) => layer.isVisible || layer.id === focusedLayer).map')
+        .replace('layer.isVisible && visibleRasterIds.includes(layer.id)).map', '((layer.isVisible && visibleRasterIds.includes(layer.id)) || layer.id === focusedLayer)).map')
+        .replace("await invalidate();\n      toast.success(\u0060\u0024{result.name}:", "await invalidate();\n      setToolsPanel(\"Resultados\");\n      toast.success(\u0060\u0024{result.name}:")
+        .replace('Operação espacial</CardTitle>', `Operação espacial</CardTitle>
+            <div className="mt-2 grid gap-2">
+              <p className="text-xs text-muted-foreground">Peça à Atena para gerar áreas de influência a partir do eixo. Para desenhar à mão, use ponto, linha ou polígono na barra do mapa.</p>
+              <div className="flex flex-wrap gap-1">
+                {["ADA","AID","AII"].map(kind => <Button key={kind} type="button" size="sm" variant="outline" disabled={!canEdit}
+                  onClick={() => window.dispatchEvent(new CustomEvent("studio-open-atena",{detail:"Criar "+kind+" a partir do Eixo"}))}>{kind}</Button>)}
+                <Button type="button" size="sm" variant="outline" onClick={() => window.dispatchEvent(new Event("studio-open-atena"))}>Desenhar com a Atena</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setOperation("grid")}>Criar malha de pontos</Button>
+              </div>
+            </div>`)
         .replace('const [gridCode, setGridCode]', 'const [gridPattern, setGridPattern] = useState("quadrada");\n  const [gridCode, setGridCode]')
         .replace('spacingMeters: Number(gridSpacing),', 'spacingMeters: Number(gridSpacing), pattern: gridPattern,')
         .replace('grid: "Malha arqueológica"', 'grid: "Malha de pontos"')
@@ -193,8 +375,7 @@ const demoApi = {
           <label className="grid gap-1 text-sm">Formato da malha<select className="rounded-md border bg-background p-2" value={gridPattern} onChange={event => setGridPattern(event.target.value)}>
             <option value="quadrada">Quadrada</option><option value="triangular">Triangular (linhas alternadas)</option>
           </select></label>`)
-        .replace('Operação espacial</CardTitle></CardHeader>', 'Operação espacial</CardTitle><Button type="button" size="sm" variant="outline" onClick={() => setOperation("grid")}>Criar malha de pontos</Button></CardHeader>')
-        .replace('<InvalidateMapOnResize />', '<InvalidateMapOnResize /><PreviewIbgeLayers projectBounds={municipalProjectBounds} />')
+        .replace('<InvalidateMapOnResize />', '<InvalidateMapOnResize /><PreviewIbgeLayers projectBounds={municipalProjectBounds} projectId={projectId} />')
         .replace("  const selectedVectorFeatures = useMemo", `  const municipalProjectBounds = useMemo(() => {
     const bounds = L.latLngBounds([]);
     for (const layer of projectVectorLayers) bounds.extend(L.geoJSON(layer.layerData).getBounds());
@@ -203,7 +384,7 @@ const demoApi = {
     return bounds.isValid() ? bounds.pad(.15).toBBoxString() : "";
   }, [projectVectorLayers, rasterLayers, geometries]);
   const selectedVectorFeatures = useMemo`)
-        .concat('\nimport PreviewIbgeLayers from "./PreviewIbgeLayers.tsx";')
+        .concat('\nimport PreviewIbgeLayers, { archaeologicalFeaturePopup } from "./PreviewIbgeLayers.tsx";')
         .replace('<CardContent className="space-y-3">{geometriesLoading', `<CardContent className="space-y-3">{canEdit && projectVectorLayers.length > 0 && <details className="rounded-lg border p-3">
           <summary className="cursor-pointer text-sm font-medium">Editar simbologia</summary>
           {projectVectorLayers.map(layer => <form key={layer.id} className="mt-3 grid gap-2 border-t pt-2 text-sm" onSubmit={async event => {
@@ -232,6 +413,12 @@ const demoApi = {
           </form>)}
         </details>}{geometriesLoading`)
         .replace("  const mapRef = useRef", "  const rawStyleUtils = trpc.useUtils();\n  const mapRef = useRef")
+.replace('key={`file-vector-${layer.id}`}', `key={\`file-vector-\${layer.id}\`}
+                pointToLayer={(feature, point) => feature.properties?.id_sicg
+                  ? L.circleMarker(point,{radius:5,color:layer.defaultStyle?.color ?? "#2563eb",weight:2,fillOpacity:.85,
+                      pane:thematicPaneName("vector-"+layer.id)})
+                  : L.marker(point)}`)
+        .replace('onEachFeature={(feature, leafletLayer) => leafletLayer.bindPopup(', 'onEachFeature={(feature, leafletLayer) => leafletLayer.bindPopup(archaeologicalFeaturePopup(feature.properties,layer.name) ?? ')
         .replace('import { FeatureGroup, GeoJSON,', 'import { Tooltip, FeatureGroup, GeoJSON,')
         .replace('<FeatureGroup ref={setEditableLayers}>', `{projectVectorLayers.filter(layer => layer.isVisible).flatMap(layer =>
               layer.layerData.features.flatMap(feature => {
@@ -262,16 +449,30 @@ const demoApi = {
           </section>
         )}
         <CardContent className={projectId === 11 && showA2 ? "hidden" : "flex min-h-0 flex-1 p-0"}>`)
-        .replace("  const selectedVectorFeatures = useMemo", `  const fittedVectorProject = useRef<number | null>(null);
+        .replace("  const selectedVectorFeatures = useMemo", `  const fittedLayer = useRef<number | null>(null);
+  useEffect(() => {
+    if (!requestedLayer) return;
+    const map=mapRef.current;
+    const layer=projectVectorLayers.find(item => item.id === requestedLayer);
+    const raster=rasterLayers.find(item => item.id === requestedLayer);
+    if (!map || new URLSearchParams(previewSearch).get("tab") !== "map" || fittedLayer.current === requestedLayer || (!layer && !raster?.bounds)) return;
+    const bounds=layer ? L.geoJSON(layer.layerData).getBounds() : L.latLngBounds([[raster!.bounds!.south,raster!.bounds!.west],[raster!.bounds!.north,raster!.bounds!.east]]);
+    if (!bounds.isValid()) return;
+    fittedLayer.current=requestedLayer;
+    setFocusedLayer(requestedLayer);
+    const frame=requestAnimationFrame(() => {map.invalidateSize();map.fitBounds(bounds,{padding:[30,30],maxZoom:16});});
+    return () => cancelAnimationFrame(frame);
+  },[previewSearch,requestedLayer,projectVectorLayers,rasterLayers]);
+  const fittedVectorProject = useRef<number | null>(null);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || (projectId === 11 && showA2) || !projectVectorLayers.length || fittedVectorProject.current === projectId) return;
+    if (!map || new URLSearchParams(previewSearch).get("tab") !== "map" || requestedLayer || fittedLayer.current || (projectId === 11 && showA2) || !projectVectorLayers.length || fittedVectorProject.current === projectId) return;
     const bounds = L.latLngBounds([]);
     for (const layer of projectVectorLayers) bounds.extend(L.geoJSON(layer.layerData).getBounds());
     if (!bounds.isValid()) return;
     map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
     fittedVectorProject.current = projectId;
-  }, [projectId, projectVectorLayers, showA2]);
+  }, [projectId, projectVectorLayers, showA2, previewSearch, requestedLayer]);
   const selectedVectorFeatures = useMemo`);
     }
     if (path.endsWith("/pages/TechnicalMaps.tsx")) {
@@ -332,7 +533,55 @@ const demoApi = {
     const badge = /(\{\/\* Info Badge \*\/\}\r?\n)      (<div[^\n]+>[\s\S]*?^      <\/div>)/m;
     if (!badge.test(source)) return;
     return source.replace(badge, "")
-      .concat('\nimport PreviewIbgeLayers from "./PreviewIbgeLayers.tsx";')
+      .concat('\nimport PreviewIbgeLayers, { archaeologicalFeaturePopup } from "./PreviewIbgeLayers.tsx";')
+      .replace('new Set([...selection.data, ...(projectId ? [projectId] : [])])', 'new Set(selection.data)')
+      .replace('  const [selectionError, setSelectionError]', `  useEffect(() => {
+    const updateFromAtena = (event: Event) => {
+      if (event instanceof CustomEvent && Array.isArray(event.detail) && event.detail.every(Number.isSafeInteger)) {
+        setSelectedIds(event.detail);
+        setSelectionError(undefined);
+      }
+    };
+    window.addEventListener("preview-project-selection", updateFromAtena);
+    return () => window.removeEventListener("preview-project-selection", updateFromAtena);
+  }, []);
+  const [selectionError, setSelectionError]`)
+      .replace('  const selectionMutation = trpc.projectSelection.set.useMutation();', `  const selectionMutation = trpc.projectSelection.set.useMutation();
+  const [clearRevision, setClearRevision] = useState(0);
+  const [clearingMap, setClearingMap] = useState(false);
+  const [clearMessage, setClearMessage] = useState("");
+  async function clearMainMap() {
+    setClearingMap(true);
+    setClearMessage("");
+    try {
+      const response = await fetch("/api/trpc/previewMap.clear", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({json:{}}),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.result?.data?.json?.success) throw Error();
+      setSelectedIds([]);
+      setSelectionError(undefined);
+      utils.projectSelection.get.setData(undefined, []);
+      void utils.projectSelection.get.invalidate();
+      // Reset temporary overlays, queries and open popups with the map providers.
+      setClearRevision(value => value + 1);
+      window.dispatchEvent(new Event("preview-connections-changed"));
+      setClearMessage("Mapa limpo.");
+    } catch {
+      setClearMessage("Não foi possível limpar o mapa. Tente novamente.");
+    } finally {
+      setClearingMap(false);
+    }
+  }`)
+      .replace('<InstitutionalLayersProvider viewMode={viewMode}>', '<InstitutionalLayersProvider key={clearRevision} viewMode={viewMode}>')
+      .replace('      <GlobalMapPanels', `      {!requestedProjectId && <div className="absolute left-4 top-4 z-[1001]">
+        <button type="button" className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow hover:bg-slate-100 disabled:opacity-60"
+          disabled={clearingMap || selectionMutation.isPending} onClick={() => void clearMainMap()}>
+          {clearingMap ? "Limpando…" : "Limpar mapa"}
+        </button>
+        {clearMessage && <p role="status" className="mt-1 w-fit rounded bg-white/95 px-2 py-1 text-xs text-slate-900">{clearMessage}</p>}
+      </div>}
+      <GlobalMapPanels`)
       .replace('useState<"2d" | "3d">("3d")', 'useState<"2d" | "3d">("2d")')
       .concat(`\nfunction PreviewProjectExtent({ projectId }: { projectId: number }) {
   const map = useMapEvents({});
@@ -354,7 +603,57 @@ const demoApi = {
 }
 
 `)
-      .replace('<BaseLayerMapOverlays />', '{projectId && <PreviewProjectExtent key={projectId} projectId={projectId} />}\n          <BaseLayerMapOverlays /><PreviewIbgeLayers /><PreviewScreenScale />')
+      .concat(`
+function PreviewDevelopmentExtent({data}:{data:import("geojson").FeatureCollection}) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    const bounds = L.geoJSON(data).getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds,{padding:[28,28],maxZoom:15});
+  },[map,data]);
+  return null;
+}
+
+function PreviewDevelopmentsMap({projectId,layerId,basemapUrl}:{projectId:number;layerId:number;basemapUrl:string}) {
+  const query = trpc.layers.list.useQuery({projectId},{retry:false});
+  const layer = query.data?.find(item => item.id === layerId && item.name === "Empreendimentos IPHAN · AII.geojson");
+  const data = isWorkspaceFeatureCollection(layer?.layerData) ? layer.layerData as import("geojson").FeatureCollection : undefined;
+  return <div className="relative flex h-full min-h-[420px] w-full flex-col">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2 text-sm">
+      <span role="status">{data ? data.features.length+" empreendimentos IPHAN na AII" :
+        query.isLoading ? "Carregando empreendimentos…" : "Camada de empreendimentos indisponível."}</span>
+      <a href={"/?projectId="+projectId} className="underline">Voltar à vista geral</a>
+    </div>
+    <MapContainer center={[-5.3,-37.2]} zoom={8} className="min-h-[380px] flex-1" aria-label="Empreendimentos IPHAN na AII">
+      <TileLayer url={basemapUrl}/>
+      {data && <>
+        <PreviewDevelopmentExtent data={data}/>
+        <GeoJSON data={data} style={{color:"#7c3aed",weight:2,fillOpacity:.3}}
+          pointToLayer={(_,point) => L.circleMarker(point,{radius:5,color:"#7c3aed",fillOpacity:.8})}
+          onEachFeature={(feature,item) => {
+            const props=feature.properties;
+            const popup=document.createElement("div");
+            const title=document.createElement("strong");
+            title.textContent=String(props?.projeto || "Empreendimento sem nome publicado");
+            const procedure=document.createElement("div");
+            procedure.textContent="Processo IPHAN: "+String(props?.processo || "Não informado");
+            popup.append(title,procedure);
+            item.bindPopup(popup);
+          }}/>
+      </>}
+    </MapContainer>
+  </div>;
+}
+`)
+      .replace(/  return \(\r?\n    <InstitutionalLayersProvider viewMode=\{viewMode\}>/, match => `  const developmentLayerId = Number(new URLSearchParams(window.location.search).get("empreendimentosAii"));
+  if (projectId && Number.isSafeInteger(developmentLayerId) && developmentLayerId > 0) {
+    return <PreviewDevelopmentsMap projectId={projectId} layerId={developmentLayerId}
+      basemapUrl={activeBasemap.url ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png"}/>;
+  }
+` + match)
+      .replace('onEachFeature={(_feature, leafletLayer) => {', `onEachFeature={(feature, leafletLayer) => {
+              const site = archaeologicalFeaturePopup(feature.properties,layer.name);
+              if (site) { leafletLayer.bindPopup(site,{maxHeight:320}); return; }`)
+      .replace('<BaseLayerMapOverlays />', '{projectId && <PreviewProjectExtent key={projectId} projectId={projectId} />}\n          <BaseLayerMapOverlays /><PreviewIbgeLayers projectId={projectId} /><PreviewScreenScale />')
       .replace("onNavigate={(lat, lng) =>", "onNavigate={(lat, lng, zoom = 14) =>")
       .replace("setMapZoom(14);\n            }}", "setMapZoom(zoom);\n            }}")
       .concat(`\nfunction PreviewScreenScale() {
@@ -477,8 +776,7 @@ const demoApi = {
           box-shadow: none;
           backdrop-filter: none;
         }
-        #map-panel-trigger-projects { display: none; }
-        #map-panel-trigger-basemap, #map-panel-trigger-layers {
+        #map-panel-trigger-projects, #map-panel-trigger-basemap, #map-panel-trigger-layers {
           width: 2.25rem;
           height: 2.25rem;
           min-height: 0;
@@ -487,16 +785,18 @@ const demoApi = {
           border-radius: .5rem;
           box-shadow: 0 10px 15px -3px #0002;
         }
+        #map-panel-trigger-projects[aria-expanded="false"],
         #map-panel-trigger-basemap[aria-expanded="false"],
         #map-panel-trigger-layers[aria-expanded="false"] {
           background: rgb(255 255 255 / .9);
           color: #171717;
         }
+        #map-panel-trigger-projects[aria-expanded="false"]:hover,
         #map-panel-trigger-basemap[aria-expanded="false"]:hover,
         #map-panel-trigger-layers[aria-expanded="false"]:hover { background: white; }
-        #map-panel-trigger-basemap > span, #map-panel-trigger-layers > span,
+        #map-panel-trigger-projects > span, #map-panel-trigger-basemap > span, #map-panel-trigger-layers > span,
         #map-panel-trigger-basemap > svg:last-child { display: none; }
-        #map-panel-trigger-basemap > svg:first-child, #map-panel-trigger-layers > svg {
+        #map-panel-trigger-projects > svg, #map-panel-trigger-basemap > svg:first-child, #map-panel-trigger-layers > svg {
           display: block;
           width: 1.25rem;
           height: 1.25rem;
@@ -509,6 +809,7 @@ const demoApi = {
           color: #171717;
         }
         .preview-home-layout .preview-ibge-control { top: 9.25rem; }
+        .preview-home-layout:has(.preview-ibge-control) #map-panel-trigger-layers { display: none; }
         .preview-ibge-control > summary {
           display: grid;
           place-items: center;
@@ -527,7 +828,9 @@ const demoApi = {
           position: absolute;
           top: 0;
           right: calc(100% + .5rem);
-          width: min(12.5rem, 55vw);
+          width: min(20rem, calc(100vw - 8rem));
+          max-height: min(55vh, 24rem);
+          overflow: auto;
         }
         div:has(> button[title="Aproximar"]):has(> button[title="Afastar"]) { top: 9.25rem; }
         .preview-home-layout:has(.preview-ibge-control) div:has(> button[title="Aproximar"]):has(> button[title="Afastar"]) { top: 12rem; }
@@ -536,6 +839,81 @@ const demoApi = {
     }];
   },
   configureServer(server: { middlewares: { use: (path: string, handler: any) => void } }) {
+    server.middlewares.use("/previa/uso-solo/worldcover.png", (req: any, res: any) => {
+      if (req.method !== "GET") { res.statusCode = 405; res.end(); return; }
+      try {
+        const image = readFileSync(new URL("./previa-raster/uso-solo/worldcover.png", import.meta.url));
+        res.setHeader("Content-Type", "image/png");
+        res.end(image);
+      } catch {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
+    server.middlewares.use("/previa/relevo", (req: any, res: any) => {
+      const name = new URL(req.url, "http://127.0.0.1").pathname.slice(1);
+      if (req.method !== "GET" || !/^(?:sombreado\.png|elevacao\.png|declividade\.png|curvas\.png)$/.test(name)) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      try {
+        const data = readFileSync(new URL("./previa-raster/relevo/" + name, import.meta.url));
+        res.setHeader("Content-Type", "image/png");
+        res.end(data);
+      } catch {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
+    server.middlewares.use("/previa/condephaat", async (req: any, res: any) => {
+      if (req.method !== "GET") { res.statusCode = 405; res.end(); return; }
+      // Fixed public GeoJSON from the São Paulo municipal catalog, sourced from IDE-SP.
+      const source = "https://dadosabertos.urbis.prefeitura.sp.gov.br/dataset/5387954f-357b-4c73-9270-8b80f303bd72/resource/705ab95e-8233-42b4-ba2c-4d2f9ab1b4c6/download/idesp_imoveis_estadual.geojson";
+      try {
+        const response = await fetch(source, { signal: AbortSignal.timeout(12000), redirect: "error" });
+        if (!response.ok) throw Error();
+        const data = await response.json();
+        if (data.type !== "FeatureCollection" || !Array.isArray(data.features) ||
+            data.crs?.properties?.name !== "urn:ogc:def:crs:EPSG::4674") throw Error();
+        res.setHeader("Content-Type", "application/geo+json; charset=utf-8");
+        res.setHeader("Cache-Control", "private, max-age=300");
+        res.end(JSON.stringify(data));
+      } catch {
+        res.statusCode = 502;
+        res.end();
+      }
+    });
+    server.middlewares.use("/previa/catalogo-wms", async (req: any, res: any) => {
+      const endpoints: Record<string, string> = {
+        "-1": "https://geoserver.iphan.gov.br/geoserver/wms",
+        "-3": "https://cmr.funai.gov.br/geoserver/ows",
+      };
+      const id = new URL(req.url, "http://127.0.0.1").searchParams.get("id") ?? "";
+      // Only fixed institutional endpoints use the preview server. Custom URLs stay in the browser.
+      if (req.method !== "GET" || !Object.hasOwn(endpoints, id)) { res.statusCode = 404; res.end(); return; }
+      try {
+        const response = await fetch(endpoints[id] + "?service=WMS&request=GetCapabilities&version=1.1.1",
+          { signal: AbortSignal.timeout(10000), redirect: "error" });
+        if (!response.ok || !response.body) throw Error();
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > 4_000_000) { await reader.cancel(); throw Error(); }
+          chunks.push(value);
+        }
+        res.setHeader("Content-Type", "application/xml; charset=utf-8");
+        res.setHeader("Cache-Control", "private, max-age=300");
+        res.end(Buffer.concat(chunks));
+      } catch {
+        res.statusCode = 502;
+        res.end();
+      }
+    });
     server.middlewares.use("/previa/busca", (req: any, res: any) => {
       const url = new URL(req.url, "http://127.0.0.1");
       const query = normalizeSearch((url.searchParams.get("q") ?? "").slice(0, 120));
@@ -610,31 +988,68 @@ const demoApi = {
     });
     server.middlewares.use("/previa/prancha", async (req: any, res: any) => {
       const url = new URL(req.url, "http://127.0.0.1");
-      if (req.method !== "GET" || !/^\/11\.(svg|pdf)$/.test(url.pathname)) { res.statusCode = 404; res.end(); return; }
+      if (req.method !== "GET" || !/^\/11\.(svg|pdf|json)$/.test(url.pathname)) { res.statusCode = 404; res.end(); return; }
       try {
         const pdf = url.pathname.endsWith(".pdf");
         const requested = url.searchParams.get("camadas");
-        const ids = requested === null ? null : new Set(requested.split(",").map(Number));
-        const layers = (await workflow("gisAnalysis.list", { projectId: 11 })).filter(layer =>
-          ids ? ids.has(layer.id) : layer.isVisible);
+        const ids = requested === null ? null : [...new Set(requested.split(",").filter(Boolean).map(Number))];
+        const available = await workflow("gisAnalysis.list", { projectId: 11 });
+        if (pdf && url.searchParams.get("relatorio") === "empreendimentos-aii") {
+          const aii = available.find(layer => layer.name === "AII.geojson");
+          const developments = available.find(layer => layer.name === "Empreendimentos IPHAN · AII.geojson");
+          if (!aii || !developments) throw Error("A AII ou a camada dos empreendimentos não está disponível.");
+          res.setHeader("Content-Type","application/pdf");
+          res.setHeader("Content-Disposition",'inline; filename="lt-angicos-empreendimentos-aii-A3.pdf"');
+          res.setHeader("Cache-Control","no-store");
+          res.end(developmentsAiiPdf(aii,developments));
+          return;
+        }
+        const layers = ids ? ids.flatMap(id => available.filter(layer => layer.id === id)) : available.filter(layer => layer.isVisible);
+        const modelId = url.searchParams.get("modelo") ?? "";
+        const required = studioLayerRequirements(modelId,layers);
+        if (required) throw Error(required);
         if (!layers.length) { res.statusCode = 422; res.end("Ative ao menos uma camada do projeto."); return; }
         const atlas = url.searchParams.get("atlas");
         const [columns, rows, overlap, grid] = atlas?.split(",").map(Number) ?? [];
         const title = url.searchParams.get("titulo")?.slice(0,85);
         const layout = url.searchParams.get("layout");
         const scale = url.searchParams.get("escala");
-        const options = { layout: readLayout(layout ? JSON.parse(layout) : undefined), scale: readScale(scale ? Number(scale) : undefined) };
-        const body = atlas ? (pdf ? atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
-          atlasView(layers, columns, rows, overlap, grid, Number(url.searchParams.get("folha") ?? 0), title, options)) :
-          pranchaAngicos(layers, pdf, undefined, title, options);
+        const model = url.searchParams.get("modelo");
+        const requestedGrid = Number(url.searchParams.get("grade"));
+        const view = url.searchParams.get("vista");
+        const orientation = readOrientation(url.searchParams.get('orientacao'));
+        const options = {
+          orientation,
+          brands: await Promise.all(["empresa","cliente"].map(kind => workflow("previewProducts.brand",{projectId:11,id:Number(url.searchParams.get(kind))}))),
+          paper: readPaper(url.searchParams.get('papel')),
+          view: readStudioView(view ? JSON.parse(view) : undefined),
+          available,
+          layout: readLayout(layout ? JSON.parse(layout) : undefined, orientation),
+          scale: readScale(scale ? Number(scale) : undefined),
+          grid: Number.isInteger(requestedGrid) && requestedGrid >= 1000 && requestedGrid <= 50000 ? requestedGrid : undefined,
+          model: model ?? undefined,
+          raster: undefined as Awaited<ReturnType<typeof printMapBiomas>> | undefined,
+        };
+        const corridor = model === "corredor" ? corridorSheets(layers, overlap, grid, options) : undefined;
+        if (url.pathname.endsWith(".json")) {
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(JSON.stringify(studioReview(layers, corridor ?? (atlas ? planSheets(layers, columns, rows, overlap, grid, options) : undefined), options)));
+          return;
+        }
+        if (model === "uso-solo") options.raster = await printMapBiomas(layers, options);
+        if (model === "relevo" || model === "topografia") options.raster = printTerrain(layers,options,model === "topografia");
+        const body = corridor ? await corridorAtlas(layers, corridor, pdf, Number(url.searchParams.get("folha") ?? 0), title, options, url.searchParams.has("folha")) : atlas ? (pdf ? await atlasAngicos(layers, columns, rows, overlap, grid, title, options) :
+          await atlasView(layers, columns, rows, overlap, grid, Number(url.searchParams.get("folha") ?? 0), title, options)) :
+          pranchaAngicos(layers, pdf, undefined, title, await prepareStudioBases(layers,options));
         res.setHeader("Cache-Control", "no-store");
         res.setHeader("Content-Type", pdf ? "application/pdf" : "image/svg+xml; charset=utf-8");
-        if (pdf) res.setHeader("Content-Disposition", `attachment; filename="${atlas ? "Atlas-" : ""}LT-Angicos-Jaguaruana-II-A2.pdf"`);
+        if (pdf) res.setHeader("Content-Disposition", `attachment; filename="${(model ?? (atlas ? "Atlas" : "Mapa")).replace(/[^a-z0-9-]/gi,"")}-LT-Angicos-Jaguaruana-II-${options.paper}.pdf"`);
         res.end(body);
       } catch (error) {
         console.error(error);
         res.statusCode = 500;
-        res.end("Não foi possível montar a folha A2.");
+        res.end(error instanceof Error ? error.message : "Não foi possível montar a folha A2.");
       }
     });
     server.middlewares.use("/api/trpc", async (req: any, res: any) => {
