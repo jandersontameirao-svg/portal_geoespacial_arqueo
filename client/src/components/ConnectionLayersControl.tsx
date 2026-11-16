@@ -5,13 +5,26 @@ import { Layers, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 /**
- * Controle "Camadas do mapa" (topo direito) — liga/desliga no mapa as conexões
- * WMS cadastradas (ex.: Sítios do IPHAN SICG, patrimônio estadual), sem precisar
- * ir à página de administração. Porte do painel "Camadas do mapa" da prévia do
- * Codex, generalizado para as conexões reais (connections.list/save).
+ * Controle "Camadas do mapa" (topo direito) — liga/desliga no próprio mapa as
+ * fontes WMS e ArcGIS REST cadastradas (ex.: Sítios do IPHAN SICG, patrimônio
+ * estadual, fundiário INCRA, cavidades), organizadas por grupo, sem precisar ir
+ * à página de administração. Porte do painel "Camadas do mapa" da prévia do
+ * Codex, generalizado para as conexões reais (connections.list/save + groupKey).
  *
  * Fica abaixo dos controles IBGE (.75rem) e de sítios IPHAN (3.75rem).
  */
+
+// Títulos e ordem dos grupos, como o dev organizou na prévia.
+const GROUPS: { key: string; title: string }[] = [
+  { key: "patrimonio-estadual", title: "Patrimônio cultural estadual" },
+  { key: "cavidades", title: "Cavidades naturais" },
+  { key: "fundiario", title: "Imóveis rurais e fundiário" },
+  { key: "uso-solo", title: "Uso e cobertura do solo" },
+  { key: "recursos-hidricos", title: "Recursos hídricos" },
+  { key: "relevo", title: "Relevo e topografia" },
+  { key: "infraestrutura-eletrica", title: "Infraestrutura elétrica" },
+];
+
 export default function ConnectionLayersControl() {
   const map = useMap();
   const utils = trpc.useUtils();
@@ -38,19 +51,42 @@ export default function ConnectionLayersControl() {
     control.querySelector("summary")?.focus();
   }
 
-  // Só fontes WMS com camada podem ser exibidas no mapa (regra do servidor).
-  const displayable = connections.filter((c) => c.type === "WMS" && c.layer);
-  const others = connections.filter((c) => !(c.type === "WMS" && c.layer));
+  // Só fontes WMS e ArcGIS REST com camada podem ser exibidas no mapa.
+  const displayable = connections.filter((c) => (c.type === "WMS" || c.type === "ArcGIS REST") && c.layer);
+  const others = connections.filter((c) => !((c.type === "WMS" || c.type === "ArcGIS REST") && c.layer));
+
+  const ungrouped = displayable.filter((c) => !c.groupKey);
+  const grouped = GROUPS.map((group) => ({
+    ...group,
+    sources: displayable.filter((c) => c.groupKey === group.key),
+  })).filter((group) => group.sources.length > 0);
 
   function toggle(source: (typeof connections)[number], enabled: boolean) {
     save.mutate({
       id: source.id,
       name: source.name,
-      type: source.type as "WMS",
+      type: source.type as "WMS" | "ArcGIS REST",
       address: source.address,
       layer: source.layer ?? "",
       enabled,
+      groupKey: source.groupKey ?? null,
     });
+  }
+
+  function renderSource(source: (typeof connections)[number]) {
+    return (
+      <div key={source.id} className="rounded px-2 py-1.5 text-xs hover:bg-slate-50">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={!!source.enabled}
+            disabled={save.isPending}
+            onChange={(event) => toggle(source, event.target.checked)}
+          />
+          <span>{source.name}</span>
+        </label>
+      </div>
+    );
   }
 
   return (
@@ -65,10 +101,10 @@ export default function ConnectionLayersControl() {
         }
       }}
     >
-      <summary aria-label="Camadas do mapa" title="Camadas do mapa (IPHAN e outras fontes)">
+      <summary aria-label="Camadas do mapa" title="Camadas do mapa (IPHAN e outras fontes oficiais)">
         <Layers size={20} aria-hidden="true" />
       </summary>
-      <div className="preview-ibge-panel rounded-lg border bg-white p-2 shadow-lg">
+      <div className="preview-ibge-panel max-h-[70vh] overflow-auto rounded-lg border bg-white p-2 shadow-lg">
         <div className="flex items-center justify-between gap-2 pl-2">
           <h3 className="text-xs font-semibold">Camadas do mapa</h3>
           <button
@@ -88,18 +124,15 @@ export default function ConnectionLayersControl() {
           </p>
         )}
 
-        {displayable.map((source) => (
-          <div key={source.id} className="rounded px-2 py-1.5 text-xs hover:bg-slate-50">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={!!source.enabled}
-                disabled={save.isPending}
-                onChange={(event) => toggle(source, event.target.checked)}
-              />
-              <span>{source.name}</span>
-            </label>
-          </div>
+        {/* Fontes sem grupo (IPHAN, terras indígenas, quilombolas…) no topo. */}
+        {ungrouped.map(renderSource)}
+
+        {/* Grupos organizados, colapsáveis. */}
+        {grouped.map((group) => (
+          <details key={group.key} className="border-t py-1 text-sm">
+            <summary className="cursor-pointer px-2 py-1 text-xs font-medium">{group.title}</summary>
+            <div className="ml-1">{group.sources.map(renderSource)}</div>
+          </details>
         ))}
 
         {others.length > 0 && (

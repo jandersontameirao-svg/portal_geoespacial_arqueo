@@ -35,9 +35,10 @@ function validateAddressAndLayer(type: string, address: string, layerRaw: string
       throw new TRPCError({ code: "BAD_REQUEST", message: "Use o endereço base, sem credenciais, parâmetros ou fragmento." });
     }
   }
-  const layer = type === "WMS" ? layerRaw.trim() : "";
+  // WMS (workspace:camada) e ArcGIS REST (índices numéricos) carregam camada.
+  const layer = ["WMS", "ArcGIS REST"].includes(type) ? layerRaw.trim() : "";
   if (layer && !/^[\w.:,-]{1,500}$/.test(layer)) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Informe o identificador da camada WMS (várias separadas por vírgula)." });
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Informe o identificador da camada (WMS: workspace:camada; ArcGIS REST: índices separados por vírgula)." });
   }
   return layer;
 }
@@ -58,6 +59,7 @@ export const connectionsRouter = router({
       address: z.string().trim().min(1).max(500),
       layer: z.string().trim().max(500).optional(),
       enabled: z.boolean().optional(),
+      groupKey: z.string().trim().max(40).nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -65,11 +67,14 @@ export const connectionsRouter = router({
 
       const layer = validateAddressAndLayer(input.type, input.address, input.layer ?? "");
       const enabled = Boolean(input.enabled);
-      if (enabled && (input.type !== "WMS" || !layer)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Para exibir no mapa, informe a camada de uma fonte WMS." });
+      if (enabled && !(["WMS", "ArcGIS REST"].includes(input.type) && layer)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Para exibir no mapa, informe a camada de uma fonte WMS ou ArcGIS REST." });
       }
 
-      const values = { name: input.name, type: input.type, address: input.address, layer, enabled };
+      // groupKey só é alterado quando enviado (o cadastro admin não o envia,
+      // então a organização por grupo é preservada ao ligar/desligar).
+      const base = { name: input.name, type: input.type, address: input.address, layer, enabled };
+      const values = input.groupKey !== undefined ? { ...base, groupKey: input.groupKey || null } : base;
 
       let id = input.id;
       if (id != null) {

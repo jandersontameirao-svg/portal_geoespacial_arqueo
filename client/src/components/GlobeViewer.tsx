@@ -62,6 +62,7 @@ import ConnectionWmsLayers from "./ConnectionWmsLayers";
 import IbgeLocalLayers from "./IbgeLocalLayers";
 import IphanSitesLayer from "./IphanSitesLayer";
 import ConnectionLayersControl from "./ConnectionLayersControl";
+import ArcGisRestLayers from "./ArcGisRestLayers";
 import InstitutionalMapLayers, { InstitutionalLayersProvider } from "./InstitutionalMapLayers";
 import IndeGlobeLayers from "./IndeGlobeLayers";
 import {
@@ -661,6 +662,7 @@ export default function GlobeViewer({
           />
           <BaseLayerMapOverlays />
           <ConnectionWmsLayers />
+          <ArcGisRestLayers />
           <IbgeLocalLayers />
           <IphanSitesLayer />
           <ConnectionLayersControl />

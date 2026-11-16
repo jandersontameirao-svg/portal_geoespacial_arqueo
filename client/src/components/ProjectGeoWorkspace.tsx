@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import IbgeLocalLayers from "./IbgeLocalLayers";
 import IphanSitesLayer from "./IphanSitesLayer";
 import ConnectionWmsLayers from "./ConnectionWmsLayers";
+import ArcGisRestLayers from "./ArcGisRestLayers";
 import ConnectionLayersControl from "./ConnectionLayersControl";
 import { FeatureGroup, GeoJSON, MapContainer, Marker, Pane as MapPane, Polygon, Polyline, Popup, TileLayer, Tooltip, useMap, WMSTileLayer } from "react-leaflet";
 import L from "leaflet";
@@ -561,6 +562,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
             <InvalidateMapOnResize />
             <ScreenScaleIndicator />
             <ConnectionWmsLayers />
+            <ArcGisRestLayers />
             <IbgeLocalLayers projectBounds={municipalProjectBounds} />
             <IphanSitesLayer />
             <ConnectionLayersControl />

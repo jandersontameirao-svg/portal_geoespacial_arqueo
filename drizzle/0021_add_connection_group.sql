@@ -1,0 +1,1 @@
+ALTER TABLE `map_connections` ADD `groupKey` varchar(40);

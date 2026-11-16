@@ -148,6 +148,20 @@
       "when": 1794834446256,
       "tag": "0020_studio_products",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1794855170685,
+      "tag": "0021_add_connection_group",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1794855170686,
+      "tag": "0022_group_official_connections",
+      "breakpoints": true
     }
   ]
 }

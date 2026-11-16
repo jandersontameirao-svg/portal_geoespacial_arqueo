@@ -784,8 +784,11 @@ export const mapConnections = mysqlTable("map_connections", {
   // Identificador(es) da camada WMS (workspace:camada, separadas por vírgula);
   // vazio para os demais tipos.
   layer: varchar("layer", { length: 500 }).default("").notNull(),
-  // Só WMS com camada pode ficar ligada e aparecer no mapa.
+  // Fontes WMS e ArcGIS REST com camada podem ficar ligadas e aparecer no mapa.
   enabled: boolean("enabled").default(false).notNull(),
+  // Categoria para organizar as fontes no painel "Camadas do mapa" (slug do
+  // grupo, ex.: "patrimonio-estadual", "fundiario"); nulo = sem grupo (topo).
+  groupKey: varchar("groupKey", { length: 40 }),
   createdById: int("createdById"),
   createdByName: varchar("createdByName", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
