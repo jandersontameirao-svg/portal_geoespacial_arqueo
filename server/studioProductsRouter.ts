@@ -11,7 +11,7 @@ import { getDb, getLayersByProject } from "./db";
 import { studioProducts } from "../drizzle/schema";
 import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
 import { isPromotableVectorLayer, vectorFeaturesFromLayer } from "./vectorLayerPromotion";
-import { renderPrancha, renderAtlas, type RenderLayer } from "./studioPranchaService";
+import { renderPrancha, renderAtlas, prepareBaseImages, type RenderLayer } from "./studioPranchaService";
 import { readPaper, readOrientation, readLayout, readScale } from "../shared/studioLayout";
 
 /** Camadas vetoriais do projeto com flags de geometria (área/linha/ponto). */
@@ -91,6 +91,7 @@ export const studioProductsRouter = router({
       grid: z.number().int().min(1000).max(50000).optional(),
       scale: z.number().int().optional(),
       layout: z.unknown().optional(),
+      background: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireProjectAccess(input.projectId, ctx.user);
@@ -102,6 +103,7 @@ export const studioProductsRouter = router({
         grid: input.grid,
         scale: readScale(input.scale),
         layout: readLayout(input.layout, orientation),
+        background: input.background,
       };
       const all = await getLayersByProject(input.projectId);
       const chosen = input.layerIds
@@ -117,7 +119,8 @@ export const studioProductsRouter = router({
         defaultStyle: layer.defaultStyle as RenderLayer["defaultStyle"],
       }));
       try {
-        const result = renderPrancha(renderLayers, input.format === "pdf", options);
+        const baseImages = await prepareBaseImages(renderLayers, options);
+        const result = renderPrancha(renderLayers, input.format === "pdf", { ...options, baseImages });
         if (input.format === "pdf") {
           return { format: "pdf" as const, filename: (input.title || "prancha").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 80) + ".pdf", base64: (result as Buffer).toString("base64") };
         }

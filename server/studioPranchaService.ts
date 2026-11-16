@@ -23,7 +23,7 @@ type Shape = { type: string; coordinates: any };
 type Feature = { geometry: Shape; properties?: Record<string, unknown> | null };
 export type RenderLayer = { id?: number; name: string; layerData: { features: Feature[] }; defaultStyle?: { color?: string; weight?: number; fillOpacity?: number } | null };
 export type Sheet = { center: Point; scale: number; number?: number; total?: number; grid?: number };
-export type RenderOptions = { paper?: Paper; orientation?: Orientation; title?: string; grid?: number; layout?: Layout; scale?: number; labels?: boolean; sheet?: Sheet; document?: any; index?: Sheet[] };
+export type RenderOptions = { paper?: Paper; orientation?: Orientation; title?: string; grid?: number; layout?: Layout; scale?: number; labels?: boolean; sheet?: Sheet; document?: any; index?: Sheet[]; background?: string; baseImages?: { principal?: string } };
 
 const xml = (s: string) => s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]!));
 
@@ -184,9 +184,15 @@ export function renderPrancha(layers: RenderLayer[], asPdf: boolean, options: Re
   const heading = options.title || "Mapa de localização";
   label(portrait ? 215 : 247, 20.5, heading, Math.min(5.6, (portrait ? 370 : 440) / (heading.length * .62)), true, true);
 
+  const baseImage = (url: string, x: number, y: number, w: number, h: number) => {
+    if (pdf) pdf.addImage(url, "PNG", x * factor, y * factor, w * factor, h * factor);
+    else svg.push(`<image href="${url}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`);
+  };
+
   // Mapa principal
   rect(frame.x, frame.y, frame.w, frame.h, "#ffffff");
   clip(frame.x, frame.y, frame.w, frame.h, () => {
+    if (options.baseImages?.principal) baseImage(options.baseImages.principal, frame.x, frame.y, frame.w, frame.h);
     for (const layer of layers) {
       drawFeatures(layer.layerData.features, main, layer.defaultStyle?.color ?? "#1d4ed8", layerFill(layer),
         layer.defaultStyle?.weight ? layer.defaultStyle.weight * .16 : .32, layer.defaultStyle?.fillOpacity ?? 1);
@@ -344,4 +350,63 @@ export function renderAtlas(layers: RenderLayer[], columns: number, rows: number
     renderPrancha(layers, true, { ...options, document: doc, sheet });
   }
   return Buffer.from(doc.output("arraybuffer"));
+}
+
+// ── Bases Esri (fundo de satélite/cinza do mapa principal) ──────────────────
+
+const esriServices = {
+  "esri-imagery": "World_Imagery",
+  "esri-light-gray": "Canvas/World_Light_Gray_Base",
+  "esri-dark-gray": "Canvas/World_Dark_Gray_Base",
+} as const;
+type EsriBase = keyof typeof esriServices;
+function isEsriBase(id: string | undefined): id is EsriBase {
+  return !!id && Object.hasOwn(esriServices, id);
+}
+const esriCache = new Map<string, Promise<string>>();
+
+/**
+ * Imagem Esri (ArcGIS Online) que cobre o quadro principal, em WebMercator,
+ * para preencher a moldura como fundo. Com cache e timeout; sem reprojeção
+ * pixel-a-pixel (aproximação aceitável no tamanho de um quadro).
+ */
+async function esriImage(id: EsriBase, projection: any, center: Point, widthM: number, heightM: number, pixels: number): Promise<string> {
+  const key = JSON.stringify([id, center.map((v) => Math.round(v)), Math.round(widthM), Math.round(heightM), pixels]);
+  const cached = esriCache.get(key);
+  if (cached) return cached;
+  const pending = (async () => {
+    const mercator = proj4("EPSG:4326", "EPSG:3857");
+    const samples: Point[] = [];
+    for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) {
+      const lonlat = projection.inverse([center[0] + (i / 8 - .5) * widthM, center[1] + (j / 8 - .5) * heightM]);
+      samples.push(mercator.forward(lonlat) as Point);
+    }
+    const xs = samples.map((p) => p[0]), ys = samples.map((p) => p[1]);
+    const west = Math.min(...xs), east = Math.max(...xs), south = Math.min(...ys), north = Math.max(...ys);
+    const rows = Math.max(64, Math.round(pixels * (north - south) / (east - west)));
+    const query = new URLSearchParams({ bbox: [west, south, east, north].join(","), bboxSR: "3857", imageSR: "3857", size: pixels + "," + rows, format: "png32", transparent: "true", f: "image" });
+    const response = await fetch("https://server.arcgisonline.com/ArcGIS/rest/services/" + esriServices[id] + "/MapServer/export?" + query, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok || !response.headers.get("content-type")?.includes("image/png")) throw new Error("O mapa-base Esri está indisponível para esta folha.");
+    return "data:image/png;base64," + Buffer.from(await response.arrayBuffer()).toString("base64");
+  })();
+  if (esriCache.size >= 40) esriCache.delete(esriCache.keys().next().value!);
+  esriCache.set(key, pending);
+  pending.catch(() => esriCache.delete(key));
+  return pending;
+}
+
+/** Busca a imagem de fundo do quadro principal quando o fundo é uma base Esri. */
+export async function prepareBaseImages(layers: RenderLayer[], options: RenderOptions = {}): Promise<{ principal?: string }> {
+  if (!isEsriBase(options.background)) return {};
+  const portrait = options.orientation === "portrait";
+  const frame = (options.layout ?? (portrait ? portraitLayout : defaultLayout)).principal;
+  const { projection } = utmFor(layers);
+  const { center, scale } = options.sheet ?? mapView(projection, layers, frame, options);
+  const factor = paperFactor(options.paper ?? "A2");
+  try {
+    const principal = await esriImage(options.background, projection, center, frame.w * scale * factor / 1000, frame.h * scale * factor / 1000, 750);
+    return { principal };
+  } catch {
+    return {};
+  }
 }

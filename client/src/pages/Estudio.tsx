@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Download, Loader2, Save } from "lucide-react";
-import { defaultLayout, portraitLayout, type Layout, type Orientation, type Paper } from "@shared/studioLayout";
+import { defaultLayout, portraitLayout, studioBackgrounds, type Layout, type Orientation, type Paper, type StudioBackground } from "@shared/studioLayout";
 
 type Box = { x: number; y: number; w: number; h: number };
 type ElementId = keyof Layout;
@@ -29,6 +29,7 @@ export default function Estudio() {
   const [paper, setPaper] = useState<Paper>("A2");
   const [orientation, setOrientation] = useState<Orientation>("landscape");
   const [grid, setGrid] = useState(25000);
+  const [background, setBackground] = useState<StudioBackground>("cartografico");
   const [layerIds, setLayerIds] = useState<number[]>([]);
   const [layout, setLayout] = useState<Layout>(defaultLayout);
   const [svg, setSvg] = useState("");
@@ -44,13 +45,14 @@ export default function Estudio() {
   useEffect(() => {
     if (hydrated.current) return;
     const saved = studio.data?.products.find((product) => product.productKey === "estudio");
-    const config = saved?.config as Partial<{ title: string; paper: Paper; orientation: Orientation; grid: number; layerIds: number[]; layout: Layout }> | undefined;
+    const config = saved?.config as Partial<{ title: string; paper: Paper; orientation: Orientation; grid: number; background: StudioBackground; layerIds: number[]; layout: Layout }> | undefined;
     if (!config) return;
     hydrated.current = true;
     if (config.title) setTitle(config.title);
     if (config.paper) setPaper(config.paper);
     if (config.orientation) setOrientation(config.orientation);
     if (config.grid) setGrid(config.grid);
+    if (config.background) setBackground(config.background);
     if (Array.isArray(config.layerIds)) setLayerIds(config.layerIds);
     if (config.layout) setLayout(config.layout);
   }, [studio.data]);
@@ -84,11 +86,11 @@ export default function Estudio() {
   const [overlap, setOverlap] = useState(10);
 
   // Prévia ao vivo (debounce) sempre que os parâmetros mudam.
-  const paramsKey = useMemo(() => JSON.stringify([title, paper, orientation, grid, layerIds, layout]), [title, paper, orientation, grid, layerIds, layout]);
+  const paramsKey = useMemo(() => JSON.stringify([title, paper, orientation, grid, background, layerIds, layout]), [title, paper, orientation, grid, background, layerIds, layout]);
   useEffect(() => {
     if (!projectId || !layerIds.length) { setSvg(""); return; }
     const timer = window.setTimeout(() => {
-      render.mutate({ projectId, layerIds, format: "svg", title, paper, orientation, grid, layout });
+      render.mutate({ projectId, layerIds, format: "svg", title, paper, orientation, grid, background, layout });
     }, 350);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,6 +158,9 @@ export default function Estudio() {
         </div>
         <div className="space-y-1"><Label htmlFor="studio-grid">Grade UTM (m)</Label>
           <Input id="studio-grid" className={field} type="number" min={1000} max={50000} step={1000} value={grid} onChange={(e) => setGrid(Number(e.target.value) || 25000)} /></div>
+        <div className="space-y-1"><Label>Fundo do mapa</Label>
+          <Select value={background} onValueChange={(v) => setBackground(v as StudioBackground)}><SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{(Object.entries(studioBackgrounds) as [StudioBackground, string][]).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></div>
         <div className="space-y-1">
           <Label>Camadas do produto</Label>
           {layers.length === 0 && <p className="text-xs text-muted-foreground">Este projeto ainda não tem camadas vetoriais.</p>}
@@ -170,10 +175,10 @@ export default function Estudio() {
         <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={save.isPending || !layerIds.length} onClick={() => save.mutate({
             projectId, productKey: "estudio", title,
-            config: { title, paper, orientation, grid, layerIds, layout },
+            config: { title, paper, orientation, grid, background, layerIds, layout },
           })}>{save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}Salvar</Button>
           <Button size="sm" variant="outline" disabled={exportPdf.isPending || !layerIds.length} onClick={() =>
-            exportPdf.mutate({ projectId, layerIds, format: "pdf", title, paper, orientation, grid, layout })}>
+            exportPdf.mutate({ projectId, layerIds, format: "pdf", title, paper, orientation, grid, background, layout })}>
             {exportPdf.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Exportar PDF</Button>
         </div>
         <p className="text-[11px] text-muted-foreground">Arraste os elementos pelo nome; puxe o canto para redimensionar.</p>
