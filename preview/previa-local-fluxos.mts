@@ -1,3 +1,4 @@
+import { readPlant, samplePlant, plantGeoJson, metresPerUnit } from "./previa-plantas.mts";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -13,7 +14,7 @@ const municipalAnchors = JSON.parse(readFileSync(new URL("./previa-raster/angico
 const storePath = fileURLToPath(new URL("./previa-local-dados.json", import.meta.url));
 const seed = { id: 1, name: "Levantamento arqueológico demonstrativo", code: "DEMO-01", description: "Projeto fictício para explorar o Geoportal.", clientName: "Cliente fictício", status: "active", createdAt: "2026-11-12T12:00:00Z" };
 type Row = Record<string, any>;
-type State = { mapProjectIds?: number[]; iphanKnowledge?: Row[]; geometries?: Row[]; projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
+type State = { plants?: Row[]; mapProjectIds?: number[]; iphanKnowledge?: Row[]; geometries?: Row[]; projects: Row[]; files: Row[]; jobs: Row[]; templates: Row[]; products?: Record<string, Row[]>; recentProjects?: Record<string, number[]>; connections?: Row[]; studioBrands?: Row[]; nextId: number };
 let state: State;
 try {
   state = JSON.parse(readFileSync(storePath, "utf8"));
@@ -626,6 +627,41 @@ function regionalProjectSelection(projectId:number, requireAii = false) {
 }
 
 export async function workflow(method: string, input: Row = {}, write = false, validateOnly = false) {
+  if (method.startsWith("previewPlants.")) {
+    if (!state.projects.some(project=>project.id===input.projectId)) throw Error("Projeto indisponível.");
+    const all = state.plants ?? [];
+    const documents = all.filter(item=>item.projectId===input.projectId);
+    if (method==="previewPlants.list" && !write) return documents;
+    if (method==="previewPlants.save" && write) {
+      const previous=documents.find(item=>item.id===input.id);
+      if (input.id!=null && (!previous || input.baseVersion!==previous.versions.length)) throw Error("A planta mudou. Reabra a versão atual antes de salvar.");
+      if ((previous?.versions.length ?? 0)>=100) throw Error("Limite de versões atingido. Salve outra planta.");
+      const version={createdAt:new Date().toISOString(),plant:readPlant(input.plant)};
+      const document={id:previous?.id??crypto.randomUUID(),projectId:input.projectId,versions:[...(previous?.versions??[]),version]};
+      save({...state,plants:[...all.filter(item=>item.id!==document.id),document]});
+      return document;
+    }
+    if (method==="previewPlants.implant" && write) {
+      const plant=documents.find(item=>item.id===input.id)?.versions[input.version-1]?.plant;
+      if (!plant?.origin) throw Error("Salve a versão com origem UTM antes de enviar ao mapa.");
+      const o=plant.origin, factor=metresPerUnit(o.unit), angle=o.rotation*Math.PI/180;
+      const projection=require("proj4")(`+proj=utm +zone=${o.zone}${o.south?" +south":""} +ellps=GRS80 +units=m +no_defs`,"EPSG:4326");
+      const data=plantGeoJson(plant,([x,y])=>{
+        const coordinates=projection.forward([o.east+factor*(x*Math.cos(angle)-y*Math.sin(angle)),o.north+factor*(x*Math.sin(angle)+y*Math.cos(angle))]);
+        if (!coordinates.every(Number.isFinite)) throw Error("Implantação fora da projeção.");
+        return coordinates;
+      });
+      if (!data.features.length) throw Error("Desenhe uma geometria para implantar.");
+      const filename="implantacao-"+input.id+"-v"+input.version+".geojson";
+      const existing=state.files.find(file=>file.projectId===input.projectId&&file.name===filename);
+      if (existing) return {id:existing.id};
+      const contents=Buffer.from(JSON.stringify(data));
+      const file=append("files",{projectId:input.projectId,name:filename,fileType:"geojson",fileSize:contents.length,mimeType:"application/geo+json",isGeospatial:true,currentVersion:1,
+        uploadedAt:new Date().toISOString(),s3Url:"/previa/download/arquivo/"+state.nextId,vector:data,contents:contents.toString("base64")});
+      return {id:file.id};
+    }
+    throw Error("Operação de plantas indisponível.");
+  }
   if (method === "previewMap.clear" && write) {
     // Store project and source visibility together. Keep registrations and sublayer choices.
     const connections = [...(state.connections ?? [])];
@@ -873,6 +909,14 @@ export async function workflow(method: string, input: Row = {}, write = false, v
     case "atena.previewRun": {
       const text = String(input.text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const request = String(input.text ?? "").trim();
+      const plantCommand=request.match(/^(?:criar|crie) planta fict[ií]cia "([^"]{1,75})"$/i);
+      if (plantCommand) {
+        if (!state.projects.some(project=>project.id===input.projectId)) throw Error("Abra um projeto para criar a planta.");
+        const plant=samplePlant(plantCommand[1]);
+        if (method==="atena.previewPlan") return {summary:"Criar uma planta fictícia de "+plant.title+" com lote, edificação e cota, e abrir no Estúdio de Plantas."};
+        const document=await workflow("previewPlants.save",{projectId:input.projectId,plant},true);
+        return {studioUrl:"/projects/"+input.projectId+"?tab=plants&planta="+document.id,message:"Planta fictícia salva no projeto."};
+      }
       if (/\b(cruzar|cruze|cruzamento|intersectar|intersecte)\b/.test(text) && /\biphan\b/.test(text) && /\b(ada|aid|aii)\b/.test(text)) {
         if (!state.projects.some(project => project.id === input.projectId)) throw Error("Abra o projeto para cruzar as áreas.");
         const areas = iphanInfluenceLayers(input.projectId);
