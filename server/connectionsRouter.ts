@@ -36,8 +36,8 @@ function validateAddressAndLayer(type: string, address: string, layerRaw: string
     }
   }
   const layer = type === "WMS" ? layerRaw.trim() : "";
-  if (layer && !/^[\w.:-]{1,150}$/.test(layer)) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Informe o identificador da camada WMS." });
+  if (layer && !/^[\w.:,-]{1,500}$/.test(layer)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Informe o identificador da camada WMS (várias separadas por vírgula)." });
   }
   return layer;
 }
@@ -56,7 +56,7 @@ export const connectionsRouter = router({
       name: z.string().trim().min(1).max(100),
       type: z.enum(TYPES),
       address: z.string().trim().min(1).max(500),
-      layer: z.string().trim().max(150).optional(),
+      layer: z.string().trim().max(500).optional(),
       enabled: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

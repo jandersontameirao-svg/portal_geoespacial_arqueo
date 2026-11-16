@@ -127,6 +127,20 @@
       "when": 1794600035437,
       "tag": "0017_map_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1794830461000,
+      "tag": "0018_widen_connection_layer",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1794830462000,
+      "tag": "0019_seed_official_connections",
+      "breakpoints": true
     }
   ]
 }

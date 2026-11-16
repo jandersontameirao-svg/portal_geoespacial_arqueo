@@ -1,0 +1,1 @@
+ALTER TABLE `map_connections` MODIFY COLUMN `layer` varchar(500) NOT NULL DEFAULT '';

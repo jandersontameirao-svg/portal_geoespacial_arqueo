@@ -781,8 +781,9 @@ export const mapConnections = mysqlTable("map_connections", {
   name: varchar("name", { length: 100 }).notNull(),
   type: mysqlEnum("type", ["WMS", "WFS", "ArcGIS REST", "GeoJSON", "PostGIS"]).notNull(),
   address: varchar("address", { length: 500 }).notNull(),
-  // Identificador da camada WMS (workspace:camada); vazio para os demais tipos.
-  layer: varchar("layer", { length: 150 }).default("").notNull(),
+  // Identificador(es) da camada WMS (workspace:camada, separadas por vírgula);
+  // vazio para os demais tipos.
+  layer: varchar("layer", { length: 500 }).default("").notNull(),
   // Só WMS com camada pode ficar ligada e aparecer no mapa.
   enabled: boolean("enabled").default(false).notNull(),
   createdById: int("createdById"),
