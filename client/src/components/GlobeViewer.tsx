@@ -25,6 +25,7 @@ import {
   Hand,
   Upload,
   Printer,
+  Eraser,
 } from "lucide-react";
 import {
   Dialog,
@@ -271,6 +272,18 @@ export default function GlobeViewer({
   const [selectedIds, setSelectedIds] = useState<number[] | null>(null);
   const [selectionError, setSelectionError] = useState<string>();
   const selectionMutation = trpc.projectSelection.set.useMutation();
+  const disableConnections = trpc.connections.disableAll.useMutation();
+  const clearingMap = disableConnections.isPending || selectionMutation.isPending;
+  const clearMainMap = async () => {
+    try {
+      await disableConnections.mutateAsync();
+      await selectionMutation.mutateAsync({ projectIds: [] });
+      await Promise.all([
+        utils.connections.list.invalidate(),
+        utils.projectSelection.get.invalidate(),
+      ]);
+    } catch { /* o mapa permanece como está se o reset falhar */ }
+  };
   const enabledIds = useMemo(
     () =>
       projectsError
@@ -1005,6 +1018,19 @@ export default function GlobeViewer({
 
       {/* Controles Flutuantes */}
       <div className="absolute top-4 right-3 flex flex-col gap-2 z-[900]">
+        {viewMode === "2d" && (
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => void clearMainMap()}
+            disabled={clearingMap}
+            className="bg-white/90 hover:bg-white shadow-lg"
+            title="Limpar mapa (desliga conexões e projetos visíveis)"
+            aria-label="Limpar mapa"
+          >
+            <Eraser className="w-5 h-5" />
+          </Button>
+        )}
         {/* Toggle 2D/3D */}
         <Button
           variant="secondary"

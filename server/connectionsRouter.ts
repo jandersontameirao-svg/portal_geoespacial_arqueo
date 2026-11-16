@@ -98,4 +98,20 @@ export const connectionsRouter = router({
       const [saved] = await db.select().from(mapConnections).where(eq(mapConnections.id, id)).limit(1);
       return withStatus(saved);
     }),
+
+  // Desliga todas as conexões ligadas (usado por "Limpar mapa"). Mantém o cadastro.
+  disableAll: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível." });
+    await db.update(mapConnections).set({ enabled: false }).where(eq(mapConnections.enabled, true));
+    await createAuditLog({
+      userId: ctx.user.id,
+      userEmail: ctx.user.email || null,
+      userName: ctx.user.name || null,
+      action: "mapConnection.disableAll",
+      entityType: "mapConnection",
+      entityId: 0,
+    });
+    return { success: true };
+  }),
 });
