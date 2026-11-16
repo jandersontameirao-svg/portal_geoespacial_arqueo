@@ -28,6 +28,7 @@ import { officialRouter } from "./officialRouter";
 import { observacoesRouter } from "./observacoesRouter";
 import { connectionsRouter } from "./connectionsRouter";
 import { ibgeLocalRouter } from "./ibgeLocalRouter";
+import { iphanSitesRouter } from "./iphanSitesRouter";
 import { atenaChatRouter } from "./atenaChatRouter";
 import { geoRouter } from "./geoRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -765,6 +766,7 @@ export const appRouter = router({
   observacoes: observacoesRouter,
   connections: connectionsRouter,
   ibgeLocal: ibgeLocalRouter,
+  iphanSites: iphanSitesRouter,
   atenaChat: atenaChatRouter,
   geo: geoRouter,
 });
