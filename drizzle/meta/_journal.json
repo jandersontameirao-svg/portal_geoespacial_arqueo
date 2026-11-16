@@ -141,6 +141,13 @@
       "when": 1794830462000,
       "tag": "0019_seed_official_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1794834446256,
+      "tag": "0020_studio_products",
+      "breakpoints": true
     }
   ]
 }

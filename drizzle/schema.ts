@@ -796,3 +796,26 @@ export const mapConnections = mysqlTable("map_connections", {
 
 export type MapConnection = typeof mapConnections.$inferSelect;
 export type InsertMapConnection = typeof mapConnections.$inferInsert;
+
+// ============================================================================
+// Estúdio Cartográfico — produtos (pranchas/atlas) editáveis por projeto
+// ============================================================================
+
+export const studioProducts = mysqlTable("studio_products", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  // Chave do produto dentro do projeto (ex.: "mapa", "atlas", template id).
+  productKey: varchar("productKey", { length: 80 }).notNull(),
+  title: varchar("title", { length: 120 }).notNull(),
+  // Configuração completa da prancha (papel, layout, vista, camadas, marcas…).
+  config: json("config").$type<Record<string, unknown>>().notNull(),
+  createdById: int("createdById"),
+  createdByName: varchar("createdByName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  projectKeyIdx: unique("studio_products_project_key_uq").on(table.projectId, table.productKey),
+}));
+
+export type StudioProduct = typeof studioProducts.$inferSelect;
+export type InsertStudioProduct = typeof studioProducts.$inferInsert;
