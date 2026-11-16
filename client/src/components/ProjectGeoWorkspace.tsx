@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import IbgeLocalLayers from "./IbgeLocalLayers";
 import IphanSitesLayer from "./IphanSitesLayer";
+import ConnectionWmsLayers from "./ConnectionWmsLayers";
+import ConnectionLayersControl from "./ConnectionLayersControl";
 import { FeatureGroup, GeoJSON, MapContainer, Marker, Pane as MapPane, Polygon, Polyline, Popup, TileLayer, Tooltip, useMap, WMSTileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -558,8 +560,10 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
           <MapContainer ref={mapRef} center={center} zoom={11} style={{ height: "100%", width: "100%" }} className="isolate z-0 min-h-[420px] flex-1 lg:min-h-0">
             <InvalidateMapOnResize />
             <ScreenScaleIndicator />
+            <ConnectionWmsLayers />
             <IbgeLocalLayers projectBounds={municipalProjectBounds} />
             <IphanSitesLayer />
+            <ConnectionLayersControl />
             <TileLayer key={activeBasemap.id} attribution={activeBasemap.attribution} url={activeBasemap.url!} crossOrigin={activeBasemap.crossOrigin} minNativeZoom={activeBasemap.minZoom} maxNativeZoom={activeBasemap.maxZoom} />
             {thematicItems.map((item) => <MapPane key={item.id} name={thematicPaneName(item.id)} style={{ zIndex: thematicZIndex(item.id) }} />)}
             {rasterLayers.filter((layer) => layer.isVisible && visibleRasterIds.includes(layer.id)).map((layer) => (

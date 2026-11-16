@@ -61,6 +61,7 @@ import { BaseLayerMapOverlays } from "./BaseLayersPanel";
 import ConnectionWmsLayers from "./ConnectionWmsLayers";
 import IbgeLocalLayers from "./IbgeLocalLayers";
 import IphanSitesLayer from "./IphanSitesLayer";
+import ConnectionLayersControl from "./ConnectionLayersControl";
 import InstitutionalMapLayers, { InstitutionalLayersProvider } from "./InstitutionalMapLayers";
 import IndeGlobeLayers from "./IndeGlobeLayers";
 import {
@@ -662,6 +663,7 @@ export default function GlobeViewer({
           <ConnectionWmsLayers />
           <IbgeLocalLayers />
           <IphanSitesLayer />
+          <ConnectionLayersControl />
           <InstitutionalMapLayers />
           {enabledIds.map(id => (
             <ProjectLayerDataOverlays key={id} projectId={id} />
