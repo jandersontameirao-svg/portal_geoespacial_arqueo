@@ -67,9 +67,9 @@ export default function MapConnectionsPanel() {
           <label className="text-sm">Endereço da fonte
             <input className={field} required maxLength={500} value={draft.address} placeholder={draft.type === "PostGIS" ? "servidor:5432/banco" : "https://servidor/servico"} onChange={(e) => setDraft({ ...draft, address: e.target.value })} />
           </label>
-          {draft.type === "WMS" && (
-            <label className="text-sm">Identificador da camada WMS
-              <input className={field} value={draft.layer ?? ""} onChange={(e) => setDraft({ ...draft, layer: e.target.value, enabled: e.target.value.trim() ? draft.enabled : false })} placeholder="workspace:camada" />
+          {(draft.type === "WMS" || draft.type === "ArcGIS REST") && (
+            <label className="text-sm">{draft.type === "WMS" ? "Identificador da camada WMS" : "Índice(s) da camada ArcGIS REST"}
+              <input className={field} value={draft.layer ?? ""} onChange={(e) => setDraft({ ...draft, layer: e.target.value, enabled: e.target.value.trim() ? draft.enabled : false })} placeholder={draft.type === "WMS" ? "workspace:camada" : "0 ou 0,1,2"} />
             </label>
           )}
           <div className="flex gap-2">
@@ -86,13 +86,13 @@ export default function MapConnectionsPanel() {
             <div>
               <strong>{item.name}</strong>
               <p className="break-all text-muted-foreground">{item.type} · {item.address}</p>
-              {item.type === "WMS" && item.layer ? (
+              {(item.type === "WMS" || item.type === "ArcGIS REST") && item.layer ? (
                 <label className="flex gap-2">
                   <input type="checkbox" disabled={busy || !!draft} checked={!!item.enabled} onChange={(e) => save.mutate({ id: item.id, name: item.name, type: item.type, address: item.address, layer: item.layer ?? undefined, enabled: e.target.checked })} />
                   Exibir {item.name} no mapa
                 </label>
               ) : (
-                <span>{item.type === "WMS" ? "Informe a camada WMS para ligar a fonte." : "Cadastro para integração futura."}</span>
+                <span>{item.type === "WMS" ? "Informe a camada WMS para ligar a fonte." : item.type === "ArcGIS REST" ? "Informe o índice da camada para ligar a fonte." : "Cadastro para integração futura."}</span>
               )}
             </div>
             <button type="button" className="rounded border px-3 py-1" onClick={() => { setNotice(""); setDraft({ ...item }); }}>Editar fonte</button>
