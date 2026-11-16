@@ -7,6 +7,8 @@
  * um próximo incremento.
  */
 import { createRequire } from "node:module";
+import { existsSync, readFileSync } from "node:fs";
+import nodePath from "node:path";
 import proj4 from "proj4";
 import { defaultLayout, portraitLayout, paperSize, paperFactor, type Layout, type Orientation, type Paper } from "../shared/studioLayout";
 
@@ -50,6 +52,32 @@ function utmFor(layers: RenderLayer[]) {
   const epsg = (sumLat / count) < 0 ? 31978 + zone - 17 : 31960 + zone; // referência informativa
   const projection = proj4("EPSG:4326", `+proj=utm +zone=${zone}${south ? " +south" : ""} +ellps=GRS80 +units=m +no_defs`);
   return { projection, zone, south, epsg };
+}
+
+// Estados do IBGE (para os quadros de situação). Vazio se os dados não estiverem
+// no servidor (ARQUEO_IBGE_DATA_DIR ou <app>/data/ibge) — os insets degradam.
+let estadosCache: { geometry: Shape }[] | null = null;
+function studioEstados(): { geometry: Shape }[] {
+  if (estadosCache) return estadosCache;
+  const dir = process.env.ARQUEO_IBGE_DATA_DIR?.trim() || nodePath.resolve(process.cwd(), "data/ibge");
+  const file = nodePath.join(dir, "estados.geojson");
+  if (!existsSync(file)) { estadosCache = []; return estadosCache; }
+  try {
+    const data = JSON.parse(readFileSync(file, "utf8"));
+    estadosCache = (data.features ?? []).map((f: any) => ({ geometry: f.geometry }));
+  } catch { estadosCache = []; }
+  return estadosCache!;
+}
+const brazilProjection = proj4("EPSG:4326", "+proj=lcc +lat_1=-5 +lat_2=-25 +lat_0=-14 +lon_0=-54 +ellps=GRS80 +units=m +no_defs");
+
+function lonLatBounds(layers: RenderLayer[]) {
+  let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+  for (const layer of layers) for (const feature of layer.layerData.features) for (const part of paths(feature.geometry)) {
+    for (const ring of part.rings) for (const [lon, lat] of ring) {
+      west = Math.min(west, lon); east = Math.max(east, lon); south = Math.min(south, lat); north = Math.max(north, lat);
+    }
+  }
+  return { west, south, east, north, lon: (west + east) / 2, lat: (south + north) / 2 };
 }
 
 function extent(projection: any, layers: RenderLayer[]) {
@@ -184,6 +212,39 @@ export function renderPrancha(layers: RenderLayer[], asPdf: boolean, options: Re
   const tip: Point = [nx + Math.sin(direction) * northH * .5, ny - Math.cos(direction) * northH * .5];
   path([[[nx - northW * .15, ny], tip, [nx + northW * .15, ny], [nx, ny - northH * .1]]], true, ink, ink, .2);
   label(tip[0], tip[1] - 1, "N", Math.min(northH * .22, northW * .4), true, true);
+
+  // Quadros de situação (nacional e regional)
+  const features = layers.flatMap((l) => l.layerData.features);
+  const lonLat = lonLatBounds(layers);
+  const states = studioEstados();
+  const padLon = Math.max(0.6, (lonLat.east - lonLat.west) * 0.6);
+  const padLat = Math.max(0.6, (lonLat.north - lonLat.south) * 0.6);
+  const drawOverview = (heading2: string, box: Layout["brasil"], national: boolean) => {
+    if (!box) return;
+    const proj = national ? brazilProjection : projection;
+    const [w, s, e, nth] = national ? [-74, -34, -34, 6] : [lonLat.west - padLon, lonLat.south - padLat, lonLat.east + padLon, lonLat.north + padLat];
+    const corners = ([[w, s], [w, nth], [e, s], [e, nth]] as Point[]).map((p) => proj.forward(p) as Point);
+    const xs = corners.map((c) => c[0]), ys = corners.map((c) => c[1]);
+    const left = Math.min(...xs), right = Math.max(...xs), bottom = Math.min(...ys), top = Math.max(...ys);
+    const headingH = Math.min(7, box.h * 0.2), height = box.h - headingH;
+    const scaleOv = Math.max(1, Math.ceil(Math.max((right - left) / box.w, (top - bottom) / height) * 1080 / factor));
+    const cx = (left + right) / 2, cy = (bottom + top) / 2, headTop = box.y + headingH;
+    const project = ([lo, la]: Point): Point => {
+      const [px, py] = proj.forward([lo, la]);
+      return [box.x + box.w / 2 + (px - cx) * 1000 / (scaleOv * factor), headTop + height / 2 - (py - cy) * 1000 / (scaleOv * factor)];
+    };
+    rect(box.x, box.y, box.w, box.h, "#ffffff");
+    label(box.x + 1, box.y + headingH * 0.72, `${heading2} · 1:${scaleOv.toLocaleString("pt-BR")}`, Math.min(3.2, box.w / Math.max(8, heading2.length * 0.58), headingH * 0.7), true);
+    rect(box.x, headTop, box.w, height, "#eef3f4");
+    clip(box.x, headTop, box.w, height, () => {
+      if (states.length) drawFeatures(states as unknown as Feature[], project, "#a5aaa0", "#f3f0e7", 0.13);
+      if (national) { const [mx, my] = project([lonLat.lon, lonLat.lat]); rect(mx - 1, my - 1, 2, 2, "#a52932", "none"); }
+      else drawFeatures(features, project, "#a52932", "none", 0.4);
+    });
+    rect(box.x, headTop, box.w, height);
+  };
+  drawOverview("Brasil", layout.brasil, true);
+  drawOverview("Região do empreendimento", layout.regional, false);
 
   // Legenda
   const legend = layout.legenda, rowHeight = legend.h / (layers.length + 1);
