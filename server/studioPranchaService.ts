@@ -22,7 +22,8 @@ type Point = [number, number];
 type Shape = { type: string; coordinates: any };
 type Feature = { geometry: Shape; properties?: Record<string, unknown> | null };
 export type RenderLayer = { id?: number; name: string; layerData: { features: Feature[] }; defaultStyle?: { color?: string; weight?: number; fillOpacity?: number } | null };
-export type RenderOptions = { paper?: Paper; orientation?: Orientation; title?: string; grid?: number; layout?: Layout; scale?: number; labels?: boolean };
+export type Sheet = { center: Point; scale: number; number?: number; total?: number; grid?: number };
+export type RenderOptions = { paper?: Paper; orientation?: Orientation; title?: string; grid?: number; layout?: Layout; scale?: number; labels?: boolean; sheet?: Sheet; document?: any; index?: Sheet[] };
 
 const xml = (s: string) => s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]!));
 
@@ -112,7 +113,7 @@ export function renderPrancha(layers: RenderLayer[], asPdf: boolean, options: Re
   const pageWidth = portrait ? 420 : 594, pageHeight = portrait ? 594 : 420;
 
   const { projection, zone, south } = utmFor(layers);
-  const pdf = asPdf ? new jsPDF({ orientation: options.orientation ?? "landscape", unit: "mm", format: paperSize(paper, options.orientation), compress: true, precision: 6 }) : null;
+  const pdf = asPdf ? (options.document ?? new jsPDF({ orientation: options.orientation ?? "landscape", unit: "mm", format: paperSize(paper, options.orientation), compress: true, precision: 6 })) : null;
   const svg = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${paperWidth / factor} ${paperHeight / factor}" width="${paperWidth}mm" height="${paperHeight}mm" font-family="Arial, sans-serif">`];
   let clipId = 0;
 
@@ -163,7 +164,7 @@ export function renderPrancha(layers: RenderLayer[], asPdf: boolean, options: Re
     }
   };
 
-  const { center: [midX, midY], scale } = mapView(projection, layers, frame, options);
+  const { center: [midX, midY], scale } = options.sheet ?? mapView(projection, layers, frame, options);
   const step = scale * factor / mm;
   const grid = ([e, n]: Point): Point => [frame.x + frame.w / 2 + (e - midX) / step, frame.y + frame.h / 2 - (n - midY) / step];
   const main = (p: Point): Point => grid(projection.forward(p));
@@ -200,6 +201,12 @@ export function renderPrancha(layers: RenderLayer[], asPdf: boolean, options: Re
   }
   for (let n = Math.ceil((midY - frame.h * step / 2) / gridStep) * gridStep; n <= midY + frame.h * step / 2; n += gridStep) {
     const [, y] = grid([midX, n]); line(frame.x, y, frame.x + frame.w, y, "#90978f", .1); label(frame.x + 1, y - 1, String(n), 2.6);
+  }
+  // Quadrinhos das folhas (mapa índice do atlas)
+  for (const fp of options.index ?? []) {
+    const [fx, fy] = grid(fp.center), ratio = fp.scale / scale;
+    rect(fx - frame.w * ratio / 2, fy - frame.h * ratio / 2, frame.w * ratio, frame.h * ratio, "none", "#1d4ed8");
+    if ((options.index!.length <= 24) || (fp.number ?? 0) % 5 === 0) label(fx, fy - 2, String(fp.number ?? ""), options.index!.length <= 24 ? 4 : 2.8, true, true);
   }
   rect(frame.x, frame.y, frame.w, frame.h);
 
@@ -279,8 +286,62 @@ export function renderPrancha(layers: RenderLayer[], asPdf: boolean, options: Re
   detail(315, "0", 2.8);
   label(detailX + bar, detailY + 38, distance >= 1000 ? `${distance / 1000} km` : `${distance} m`, 2.8, false, true);
   detail(321, "1:" + scale.toLocaleString("pt-BR"), 3.5, true);
+  if (options.sheet?.number !== undefined) {
+    detail(333, "Identificação da folha", 4, true);
+    detail(341, options.sheet.number === 0 ? `Mapa índice · ${paper}` : `Folha ${paper} · ${String(options.sheet.number).padStart(2, "0")}/${String(options.sheet.total ?? 1).padStart(2, "0")}`);
+  }
   detail(345, "Fontes", 4, true);
   detail(353, "Camadas do projeto", 3.25);
 
+  if (options.document) return "";
   return pdf ? Buffer.from(pdf.output("arraybuffer")) : svg.join("") + "</svg>";
+}
+
+// ── Atlas multipágina ───────────────────────────────────────────────────────
+
+/** Calcula as folhas (centros em UTM) para cobrir a extensão por colunas×linhas. */
+export function planSheets(layers: RenderLayer[], columns: number, rows: number, overlap: number, grid: number, options: RenderOptions = {}): Sheet[] {
+  const portrait = options.orientation === "portrait";
+  const frame = (options.layout ?? (portrait ? portraitLayout : defaultLayout)).principal;
+  if (![columns, rows].every((n) => Number.isInteger(n) && n >= 1 && n <= 8) || columns * rows > 24 ||
+    !Number.isFinite(overlap) || overlap < 0 || overlap > 30 || !Number.isInteger(grid) || grid < 1000 || grid > 50000) {
+    throw new Error("Grade de atlas inválida (até 24 folhas, sobreposição 0–30%, grade 1–50 km).");
+  }
+  const { projection } = utmFor(layers);
+  const { left, right, bottom, top } = extent(projection, layers);
+  const factor = paperFactor(options.paper ?? "A2");
+  const fraction = 1 - overlap / 100;
+  const width = right - left, height = top - bottom;
+  const scale = options.scale ?? Math.max(1000, Math.ceil(Math.max(
+    width / (frame.w * (1 + (columns - 1) * fraction)), height / (frame.h * (1 + (rows - 1) * fraction))) * 1.05 / (25 * factor)) * 25000);
+  const cx = (left + right) / 2, cy = (bottom + top) / 2;
+  const sheets: Sheet[] = [];
+  for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
+    sheets.push({
+      center: [cx + (col - (columns - 1) / 2) * frame.w * scale * factor / 1000 * fraction,
+        cy - (row - (rows - 1) / 2) * frame.h * scale * factor / 1000 * fraction],
+      scale, number: row * columns + col + 1, total: rows * columns, grid,
+    });
+  }
+  return sheets;
+}
+
+/** PDF do atlas: mapa índice + uma folha de detalhe por quadro. */
+export function renderAtlas(layers: RenderLayer[], columns: number, rows: number, overlap: number, grid: number, options: RenderOptions = {}): Buffer {
+  if (!layers.length) throw new Error("Ative ao menos uma camada do projeto.");
+  const sheets = planSheets(layers, columns, rows, overlap, grid, options);
+  const factor = paperFactor(options.paper ?? "A2");
+  const portrait = options.orientation === "portrait";
+  const frame = (options.layout ?? (portrait ? portraitLayout : defaultLayout)).principal;
+  const [west, north] = sheets[0].center;
+  const [east, south] = sheets.at(-1)!.center;
+  const required = sheets[0].scale + 1000 * Math.max((east - west) / (frame.w * factor), (north - south) / (frame.h * factor));
+  const doc = new jsPDF({ orientation: options.orientation ?? "landscape", unit: "mm", format: paperSize(options.paper ?? "A2", options.orientation), compress: true, precision: 6 });
+  const index: Sheet = { center: [(west + east) / 2, (north + south) / 2], scale: Math.max(1000, Math.ceil(required * 1.08 / 25000) * 25000), number: 0, total: sheets.length, grid };
+  renderPrancha(layers, true, { ...options, document: doc, sheet: index, index: sheets, title: (options.title || "Atlas") + " · mapa índice" });
+  for (const sheet of sheets) {
+    doc.addPage(paperSize(options.paper ?? "A2", options.orientation), options.orientation ?? "landscape");
+    renderPrancha(layers, true, { ...options, document: doc, sheet });
+  }
+  return Buffer.from(doc.output("arraybuffer"));
 }

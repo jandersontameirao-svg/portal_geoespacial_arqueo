@@ -65,16 +65,23 @@ export default function Estudio() {
     onSuccess: () => { void studio.refetch(); toast.success("Produto salvo"); },
     onError: (error) => toast.error(error.message),
   });
-  const exportPdf = trpc.studioProducts.render.useMutation({
-    onSuccess: (result) => {
-      if (result.format !== "pdf") return;
-      const bytes = Uint8Array.from(atob(result.base64), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-      const link = Object.assign(document.createElement("a"), { href: url, download: result.filename });
-      document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-    },
+  const downloadPdf = (base64: string, filename: string) => {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    const link = Object.assign(document.createElement("a"), { href: url, download: filename });
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  };
+  const exportAtlas = trpc.studioProducts.renderAtlas.useMutation({
+    onSuccess: (result) => downloadPdf(result.base64, result.filename),
     onError: (error) => toast.error(error.message),
   });
+  const exportPdf = trpc.studioProducts.render.useMutation({
+    onSuccess: (result) => { if (result.format === "pdf") downloadPdf(result.base64, result.filename); },
+    onError: (error) => toast.error(error.message),
+  });
+  const [columns, setColumns] = useState(2);
+  const [rows, setRows] = useState(2);
+  const [overlap, setOverlap] = useState(10);
 
   // Prévia ao vivo (debounce) sempre que os parâmetros mudam.
   const paramsKey = useMemo(() => JSON.stringify([title, paper, orientation, grid, layerIds, layout]), [title, paper, orientation, grid, layerIds, layout]);
@@ -170,6 +177,19 @@ export default function Estudio() {
             {exportPdf.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Exportar PDF</Button>
         </div>
         <p className="text-[11px] text-muted-foreground">Arraste os elementos pelo nome; puxe o canto para redimensionar.</p>
+
+        <details className="rounded-lg border p-3 text-sm">
+          <summary className="cursor-pointer font-medium">Atlas multipágina</summary>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="space-y-1"><Label htmlFor="atlas-cols">Colunas</Label><Input id="atlas-cols" type="number" min={1} max={8} value={columns} onChange={(e) => setColumns(Math.min(8, Math.max(1, Number(e.target.value) || 1)))} /></div>
+            <div className="space-y-1"><Label htmlFor="atlas-rows">Linhas</Label><Input id="atlas-rows" type="number" min={1} max={8} value={rows} onChange={(e) => setRows(Math.min(8, Math.max(1, Number(e.target.value) || 1)))} /></div>
+            <div className="space-y-1"><Label htmlFor="atlas-ov">Sobrep. %</Label><Input id="atlas-ov" type="number" min={0} max={30} value={overlap} onChange={(e) => setOverlap(Math.min(30, Math.max(0, Number(e.target.value) || 0)))} /></div>
+          </div>
+          <Button size="sm" variant="outline" className="mt-2 w-full" disabled={exportAtlas.isPending || !layerIds.length || columns * rows > 24} onClick={() =>
+            exportAtlas.mutate({ projectId, layerIds, columns, rows, overlap, grid, title, paper, orientation })}>
+            {exportAtlas.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Exportar atlas PDF ({columns * rows} folhas)</Button>
+          {columns * rows > 24 && <p className="mt-1 text-[11px] text-destructive">Máximo de 24 folhas.</p>}
+        </details>
       </aside>
 
       <section className="rounded-xl border bg-muted/40 p-3">

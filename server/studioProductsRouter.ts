@@ -11,7 +11,7 @@ import { getDb, getLayersByProject } from "./db";
 import { studioProducts } from "../drizzle/schema";
 import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
 import { isPromotableVectorLayer, vectorFeaturesFromLayer } from "./vectorLayerPromotion";
-import { renderPrancha, type RenderLayer } from "./studioPranchaService";
+import { renderPrancha, renderAtlas, type RenderLayer } from "./studioPranchaService";
 import { readPaper, readOrientation, readLayout, readScale } from "../shared/studioLayout";
 
 /** Camadas vetoriais do projeto com flags de geometria (área/linha/ponto). */
@@ -124,6 +124,42 @@ export const studioProductsRouter = router({
         return { format: "svg" as const, svg: result as string };
       } catch (error) {
         throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Não foi possível montar a prancha." });
+      }
+    }),
+
+  // Atlas multipágina (mapa índice + folhas de detalhe) em PDF.
+  renderAtlas: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      layerIds: z.array(z.number()).min(1).max(60),
+      columns: z.number().int().min(1).max(8),
+      rows: z.number().int().min(1).max(8),
+      overlap: z.number().min(0).max(30),
+      grid: z.number().int().min(1000).max(50000),
+      title: z.string().trim().max(120).optional(),
+      paper: z.string().optional(),
+      orientation: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireProjectAccess(input.projectId, ctx.user);
+      const orientation = readOrientation(input.orientation);
+      const all = await getLayersByProject(input.projectId);
+      const chosen = input.layerIds
+        .map((id) => all.find((layer) => layer.id === id))
+        .filter((layer): layer is NonNullable<typeof layer> => !!layer && layer.layerType === "vector" && isPromotableVectorLayer(layer.layerData));
+      if (!chosen.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Selecione ao menos uma camada vetorial do projeto." });
+      const renderLayers: RenderLayer[] = chosen.map((layer) => ({
+        id: layer.id, name: layer.name,
+        layerData: layer.layerData as { features: RenderLayer["layerData"]["features"] },
+        defaultStyle: layer.defaultStyle as RenderLayer["defaultStyle"],
+      }));
+      try {
+        const pdf = renderAtlas(renderLayers, input.columns, input.rows, input.overlap, input.grid, {
+          paper: readPaper(input.paper), orientation, title: input.title,
+        });
+        return { filename: (input.title || "atlas").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 80) + ".pdf", base64: pdf.toString("base64") };
+      } catch (error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Não foi possível montar o atlas." });
       }
     }),
 });
