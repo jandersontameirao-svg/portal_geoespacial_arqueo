@@ -104,6 +104,57 @@ export const connectionsRouter = router({
       return withStatus(saved);
     }),
 
+  // Descobre as subcamadas de uma fonte (WMS GetCapabilities / ArcGIS REST),
+  // no servidor (sem problema de CORS no navegador). Retorna [{id, label}].
+  discover: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const [source] = await db.select().from(mapConnections).where(eq(mapConnections.id, input.id)).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Fonte não encontrada." });
+      if (source.type !== "WMS" && source.type !== "ArcGIS REST") return [];
+
+      let endpoint: URL;
+      try { endpoint = new URL(source.address); } catch { return []; }
+      if (!["http:", "https:"].includes(endpoint.protocol)) return [];
+
+      try {
+        if (source.type === "ArcGIS REST") {
+          endpoint.searchParams.set("f", "json");
+          const response = await fetch(endpoint, { signal: AbortSignal.timeout(15000), redirect: "error" });
+          if (!response.ok) return [];
+          const body = await response.json();
+          const layers: Array<{ id: unknown; name?: unknown }> = Array.isArray(body?.layers) ? body.layers : [];
+          return layers
+            .filter((l) => Number.isInteger(l.id))
+            .slice(0, 200)
+            .map((l) => ({ id: String(l.id), label: String(l.name ?? l.id).slice(0, 180) }));
+        }
+        // WMS GetCapabilities
+        endpoint.searchParams.set("SERVICE", "WMS");
+        endpoint.searchParams.set("REQUEST", "GetCapabilities");
+        endpoint.searchParams.set("VERSION", "1.3.0");
+        const response = await fetch(endpoint, { signal: AbortSignal.timeout(15000), redirect: "error" });
+        if (!response.ok) return [];
+        const xml = await response.text();
+        const seen = new Set<string>();
+        const result: Array<{ id: string; label: string }> = [];
+        // Captura pares <Name>…</Name><Title>…</Title> das camadas folha (ordem do GeoServer).
+        const re = /<Name>([^<]+)<\/Name>\s*<Title>([^<]*)<\/Title>/g;
+        let match: RegExpExecArray | null;
+        while ((match = re.exec(xml)) && result.length < 200) {
+          const id = match[1].trim();
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          result.push({ id, label: (match[2].trim() || id).slice(0, 180) });
+        }
+        return result;
+      } catch {
+        return [];
+      }
+    }),
+
   // Desliga todas as conexões ligadas (usado por "Limpar mapa"). Mantém o cadastro.
   disableAll: protectedProcedure.mutation(async ({ ctx }) => {
     const db = await getDb();
