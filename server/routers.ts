@@ -30,6 +30,7 @@ import { connectionsRouter } from "./connectionsRouter";
 import { ibgeLocalRouter } from "./ibgeLocalRouter";
 import { iphanSitesRouter } from "./iphanSitesRouter";
 import { studioProductsRouter } from "./studioProductsRouter";
+import { studioPlantsRouter } from "./studioPlantsRouter";
 import { atenaChatRouter } from "./atenaChatRouter";
 import { geoRouter } from "./geoRouter";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -769,6 +770,7 @@ export const appRouter = router({
   ibgeLocal: ibgeLocalRouter,
   iphanSites: iphanSitesRouter,
   studioProducts: studioProductsRouter,
+  studioPlants: studioPlantsRouter,
   atenaChat: atenaChatRouter,
   geo: geoRouter,
 });

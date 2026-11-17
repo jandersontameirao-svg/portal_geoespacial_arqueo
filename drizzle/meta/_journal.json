@@ -176,6 +176,13 @@
       "when": 1794916030589,
       "tag": "0024_studio_brands",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1794916530421,
+      "tag": "0025_studio_plants",
+      "breakpoints": true
     }
   ]
 }

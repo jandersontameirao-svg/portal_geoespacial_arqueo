@@ -188,6 +188,15 @@ export default function Header() {
                       </div>
                     </DropdownMenuItem>
                   </Link>
+                  <Link href="/plantas">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <MapIcon className="mr-2 h-4 w-4 text-emerald-600" />
+                      <div>
+                        <span>Estúdio de Plantas</span>
+                        <p className="text-xs text-slate-500">Desenho 2D, implantação e pranchas técnicas</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
                   <Link href="/technical-maps">
                     <DropdownMenuItem className="cursor-pointer">
                       <Printer className="mr-2 h-4 w-4 text-blue-500" />

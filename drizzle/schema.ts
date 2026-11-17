@@ -872,3 +872,23 @@ export const studioBrands = mysqlTable("studio_brands", {
 
 export type StudioBrand = typeof studioBrands.$inferSelect;
 export type InsertStudioBrand = typeof studioBrands.$inferInsert;
+
+// ============================================================================
+// Estúdio de Plantas — desenhos 2D (implantação / pranchas técnicas) versionados
+// ============================================================================
+
+export const studioPlants = mysqlTable("studio_plants", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  // Histórico de versões: [{ createdAt, plant }], plant no formato shared/plant.ts.
+  versions: json("versions").$type<Array<{ createdAt: string; plant: unknown }>>().notNull(),
+  createdById: int("createdById"),
+  createdByName: varchar("createdByName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  projectIdx: index("studio_plants_project_idx").on(table.projectId),
+}));
+
+export type StudioPlant = typeof studioPlants.$inferSelect;
+export type InsertStudioPlant = typeof studioPlants.$inferInsert;
