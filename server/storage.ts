@@ -1,89 +1,89 @@
 /**
- * Storage helper using Manus built-in storage service
- * Uses REST API instead of S3-compatible interface
+ * Storage local em disco (on-premise / VPS).
+ *
+ * Substitui o antigo adaptador `manus-upload-file` (write-only, dependente do
+ * ambiente Manus e indisponível na VPS). Os bytes são gravados sob um diretório
+ * raiz no servidor e servidos por uma rota autenticada (`/api/storage/<key>`),
+ * que exige sessão válida — ver `server/storageAssetRoutes.ts`.
  */
 
-import { ENV } from "./_core/env";
-import { randomBytes } from "crypto";
+import path from "node:path";
+import fs from "node:fs/promises";
 
 /**
- * Upload de arquivo para Manus Storage
- * @param key - Chave do arquivo no storage (path completo)
- * @param data - Dados do arquivo (Buffer, Uint8Array ou string)
- * @param contentType - Tipo MIME do arquivo
- * @returns Objeto com key e url do arquivo
+ * Raiz do storage no servidor. Default: `<cwd>/data/uploads`.
+ * Em produção o PM2 roda com cwd=/var/www/geoportal, então os arquivos ficam em
+ * /var/www/geoportal/data/uploads. Pode ser sobrescrito por
+ * ARQUEO_LOCAL_STORAGE_ROOT (path absoluto).
+ */
+export function getStorageRoot(value = process.env.ARQUEO_LOCAL_STORAGE_ROOT): string {
+  const root = value && value.trim() ? value.trim() : path.resolve(process.cwd(), "data", "uploads");
+  return path.resolve(root);
+}
+
+/**
+ * Resolve a chave lógica para um caminho em disco dentro da raiz, bloqueando
+ * travessia de diretório. Determinística: o mesmo input gera o mesmo caminho na
+ * escrita e na leitura.
+ */
+export function storagePathForKey(key: string, root = getStorageRoot()): string {
+  const normalized = String(key).replace(/\\/g, "/").replace(/^\/+/, "");
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length === 0) throw new Error("Chave de storage inválida (vazia)");
+  if (segments.some((s) => s === "." || s === "..")) throw new Error("Chave de storage inválida (travessia de diretório)");
+  const target = path.resolve(root, ...segments);
+  const rel = path.relative(root, target);
+  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
+    throw new Error("Chave de storage fora do diretório permitido");
+  }
+  return target;
+}
+
+/** URL relativa, servida pela rota autenticada, que o front usa diretamente. */
+export function storageUrlForKey(key: string): string {
+  const normalized = String(key).replace(/\\/g, "/").replace(/^\/+/, "");
+  const segments = normalized.split("/").filter(Boolean).map(encodeURIComponent);
+  return `/api/storage/${segments.join("/")}`;
+}
+
+/**
+ * Grava um arquivo no storage local.
+ * @param key - Chave lógica do arquivo (ex.: `projects/1/files/abc-foto.jpg`).
+ * @param data - Bytes do arquivo (Buffer, Uint8Array ou string).
+ * @param _contentType - MIME (informativo; o tipo é derivado da extensão ao servir).
+ * @returns `{ key, url }` com a URL relativa autenticada.
  */
 export async function storagePut(
   key: string,
   data: Buffer | Uint8Array | string,
-  contentType?: string
+  _contentType?: string
 ): Promise<{ key: string; url: string }> {
+  const buffer = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
+  const target = storagePathForKey(key);
   try {
-    // Converter string para Buffer se necessário
-    const buffer = typeof data === "string" ? Buffer.from(data) : data;
-
-    console.log(`[Storage] Uploading file: ${key}`);
-    console.log(`[Storage] Size: ${buffer.length} bytes`);
-    console.log(`[Storage] Content-Type: ${contentType || "application/octet-stream"}`);
-
-    // Usar o utilitário manus-upload-file para fazer upload
-    // Este é um helper interno do Manus que já tem as credenciais configuradas
-    const { execSync } = await import("child_process");
-    const fs = await import("fs");
-    const path = await import("path");
-    const os = await import("os");
-
-    // Criar arquivo temporário
-    const tmpDir = os.tmpdir();
-    const tmpFile = path.join(tmpDir, `upload-${randomBytes(8).toString("hex")}`);
-    
-    fs.writeFileSync(tmpFile, buffer);
-
-    try {
-      // Usar o comando manus-upload-file
-      const result = execSync(`manus-upload-file "${tmpFile}"`, {
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-
-      // O comando retorna a URL do arquivo
-      const url = result.trim();
-      
-      console.log(`[Storage] ✓ Upload successful: ${url}`);
-
-      // Limpar arquivo temporário
-      fs.unlinkSync(tmpFile);
-
-      return { key, url };
-    } catch (uploadError: any) {
-      // Limpar arquivo temporário em caso de erro
-      try {
-        fs.unlinkSync(tmpFile);
-      } catch {}
-      
-      throw uploadError;
-    }
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, buffer);
+    return { key, url: storageUrlForKey(key) };
   } catch (error: any) {
-    console.error("[Storage] Erro ao fazer upload:", error);
-    console.error("[Storage] Detalhes do erro:", {
-      message: error.message,
-      stderr: error.stderr?.toString(),
-      stdout: error.stdout?.toString(),
-    });
-    throw new Error(`Falha ao fazer upload do arquivo: ${error.message}`);
+    console.error("[Storage] Falha ao gravar arquivo:", { key, target, message: error?.message });
+    throw new Error(`Falha ao fazer upload do arquivo: ${error?.message ?? error}`);
   }
 }
 
 /**
- * Obter URL pública para download
- * Nota: Como usamos manus-upload-file, a URL já é retornada no upload
+ * Confirma que o objeto existe e devolve a URL de acesso.
+ * Mantém a assinatura antiga (`expiresIn` ignorado: a rota é autenticada por sessão).
  */
 export async function storageGet(
   key: string,
-  expiresIn?: number
+  _expiresIn?: number
 ): Promise<{ key: string; url: string }> {
-  // Como não temos um mapeamento direto de key para URL,
-  // esta função assume que a URL já foi armazenada no banco de dados
-  // quando o arquivo foi feito upload
-  throw new Error("storageGet não é suportado com manus-upload-file. Use a URL retornada por storagePut.");
+  const target = storagePathForKey(key);
+  await fs.access(target);
+  return { key, url: storageUrlForKey(key) };
+}
+
+/** Lê os bytes de um objeto do storage local (uso no servidor). */
+export async function storageReadBytes(key: string): Promise<Buffer> {
+  return fs.readFile(storagePathForKey(key));
 }

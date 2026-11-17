@@ -11,6 +11,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getDb } from "../db";
 import { registerRasterAssetRoutes } from "../rasterAssetRoutes";
+import { registerStorageAssetRoutes } from "../storageAssetRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -149,6 +150,9 @@ async function startServer() {
   // tRPC API (com rate limiting)
   // Bytes raster nunca são servidos por express.static: cada tile/exportação valida sessão e projeto.
   registerRasterAssetRoutes(app);
+  // Arquivos enviados (uploads, PDFs Atena/Atlas, camadas base) em disco local,
+  // servidos somente para sessões autenticadas.
+  registerStorageAssetRoutes(app);
   app.use("/api/trpc", apiLimiter);
   app.use(
     "/api/trpc",
