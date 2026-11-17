@@ -57,7 +57,9 @@ const demoApi = {
       return readFileSync(new URL("./previa-layout.mts", import.meta.url), "utf8") + "\n" + readFileSync(source, "utf8");
     }
     if (id.replaceAll("\\", "/").endsWith("/components/PreviewIbgeLayers.tsx")) {
-      return readFileSync(new URL("./previa-ibge.tsx", import.meta.url), "utf8");
+      const source = new URL('./previa-ibge.tsx', import.meta.url);
+      this.addWatchFile(fileURLToPath(source));
+      return readFileSync(source, "utf8");
     }
   },
   resolveId(id: string, importer?: string) {

@@ -428,20 +428,28 @@ function normalizeCloneColors(document: Document, root: HTMLElement): void {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) fail("CANVAS_CONTEXT", "Contexto de conversão de cores indisponível.");
   const cache = new Map<string, string>();
-  const modern = /\b(?:oklch|oklab|lab|lch|color)\(/ig;
+  // Skip quoted tokens and URL functions: filenames can contain CSS-like text.
+  const tokens = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(url|oklch|oklab|lab|lch|color-mix|color|light-dark)\(/ig;
   const convert = (value: string): string => {
     let output = "", cursor = 0;
-    modern.lastIndex = 0;
+    tokens.lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = modern.exec(value))) {
+    while ((match = tokens.exec(value))) {
+      if (!match[1]) continue;
       const start = match.index;
-      let end = modern.lastIndex, depth = 1;
+      let end = tokens.lastIndex, depth = 1, quote = "";
       while (end < value.length && depth) {
-        if (value[end] === "(") depth++;
-        if (value[end] === ")") depth--;
-        end++;
+        const char = value[end++];
+        if (char === "\\") { end++; continue; }
+        if (quote) {
+          if (char === quote) quote = "";
+        } else if (char === '"' || char === "'") quote = char;
+        else if (char === "(") depth++;
+        else if (char === ")") depth--;
       }
       if (depth) fail("CSS_COLOR", "Cor CSS moderna inválida na vista do mapa.");
+      tokens.lastIndex = end;
+      if (match[1].toLowerCase() === "url") continue;
       const color = value.slice(start, end);
       let rgb = cache.get(color);
       if (!rgb) {
@@ -454,7 +462,7 @@ function normalizeCloneColors(document: Document, root: HTMLElement): void {
         cache.set(color, rgb);
       }
       output += value.slice(cursor, start) + rgb;
-      cursor = end; modern.lastIndex = end;
+      cursor = end;
     }
     return output + value.slice(cursor);
   };
@@ -464,9 +472,13 @@ function normalizeCloneColors(document: Document, root: HTMLElement): void {
     const computed = document.defaultView!.getComputedStyle(element);
     const style = (element as HTMLElement | SVGElement).style;
     if (!style) continue;
-    for (const property of ["color", "background-color", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color", "outline-color", "text-decoration-color", "box-shadow", "text-shadow", "background-image"]) {
+    // html2canvas also parses list images and text stroke even when the
+    // corresponding marker or stroke is not visible in the final capture.
+    for (const property of ["color", "background-color", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color", "outline-color", "text-decoration-color", "box-shadow", "text-shadow", "background-image", "list-style-image", "-webkit-text-stroke-color"]) {
       const value = computed.getPropertyValue(property);
-      if (/\b(?:oklch|oklab|lab|lch|color)\(/i.test(value)) style.setProperty(property, convert(value), "important");
+      if (!/\b(?:oklch|oklab|lab|lch|color-mix|color|light-dark)\(/i.test(value)) continue;
+      const normalized = convert(value);
+      if (normalized !== value) style.setProperty(property, normalized, "important");
     }
   }
   canvas.width = canvas.height = 0;

@@ -330,7 +330,7 @@ export default function PreviewIbgeLayers({ projectBounds, projectId }: { projec
     : <WMSTileLayer key={source.id + source.address + source.layer} url={source.address} layers={source.layer} format="image/png" transparent version="1.1.1" />)}
   {active.filter(source => source.type === "ArcGIS cache SIRGAS 2000" && selectedFor(source).includes("mapbiomas2024")).map(source =>
     <MapBiomasTiles key={source.id} url={source.address} />)}
-  <details ref={controlRef} className="preview-ibge-control" onKeyDown={event => {
+  <details ref={controlRef} data-map-print-ignore="true" className="preview-ibge-control" onKeyDown={event => {
     if (event.key === "Escape" && event.currentTarget.open) {
       event.stopPropagation();
       closePanel();
@@ -610,7 +610,7 @@ export function PreviewIphanSites({projectId = 0, layerAlreadyVisible = false}:{
   },[active,consult,map,projectId]);
 
   return <>
-    {!layerAlreadyVisible && <div ref={control} className="absolute bottom-8 right-3 z-[1000]">
+    {!layerAlreadyVisible && <div ref={control} data-map-print-ignore="true" className="absolute bottom-8 right-3 z-[1000]">
       <button type="button" aria-pressed={active}
         className="rounded-md border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow aria-pressed:bg-emerald-100"
         onClick={() => {setConsult(value => !value);setResult(undefined);}}>Consultar sítios IPHAN</button>
