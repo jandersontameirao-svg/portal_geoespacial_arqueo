@@ -169,6 +169,13 @@
       "when": 1794915469642,
       "tag": "0023_iphan_knowledge",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1794916030589,
+      "tag": "0024_studio_brands",
+      "breakpoints": true
     }
   ]
 }

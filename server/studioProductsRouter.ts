@@ -5,10 +5,10 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { router, protectedProcedure } from "./_core/trpc";
 import { getDb, getLayersByProject } from "./db";
-import { studioProducts } from "../drizzle/schema";
+import { studioProducts, studioBrands } from "../drizzle/schema";
 import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
 import { isPromotableVectorLayer, vectorFeaturesFromLayer } from "./vectorLayerPromotion";
 import { renderPrancha, renderAtlas, prepareBaseImages, type RenderLayer } from "./studioPranchaService";
@@ -39,7 +39,57 @@ const productInput = z.object({
   config: z.record(z.string(), z.unknown()),
 });
 
+const marksInput = z.object({ empresa: z.number().optional(), cliente: z.number().optional() }).optional();
+
+/** Resolve os ids das marcas (empresa/cliente) nas imagens/nomes para a prancha. */
+async function resolveMarks(marks?: { empresa?: number; cliente?: number }) {
+  const ids = [marks?.empresa, marks?.cliente].filter((id): id is number => typeof id === "number");
+  if (!ids.length) return undefined;
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(studioBrands).where(inArray(studioBrands.id, ids));
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const empresa = marks?.empresa != null ? byId.get(marks.empresa) : undefined;
+  const cliente = marks?.cliente != null ? byId.get(marks.cliente) : undefined;
+  return {
+    empresaImage: empresa?.image,
+    empresaName: empresa?.name,
+    clienteImage: cliente?.image,
+    clienteName: cliente?.name,
+  };
+}
+
 export const studioProductsRouter = router({
+  // Identidade visual — marcas de empresa/cliente reutilizáveis nas pranchas.
+  brands: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select({ id: studioBrands.id, name: studioBrands.name, kind: studioBrands.kind, image: studioBrands.image })
+      .from(studioBrands).orderBy(desc(studioBrands.createdAt));
+  }),
+
+  saveBrand: protectedProcedure
+    .input(z.object({
+      name: z.string().trim().min(1).max(120),
+      kind: z.enum(["empresa", "cliente"]),
+      image: z.string().max(1_200_000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!/^data:image\/png;base64,/.test(input.image)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Envie o logotipo em PNG (de preferência com fundo transparente)." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível." });
+      const [result] = await db.insert(studioBrands).values({
+        name: input.name, kind: input.kind, image: input.image,
+        createdById: ctx.user.id, createdByName: ctx.user.name || ctx.user.email || null,
+      });
+      const id = (result as any).insertId as number;
+      const [saved] = await db.select({ id: studioBrands.id, name: studioBrands.name, kind: studioBrands.kind, image: studioBrands.image })
+        .from(studioBrands).where(eq(studioBrands.id, id)).limit(1);
+      return saved;
+    }),
+
   list: protectedProcedure
     .input(z.object({ projectId: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -92,10 +142,12 @@ export const studioProductsRouter = router({
       scale: z.number().int().optional(),
       layout: z.unknown().optional(),
       background: z.string().optional(),
+      marks: marksInput,
     }))
     .mutation(async ({ ctx, input }) => {
       await requireProjectAccess(input.projectId, ctx.user);
       const orientation = readOrientation(input.orientation);
+      const marks = await resolveMarks(input.marks);
       const options = {
         paper: readPaper(input.paper),
         orientation,
@@ -104,6 +156,7 @@ export const studioProductsRouter = router({
         scale: readScale(input.scale),
         layout: readLayout(input.layout, orientation),
         background: input.background,
+        marks,
       };
       const all = await getLayersByProject(input.projectId);
       const chosen = input.layerIds
@@ -142,10 +195,12 @@ export const studioProductsRouter = router({
       title: z.string().trim().max(120).optional(),
       paper: z.string().optional(),
       orientation: z.string().optional(),
+      marks: marksInput,
     }))
     .mutation(async ({ ctx, input }) => {
       await requireProjectAccess(input.projectId, ctx.user);
       const orientation = readOrientation(input.orientation);
+      const marks = await resolveMarks(input.marks);
       const all = await getLayersByProject(input.projectId);
       const chosen = input.layerIds
         .map((id) => all.find((layer) => layer.id === id))
@@ -158,7 +213,7 @@ export const studioProductsRouter = router({
       }));
       try {
         const pdf = renderAtlas(renderLayers, input.columns, input.rows, input.overlap, input.grid, {
-          paper: readPaper(input.paper), orientation, title: input.title,
+          paper: readPaper(input.paper), orientation, title: input.title, marks,
         });
         return { filename: (input.title || "atlas").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 80) + ".pdf", base64: pdf.toString("base64") };
       } catch (error) {

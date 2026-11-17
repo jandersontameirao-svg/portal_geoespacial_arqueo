@@ -32,6 +32,9 @@ export default function Estudio() {
   const [background, setBackground] = useState<StudioBackground>("cartografico");
   const [layerIds, setLayerIds] = useState<number[]>([]);
   const [layout, setLayout] = useState<Layout>(defaultLayout);
+  const [marks, setMarks] = useState<{ empresa?: number; cliente?: number }>({});
+  const brandsQuery = trpc.studioProducts.brands.useQuery(undefined, { enabled: isAuthenticated });
+  const brands = brandsQuery.data ?? [];
   const [svg, setSvg] = useState("");
   const sheet = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: ElementId; box: Box; x: number; y: number; resize: boolean } | null>(null);
@@ -45,7 +48,7 @@ export default function Estudio() {
   useEffect(() => {
     if (hydrated.current) return;
     const saved = studio.data?.products.find((product) => product.productKey === "estudio");
-    const config = saved?.config as Partial<{ title: string; paper: Paper; orientation: Orientation; grid: number; background: StudioBackground; layerIds: number[]; layout: Layout }> | undefined;
+    const config = saved?.config as Partial<{ title: string; paper: Paper; orientation: Orientation; grid: number; background: StudioBackground; layerIds: number[]; layout: Layout; marks: { empresa?: number; cliente?: number } }> | undefined;
     if (!config) return;
     hydrated.current = true;
     if (config.title) setTitle(config.title);
@@ -55,6 +58,7 @@ export default function Estudio() {
     if (config.background) setBackground(config.background);
     if (Array.isArray(config.layerIds)) setLayerIds(config.layerIds);
     if (config.layout) setLayout(config.layout);
+    if (config.marks) setMarks(config.marks);
   }, [studio.data]);
 
   useEffect(() => { if (!layerIds.length && layers.length) setLayerIds(layers.map((l) => l.id)); }, [layers, layerIds.length]);
@@ -81,16 +85,30 @@ export default function Estudio() {
     onSuccess: (result) => { if (result.format === "pdf") downloadPdf(result.base64, result.filename); },
     onError: (error) => toast.error(error.message),
   });
+  const saveBrand = trpc.studioProducts.saveBrand.useMutation({
+    onSuccess: (brand) => {
+      void brandsQuery.refetch();
+      setMarks((current) => ({ ...current, [brand.kind]: brand.id }));
+      toast.success("Marca cadastrada.");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const uploadBrand = (kind: "empresa" | "cliente", file: File) => {
+    if (file.type !== "image/png") { toast.error("Envie o logotipo em PNG."); return; }
+    const reader = new FileReader();
+    reader.onload = () => saveBrand.mutate({ name: file.name.replace(/\.[^.]+$/, "").slice(0, 120) || kind, kind, image: String(reader.result) });
+    reader.readAsDataURL(file);
+  };
   const [columns, setColumns] = useState(2);
   const [rows, setRows] = useState(2);
   const [overlap, setOverlap] = useState(10);
 
   // Prévia ao vivo (debounce) sempre que os parâmetros mudam.
-  const paramsKey = useMemo(() => JSON.stringify([title, paper, orientation, grid, background, layerIds, layout]), [title, paper, orientation, grid, background, layerIds, layout]);
+  const paramsKey = useMemo(() => JSON.stringify([title, paper, orientation, grid, background, layerIds, layout, marks]), [title, paper, orientation, grid, background, layerIds, layout, marks]);
   useEffect(() => {
     if (!projectId || !layerIds.length) { setSvg(""); return; }
     const timer = window.setTimeout(() => {
-      render.mutate({ projectId, layerIds, format: "svg", title, paper, orientation, grid, background, layout });
+      render.mutate({ projectId, layerIds, format: "svg", title, paper, orientation, grid, background, layout, marks });
     }, 350);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,6 +179,29 @@ export default function Estudio() {
         <div className="space-y-1"><Label>Fundo do mapa</Label>
           <Select value={background} onValueChange={(v) => setBackground(v as StudioBackground)}><SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>{(Object.entries(studioBackgrounds) as [StudioBackground, string][]).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></div>
+        <details className="rounded-lg border p-3 text-sm">
+          <summary className="cursor-pointer font-medium">Marcas da folha</summary>
+          {(["empresa", "cliente"] as const).map((kind) => (
+            <div key={kind} className="mt-3 space-y-1">
+              <Label>{kind === "empresa" ? "Empresa responsável" : "Cliente"}</Label>
+              <Select
+                value={String(marks[kind] ?? 0)}
+                onValueChange={(v) => setMarks((current) => ({ ...current, [kind]: Number(v) || undefined }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">{kind === "empresa" ? "Sem marca da empresa" : "Sem marca do cliente"}</SelectItem>
+                  {brands.filter((b) => b.kind === kind).map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <label className="block text-xs text-muted-foreground">
+                Carregar logotipo PNG {kind === "empresa" ? "da empresa" : "do cliente"}
+                <input type="file" accept="image/png" className="mt-1 block w-full text-xs" disabled={saveBrand.isPending}
+                  onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) uploadBrand(kind, file); }} />
+              </label>
+            </div>
+          ))}
+        </details>
         <div className="space-y-1">
           <Label>Camadas do produto</Label>
           {layers.length === 0 && <p className="text-xs text-muted-foreground">Este projeto ainda não tem camadas vetoriais.</p>}
@@ -175,10 +216,10 @@ export default function Estudio() {
         <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={save.isPending || !layerIds.length} onClick={() => save.mutate({
             projectId, productKey: "estudio", title,
-            config: { title, paper, orientation, grid, background, layerIds, layout },
+            config: { title, paper, orientation, grid, background, layerIds, layout, marks },
           })}>{save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}Salvar</Button>
           <Button size="sm" variant="outline" disabled={exportPdf.isPending || !layerIds.length} onClick={() =>
-            exportPdf.mutate({ projectId, layerIds, format: "pdf", title, paper, orientation, grid, background, layout })}>
+            exportPdf.mutate({ projectId, layerIds, format: "pdf", title, paper, orientation, grid, background, layout, marks })}>
             {exportPdf.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Exportar PDF</Button>
         </div>
         <p className="text-[11px] text-muted-foreground">Arraste os elementos pelo nome; puxe o canto para redimensionar.</p>
@@ -191,7 +232,7 @@ export default function Estudio() {
             <div className="space-y-1"><Label htmlFor="atlas-ov">Sobrep. %</Label><Input id="atlas-ov" type="number" min={0} max={30} value={overlap} onChange={(e) => setOverlap(Math.min(30, Math.max(0, Number(e.target.value) || 0)))} /></div>
           </div>
           <Button size="sm" variant="outline" className="mt-2 w-full" disabled={exportAtlas.isPending || !layerIds.length || columns * rows > 24} onClick={() =>
-            exportAtlas.mutate({ projectId, layerIds, columns, rows, overlap, grid, title, paper, orientation })}>
+            exportAtlas.mutate({ projectId, layerIds, columns, rows, overlap, grid, title, paper, orientation, marks })}>
             {exportAtlas.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Exportar atlas PDF ({columns * rows} folhas)</Button>
           {columns * rows > 24 && <p className="mt-1 text-[11px] text-destructive">Máximo de 24 folhas.</p>}
         </details>

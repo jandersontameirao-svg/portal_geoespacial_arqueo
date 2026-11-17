@@ -851,3 +851,24 @@ export const iphanKnowledge = mysqlTable("iphan_knowledge", {
 
 export type IphanKnowledge = typeof iphanKnowledge.$inferSelect;
 export type InsertIphanKnowledge = typeof iphanKnowledge.$inferInsert;
+
+// ============================================================================
+// Estúdio Cartográfico — identidade visual (marcas de empresa/cliente)
+// ============================================================================
+
+export const studioBrands = mysqlTable("studio_brands", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  kind: mysqlEnum("kind", ["empresa", "cliente"]).notNull(),
+  // Logotipo como data-URI base64 (self-contained, sem storage externo).
+  image: text("image").notNull(),
+  createdById: int("createdById"),
+  createdByName: varchar("createdByName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  kindIdx: index("studio_brands_kind_idx").on(table.kind),
+}));
+
+export type StudioBrand = typeof studioBrands.$inferSelect;
+export type InsertStudioBrand = typeof studioBrands.$inferInsert;

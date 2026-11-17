@@ -35,6 +35,7 @@ export const backupTableRegistry = [
   { name: "map_connections", primaryKey: "id" },
   { name: "studio_products", primaryKey: "id" },
   { name: "iphan_knowledge", primaryKey: "id" },
+  { name: "studio_brands", primaryKey: "id" },
 ] as const;
 
 export type BackupTableName = (typeof backupTableRegistry)[number]["name"];

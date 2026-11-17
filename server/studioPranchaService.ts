@@ -23,7 +23,7 @@ type Shape = { type: string; coordinates: any };
 type Feature = { geometry: Shape; properties?: Record<string, unknown> | null };
 export type RenderLayer = { id?: number; name: string; layerData: { features: Feature[] }; defaultStyle?: { color?: string; weight?: number; fillOpacity?: number } | null };
 export type Sheet = { center: Point; scale: number; number?: number; total?: number; grid?: number };
-export type RenderOptions = { paper?: Paper; orientation?: Orientation; title?: string; grid?: number; layout?: Layout; scale?: number; labels?: boolean; sheet?: Sheet; document?: any; index?: Sheet[]; background?: string; baseImages?: { principal?: string } };
+export type RenderOptions = { paper?: Paper; orientation?: Orientation; title?: string; grid?: number; layout?: Layout; scale?: number; labels?: boolean; sheet?: Sheet; document?: any; index?: Sheet[]; background?: string; baseImages?: { principal?: string }; marks?: { empresaImage?: string; empresaName?: string; clienteImage?: string; clienteName?: string } };
 
 const xml = (s: string) => s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]!));
 
@@ -298,6 +298,17 @@ export function renderPrancha(layers: RenderLayer[], asPdf: boolean, options: Re
   }
   detail(345, "Fontes", 4, true);
   detail(353, "Camadas do projeto", 3.25);
+
+  // Marcas da folha (identidade visual) — logo da empresa e do cliente.
+  let markY = 362;
+  const drawMark = (image: string | undefined, name: string | undefined, caption: string) => {
+    if (!image) return;
+    detail(markY, caption + (name ? " · " + name : ""), 3.25, true);
+    baseImage(image, detailX, detailY + (markY + 3) - 277, 34, 11);
+    markY += 22;
+  };
+  drawMark(options.marks?.empresaImage, options.marks?.empresaName, "Empresa");
+  drawMark(options.marks?.clienteImage, options.marks?.clienteName, "Cliente");
 
   if (options.document) return "";
   return pdf ? Buffer.from(pdf.output("arraybuffer")) : svg.join("") + "</svg>";
