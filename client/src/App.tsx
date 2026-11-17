@@ -49,8 +49,8 @@ function Router() {
         <Route path="/assistente" component={AssistenteAtena} />
         <Route path="/observacoes" component={Observacoes} />
         <Route path="/malha-campo" component={MalhaCampo} />
-        <Route path="/estudio" component={Estudio} />
-        <Route path="/plantas" component={Plantas} />
+        <Route path="/estudio" component={() => <Estudio />} />
+        <Route path="/plantas" component={() => <Plantas />} />
         <Route path="/files" component={Files} />
         <Route path="/admin/backups" component={Backups} />
         <Route path="/admin/ogc-catalog" component={OgcCatalog} />

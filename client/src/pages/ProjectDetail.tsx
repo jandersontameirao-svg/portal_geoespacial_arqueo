@@ -9,13 +9,15 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye, Map, Sparkles } from "lucide-react";
+import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye, Map, Sparkles, Layers, Ruler } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import FileList from "@/components/FileList";
 import ProjectGeoWorkspace from "@/components/ProjectGeoWorkspace";
+import Estudio from "@/pages/Estudio";
+import Plantas from "@/pages/Plantas";
 import { Link, useLocation, useParams, useSearch } from "wouter";
 
-const projectTabs = new Set(["overview", "members", "files", "map", "history"]);
+const projectTabs = new Set(["overview", "members", "files", "map", "estudio", "plantas", "history"]);
 
 function tabFromLocation(location: string): string {
   const tab = new URLSearchParams(location.replace(/^\?/, "")).get("tab");
@@ -195,7 +197,7 @@ export default function ProjectDetail() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className={isMapWorkspace ? "flex min-h-0 flex-1 flex-col space-y-2" : "space-y-6"}>
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto">
             <TabsTrigger value="overview" className="gap-2">
               <FileText className="w-4 h-4" />
               Visão Geral
@@ -211,6 +213,14 @@ export default function ProjectDetail() {
             <TabsTrigger value="map" className="gap-2">
               <Map className="w-4 h-4" />
               Mapa & Análise
+            </TabsTrigger>
+            <TabsTrigger value="estudio" className="gap-2">
+              <Layers className="w-4 h-4" />
+              Estúdio
+            </TabsTrigger>
+            <TabsTrigger value="plantas" className="gap-2">
+              <Ruler className="w-4 h-4" />
+              Plantas
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <History className="w-4 h-4" />
@@ -438,6 +448,16 @@ export default function ProjectDetail() {
 
           <TabsContent value="map" className={isMapWorkspace ? "mt-0 min-h-0 flex-1" : "space-y-6"}>
             <ProjectGeoWorkspace projectId={projectId} canEdit={canEdit} projectName={project.name} clientName={project.clientName || undefined} />
+          </TabsContent>
+
+          {/* Aba: Estúdio Cartográfico */}
+          <TabsContent value="estudio" className="mt-0">
+            {activeTab === "estudio" && <Estudio projectId={projectId} />}
+          </TabsContent>
+
+          {/* Aba: Estúdio de Plantas */}
+          <TabsContent value="plantas" className="mt-0">
+            {activeTab === "plantas" && <Plantas projectId={projectId} />}
           </TabsContent>
 
           {/* Aba: Histórico */}

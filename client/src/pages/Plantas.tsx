@@ -38,10 +38,10 @@ function ProjectPicker() {
   );
 }
 
-export default function Plantas() {
+export default function Plantas({ projectId: projectIdProp }: { projectId?: number } = {}) {
   const { isAuthenticated, loading } = useAuth();
   const search = useSearch();
-  const projectId = Number(new URLSearchParams(search).get("projectId")) || 0;
+  const projectId = projectIdProp ?? (Number(new URLSearchParams(search).get("projectId")) || 0);
 
   const list = trpc.studioPlants.list.useQuery({ projectId }, { enabled: isAuthenticated && projectId > 0 });
   const saveMut = trpc.studioPlants.save.useMutation();

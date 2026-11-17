@@ -17,6 +17,9 @@ describe("Atena: comandos puros e rotas reais, sem API/modelo", () => {
     ["calcular intersecção", { kind: "gis_analysis" }],
     ["gerar PDF", { kind: "advanced_gis" }], ["calcular AII", { kind: "advanced_gis" }],
     ["ajuda", { kind: "help" }],
+    ['Criar planta fictícia "QA Test"', { kind: "create_plant", title: "QA Test" }],
+    ["criar planta «Implantação»", { kind: "create_plant", title: "Implantação" }],
+    ["criar planta sem aspas", { kind: "unsupported" }],
   ])("classifica %s sem execução", (input, expected) => expect(classifyAtenaChatCommand(input as string)).toEqual(expected));
   it.each(["", "executar rm -rf /", "abrir https://example.com/atlas", "fetch('/api/foo')", "abrir arquivos; sudo ls", "eval buffer", "abrir javascript:alert(1)", "curl /api/run buffer", "x".repeat(2001)])("recusa entrada arbitrária %s", input => expect(classifyAtenaChatCommand(input)).toEqual({ kind: "unsupported" }));
   it("mantém destinos especializados e não inventa contexto no mapa baseline", () => {

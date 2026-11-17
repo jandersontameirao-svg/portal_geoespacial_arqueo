@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { atenaNavigationPath, authorizedAtenaProject, classifyAtenaChatCommand, parseAtenaProjectId, type AtenaAnalysisRequest, type AtenaNavigationTarget } from "@/lib/atenaChatCommands";
+import { samplePlant } from "@shared/plant";
 
 type Project = { id: number; name: string; code: string };
 type Plan = Extract<inferRouterOutputs<AppRouter>["atena"]["plan"], { status: "ready" }>["plan"];
@@ -60,6 +61,7 @@ function AtenaChatSession({ previewMode }: { previewMode: boolean }) {
   const plan = trpc.atena.plan.useMutation();
   const run = trpc.atena.run.useMutation();
   const cancel = trpc.atena.cancel.useMutation();
+  const createPlant = trpc.studioPlants.save.useMutation();
   const access = trpc.prospect.sources.useQuery({ projectId: projectId ?? 0 }, { enabled: !previewMode && open && Boolean(projectId), retry: false });
   const runQuery = trpc.atena.get.useQuery({ runId: lastRun?.id ?? 0 }, { enabled: !previewMode && open && Boolean(lastRun) && lastRun?.projectId === projectId, retry: false, refetchInterval: query => ACTIVE.includes(query.state.data?.status ?? "") ? 1500 : false });
   const isActive = ACTIVE.includes(runQuery.data?.status ?? "");
@@ -97,9 +99,18 @@ function AtenaChatSession({ previewMode }: { previewMode: boolean }) {
     try {
       if (previewMode) { append("Prévia sintética: nenhum comando foi consultado ou executado."); return; }
       const command = classifyAtenaChatCommand(text);
-      if (command.kind === "help") { append("Ações disponíveis: listar projetos; abrir Mapa, Projetos, Arquivos, Atlas, Backups ou Atena; propor buffer ou interseção no projeto selecionado. Para modelos/PDF, ADA/AID/AII e prospecção, abra Atena. Não executo código, URLs, SQL ou endpoints fornecidos no chat."); return; }
+      if (command.kind === "help") { append("Ações disponíveis: listar projetos; abrir Mapa, Projetos, Arquivos, Atlas, Backups ou Atena; propor buffer ou interseção no projeto selecionado; criar planta «título» no Estúdio de Plantas. Para modelos/PDF, ADA/AID/AII e prospecção, abra Atena. Não executo código, URLs, SQL ou endpoints fornecidos no chat."); return; }
       if (command.kind === "navigate") { navigateTo(command.target); return; }
       if (command.kind === "list_projects") { await showProjects(); return; }
+      if (command.kind === "create_plant") {
+        if (!projectId || projects.isError) { await showProjects(); return; }
+        const id = projectId;
+        const saved = await createPlant.mutateAsync({ projectId: id, plant: samplePlant(command.title) });
+        if (!mounted.current || token !== revision.current || id !== currentProject.current) return;
+        append(`Planta “${command.title}” criada no projeto “${project?.name}”. Abrindo o Estúdio de Plantas…`);
+        navigate(`/plantas?projectId=${id}&planta=${saved.id}`);
+        return;
+      }
       if (command.kind === "advanced_gis") { navigateTo("atena"); append("Use a página Atena para revisar camadas, parâmetros, bloqueios das fontes e geração de PDF."); return; }
       if (command.kind !== "gis_analysis") { append("Comando não suportado. Digite “ajuda”. Nenhuma alteração foi solicitada."); return; }
       if (!projectId || projects.isError) { await showProjects(); return; }

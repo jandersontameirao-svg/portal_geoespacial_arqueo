@@ -17,10 +17,10 @@ const elementNames: Record<ElementId, string> = {
 };
 const papers: Paper[] = ["A4", "A3", "A2", "A1", "A0"];
 
-export default function Estudio() {
+export default function Estudio({ projectId: projectIdProp }: { projectId?: number } = {}) {
   const { isAuthenticated, loading } = useAuth();
   const search = useSearch();
-  const projectId = Number(new URLSearchParams(search).get("projectId")) || 0;
+  const projectId = projectIdProp ?? (Number(new URLSearchParams(search).get("projectId")) || 0);
 
   const projectsQuery = trpc.projects.list.useQuery(undefined, { enabled: isAuthenticated && !projectId });
   const studio = trpc.studioProducts.list.useQuery({ projectId }, { enabled: isAuthenticated && projectId > 0 });
@@ -33,6 +33,7 @@ export default function Estudio() {
   const [layerIds, setLayerIds] = useState<number[]>([]);
   const [layout, setLayout] = useState<Layout>(defaultLayout);
   const [marks, setMarks] = useState<{ empresa?: number; cliente?: number }>({});
+  const [productKey, setProductKey] = useState("");
   const brandsQuery = trpc.studioProducts.brands.useQuery(undefined, { enabled: isAuthenticated });
   const brands = brandsQuery.data ?? [];
   const [svg, setSvg] = useState("");
@@ -43,22 +44,34 @@ export default function Estudio() {
   const layers = studio.data?.layers ?? [];
   const [pageW, pageH] = orientation === "portrait" ? [420, 594] : [594, 420];
 
-  // Carrega a configuração salva uma vez, quando chega.
+  const products = studio.data?.products ?? [];
+
+  // Carrega um produto (prancha) da biblioteca no editor, ou prepara um novo.
+  type StudioConfig = Partial<{ title: string; paper: Paper; orientation: Orientation; grid: number; background: StudioBackground; layerIds: number[]; layout: Layout; marks: { empresa?: number; cliente?: number } }>;
+  function applyConfig(config: StudioConfig | undefined, key: string, fallbackTitle: string) {
+    setProductKey(key);
+    setTitle(config?.title ?? fallbackTitle);
+    setPaper(config?.paper ?? "A2");
+    setOrientation(config?.orientation ?? "landscape");
+    setGrid(config?.grid ?? 25000);
+    setBackground(config?.background ?? "cartografico");
+    setLayerIds(Array.isArray(config?.layerIds) ? config!.layerIds! : []);
+    setLayout(config?.layout ?? defaultLayout);
+    setMarks(config?.marks ?? {});
+  }
+  function openProduct(product?: { productKey: string; title: string; config: unknown }) {
+    if (product) applyConfig(product.config as StudioConfig, product.productKey, product.title);
+    else applyConfig(undefined, "", "Mapa de localização");
+  }
+
+  // Abre uma vez o produto de ?produto= ou o primeiro da biblioteca.
   const hydrated = useRef(false);
   useEffect(() => {
-    if (hydrated.current) return;
-    const saved = studio.data?.products.find((product) => product.productKey === "estudio");
-    const config = saved?.config as Partial<{ title: string; paper: Paper; orientation: Orientation; grid: number; background: StudioBackground; layerIds: number[]; layout: Layout; marks: { empresa?: number; cliente?: number } }> | undefined;
-    if (!config) return;
+    if (hydrated.current || !studio.data) return;
     hydrated.current = true;
-    if (config.title) setTitle(config.title);
-    if (config.paper) setPaper(config.paper);
-    if (config.orientation) setOrientation(config.orientation);
-    if (config.grid) setGrid(config.grid);
-    if (config.background) setBackground(config.background);
-    if (Array.isArray(config.layerIds)) setLayerIds(config.layerIds);
-    if (config.layout) setLayout(config.layout);
-    if (config.marks) setMarks(config.marks);
+    const wanted = new URLSearchParams(search).get("produto");
+    const first = studio.data.products.find((p) => p.productKey === wanted) ?? studio.data.products[0];
+    if (first) openProduct(first);
   }, [studio.data]);
 
   useEffect(() => { if (!layerIds.length && layers.length) setLayerIds(layers.map((l) => l.id)); }, [layers, layerIds.length]);
@@ -68,9 +81,15 @@ export default function Estudio() {
     onError: () => setSvg(""),
   });
   const save = trpc.studioProducts.save.useMutation({
-    onSuccess: () => { void studio.refetch(); toast.success("Produto salvo"); },
+    onSuccess: (saved) => { setProductKey(saved.productKey); void studio.refetch(); toast.success("Produto salvo"); },
     onError: (error) => toast.error(error.message),
   });
+  const remove = trpc.studioProducts.remove.useMutation({
+    onSuccess: () => { void studio.refetch(); openProduct(undefined); toast.success("Produto removido"); },
+    onError: (error) => toast.error(error.message),
+  });
+  const currentConfig = () => ({ title, paper, orientation, grid, background, layerIds, layout, marks });
+  const newKey = () => `prancha-${Date.now().toString(36)}`;
   const downloadPdf = (base64: string, filename: string) => {
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
@@ -164,6 +183,23 @@ export default function Estudio() {
           <h1 className="text-xl font-semibold">Estúdio Cartográfico</h1>
           <p className="text-xs text-muted-foreground">Monte a prancha e exporte em PDF.</p>
         </div>
+        <div className="space-y-1 rounded-lg border bg-muted/30 p-2">
+          <Label className="text-xs">Biblioteca de pranchas</Label>
+          <Select value={productKey || "__new"} onValueChange={(v) => v === "__new" ? openProduct(undefined) : openProduct(products.find((p) => p.productKey === v))}>
+            <SelectTrigger><SelectValue placeholder="Nova prancha" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__new">+ Nova prancha</SelectItem>
+              {products.map((p) => <SelectItem key={p.productKey} value={p.productKey}>{p.title}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <div className="flex flex-wrap gap-1 pt-1">
+            <Button size="sm" variant="outline" onClick={() => openProduct(undefined)}>Nova</Button>
+            <Button size="sm" variant="outline" disabled={save.isPending || !layerIds.length}
+              onClick={() => save.mutate({ projectId, productKey: newKey(), title: title + " (cópia)", config: { ...currentConfig(), title: title + " (cópia)" } })}>Duplicar</Button>
+            <Button size="sm" variant="outline" disabled={!productKey || remove.isPending}
+              onClick={() => { if (window.confirm("Remover esta prancha da biblioteca?")) remove.mutate({ projectId, productKey }); }}>Excluir</Button>
+          </div>
+        </div>
         <div className="space-y-1"><Label htmlFor="studio-title">Título</Label>
           <Input id="studio-title" className={field} maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} /></div>
         <div className="grid grid-cols-2 gap-2">
@@ -215,8 +251,8 @@ export default function Estudio() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={save.isPending || !layerIds.length} onClick={() => save.mutate({
-            projectId, productKey: "estudio", title,
-            config: { title, paper, orientation, grid, background, layerIds, layout, marks },
+            projectId, productKey: productKey || newKey(), title,
+            config: currentConfig(),
           })}>{save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}Salvar</Button>
           <Button size="sm" variant="outline" disabled={exportPdf.isPending || !layerIds.length} onClick={() =>
             exportPdf.mutate({ projectId, layerIds, format: "pdf", title, paper, orientation, grid, background, layout, marks })}>

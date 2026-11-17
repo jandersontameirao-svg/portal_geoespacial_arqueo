@@ -8,6 +8,7 @@ export type AtenaChatIntent =
   | { kind: "list_projects" }
   | { kind: "navigate"; target: AtenaNavigationTarget }
   | { kind: "gis_analysis" } | { kind: "advanced_gis" }
+  | { kind: "create_plant"; title: string }
   | { kind: "help" } | { kind: "unsupported" };
 
 function normalize(text: string) {
@@ -20,6 +21,11 @@ export function classifyAtenaChatCommand(rawText: string): AtenaChatIntent {
   if (/\b(ajuda|o que voce pode fazer|o que voce consegue fazer|comandos disponiveis|como funciona a atena)\b/.test(text)) return { kind: "help" };
   if (/\b(meus projetos|listar projetos|liste projetos|mostrar projetos|mostre projetos|quais projetos|projetos disponiveis)\b/.test(text) || /^projetos?$/.test(text)) return { kind: "list_projects" };
   if (/\b(gerar mapa por modelo|mapa por modelo|gerar mapa tecnico|gerar pdf|exportar mapa|prospeccao)\b/.test(text)) return { kind: "advanced_gis" };
+  if (/^criar planta\b/.test(text)) {
+    const plant = rawText.trim().match(/^criar\s+planta(?:\s+fict[ií]cia)?\s+["“'«]([^"”'»]{1,100})["”'»]\s*[.!]?$/i);
+    if (plant && plant[1].trim()) return { kind: "create_plant", title: plant[1].trim() };
+    return { kind: "unsupported" };
+  }
   if (/\b(buffer|intersecc\w*|intersect\w*|zona de distancia)\b/.test(text)) return { kind: "gis_analysis" };
   if (/\b(criar|crie|calcular|calcule|delimitar|delimite|analisar|analise)\b/.test(text) && /\b(ada|aid|aii)\b/.test(text)) return { kind: "advanced_gis" };
   if (/\b(abrir|abra|ir para|va para|acessar|acesse|navegar para|voltar para|mostrar|mostre)\b/.test(text)) {

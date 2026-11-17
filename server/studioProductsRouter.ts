@@ -128,6 +128,18 @@ export const studioProductsRouter = router({
       return saved;
     }),
 
+  // Remove um produto (prancha/atlas) da biblioteca do projeto.
+  remove: protectedProcedure
+    .input(z.object({ projectId: z.number(), productKey: z.string().trim().min(1).max(80) }))
+    .mutation(async ({ ctx, input }) => {
+      await requireProjectEditor(input.projectId, ctx.user);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível." });
+      await db.delete(studioProducts)
+        .where(and(eq(studioProducts.projectId, input.projectId), eq(studioProducts.productKey, input.productKey)));
+      return { success: true };
+    }),
+
   // Renderiza a prancha (SVG para a prévia, PDF para baixar) a partir das
   // camadas escolhidas e dos parâmetros do produto.
   render: protectedProcedure
