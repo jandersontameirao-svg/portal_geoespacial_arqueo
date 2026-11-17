@@ -428,7 +428,9 @@ function normalizeCloneColors(document: Document, root: HTMLElement): void {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) fail("CANVAS_CONTEXT", "Contexto de conversão de cores indisponível.");
   const cache = new Map<string, string>();
-  const modern = /\b(?:oklch|oklab|lab|lch|color)\(/ig;
+  // Tailwind v4 emite oklch/oklab e, para opacidade, color-mix(in oklab, …).
+  const modern = /(?:oklch|oklab|lab|lch|color-mix|color)\(/ig;
+  const hasModern = (value: string) => /(?:oklch|oklab|lab|lch|color-mix|color)\(/i.test(value);
   const convert = (value: string): string => {
     let output = "", cursor = 0;
     modern.lastIndex = 0;
@@ -464,9 +466,16 @@ function normalizeCloneColors(document: Document, root: HTMLElement): void {
     const computed = document.defaultView!.getComputedStyle(element);
     const style = (element as HTMLElement | SVGElement).style;
     if (!style) continue;
-    for (const property of ["color", "background-color", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color", "outline-color", "text-decoration-color", "box-shadow", "text-shadow", "background-image"]) {
+    // Converte TODA propriedade computada (incluindo custom properties --tw-*,
+    // bordas, sombras, acento) que carregue uma função de cor moderna; a lista
+    // fixa anterior deixava passar, por exemplo, color-mix() e --tw-ring-color.
+    for (let i = 0; i < computed.length; i++) {
+      const property = computed.item(i);
       const value = computed.getPropertyValue(property);
-      if (/\b(?:oklch|oklab|lab|lch|color)\(/i.test(value)) style.setProperty(property, convert(value), "important");
+      if (!hasModern(value)) continue;
+      // Uma custom property não conversível não deve abortar toda a captura.
+      try { style.setProperty(property, convert(value), "important"); }
+      catch (error) { if (!property.startsWith("--")) throw error; }
     }
   }
   canvas.width = canvas.height = 0;
