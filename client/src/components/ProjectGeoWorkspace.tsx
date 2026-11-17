@@ -565,7 +565,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
             <ConnectionWmsLayers />
             <ArcGisRestLayers />
             <IbgeLocalLayers projectBounds={municipalProjectBounds} />
-            <IphanSitesLayer />
+            <IphanSitesLayer projectId={projectId} />
             <ConnectionLayersControl />
             <WmsFeatureInfo />
             <TileLayer key={activeBasemap.id} attribution={activeBasemap.attribution} url={activeBasemap.url!} crossOrigin={activeBasemap.crossOrigin} minNativeZoom={activeBasemap.minZoom} maxNativeZoom={activeBasemap.maxZoom} />

@@ -162,6 +162,13 @@
       "when": 1794855170686,
       "tag": "0022_group_official_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1794915469642,
+      "tag": "0023_iphan_knowledge",
+      "breakpoints": true
     }
   ]
 }

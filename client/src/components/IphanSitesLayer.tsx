@@ -26,9 +26,10 @@ type Site = {
   cadastro?: string;
 };
 
-export default function IphanSitesLayer() {
+export default function IphanSitesLayer({ projectId }: { projectId?: number }) {
   const map = useMap();
   const utils = trpc.useUtils();
+  const saveKnowledge = trpc.iphanSites.saveKnowledge.useMutation();
   const { data: connections = [] } = trpc.connections.list.useQuery(undefined, {
     refetchOnWindowFocus: true,
   });
@@ -135,7 +136,28 @@ export default function IphanSitesLayer() {
                 <button
                   type="button"
                   className="rounded border px-2 py-1"
-                  onClick={() => window.dispatchEvent(new CustomEvent("studio-open-atena", { detail: "Guardar sítio IPHAN " + site.id }))}
+                  disabled={saveKnowledge.isPending}
+                  onClick={() => saveKnowledge.mutate(
+                    {
+                      projectId,
+                      site: {
+                        id: site.id,
+                        codigo: site.codigo,
+                        nome: site.nome,
+                        classificacao: site.classificacao,
+                        tipoBem: site.tipoBem,
+                        sintese: site.sintese,
+                      },
+                    },
+                    {
+                      onSuccess: (r) => window.dispatchEvent(new CustomEvent("studio-open-atena", {
+                        detail: `Sítio IPHAN “${site.nome || site.codigo || site.id}” ${r.updated ? "atualizado" : "guardado"} no acervo.`,
+                      })),
+                      onError: (e) => window.dispatchEvent(new CustomEvent("studio-open-atena", {
+                        detail: "Não consegui guardar o sítio no acervo: " + e.message,
+                      })),
+                    },
+                  )}
                 >
                   Guardar com a Atena
                 </button>

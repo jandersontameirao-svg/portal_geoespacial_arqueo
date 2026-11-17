@@ -5,15 +5,29 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import bbox from "@turf/bbox";
 import booleanIntersects from "@turf/boolean-intersects";
 import { featureCollection } from "@turf/helpers";
 import type { Feature, Geometry } from "geojson";
 import { router, protectedProcedure } from "./_core/trpc";
 import * as db from "./db";
-import { requireProjectEditor } from "./projectAccess";
+import { requireProjectAccess, requireProjectEditor } from "./projectAccess";
 import { isPromotableVectorLayer, vectorFeaturesFromLayer } from "./vectorLayerPromotion";
 import { iphanSitesInView } from "./iphanSitesService";
+import { iphanKnowledge } from "../drizzle/schema";
+
+// Dados de um sítio do IPHAN para guardar no acervo ("Guardar com a Atena").
+const siteInput = z.object({
+  id: z.number().int(),
+  codigo: z.string().max(100).optional(),
+  nome: z.string().max(300).optional(),
+  classificacao: z.string().max(150).optional(),
+  tipoBem: z.string().max(150).optional(),
+  sintese: z.string().max(12000).optional(),
+  fonte: z.string().max(150).optional(),
+  camada: z.string().max(100).optional(),
+});
 
 function polygonAreas(features: Feature<Geometry>[]): Feature<Geometry>[] {
   return features.filter((feature) => feature.geometry && /Polygon$/.test(feature.geometry.type));
@@ -94,5 +108,62 @@ export const iphanSitesRouter = router({
       });
 
       return { success: true, layerId, name, count: inside.length };
+    }),
+
+  // Acervo de sítios do IPHAN — guarda o sítio consultado ("Guardar com a
+  // Atena"). projectId nulo = acervo global (mapa sem projeto).
+  saveKnowledge: protectedProcedure
+    .input(z.object({ projectId: z.number().optional(), site: siteInput }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.projectId != null) await requireProjectEditor(input.projectId, ctx.user);
+      const database = await db.getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível." });
+      const projectId = input.projectId ?? null;
+      const projectMatch = projectId == null ? isNull(iphanKnowledge.projectId) : eq(iphanKnowledge.projectId, projectId);
+
+      const existing = await database.select({ id: iphanKnowledge.id }).from(iphanKnowledge)
+        .where(and(projectMatch, eq(iphanKnowledge.siteId, input.site.id))).limit(1);
+      const values = {
+        projectId, siteId: input.site.id,
+        codigo: input.site.codigo ?? null,
+        nome: input.site.nome ?? null,
+        classificacao: input.site.classificacao ?? null,
+        tipoBem: input.site.tipoBem ?? null,
+        sintese: input.site.sintese ?? null,
+        fonte: input.site.fonte ?? "IPHAN / SICG",
+        camada: input.site.camada ?? null,
+      };
+      if (existing.length) {
+        await database.update(iphanKnowledge).set(values).where(eq(iphanKnowledge.id, existing[0].id));
+      } else {
+        await database.insert(iphanKnowledge).values({
+          ...values,
+          savedById: ctx.user.id,
+          savedByName: ctx.user.name || ctx.user.email || null,
+        });
+      }
+      await db.createAuditLog({
+        userId: ctx.user.id,
+        userEmail: ctx.user.email || null,
+        userName: ctx.user.name || null,
+        action: "iphan.knowledge.save",
+        entityType: "iphanKnowledge",
+        entityId: input.site.id,
+        projectId: input.projectId ?? null,
+        details: { nome: input.site.nome ?? null, codigo: input.site.codigo ?? null },
+      });
+      return { success: true, updated: existing.length > 0 };
+    }),
+
+  // Lista o acervo de sítios guardados (do projeto ou global).
+  knowledge: protectedProcedure
+    .input(z.object({ projectId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (input.projectId != null) await requireProjectAccess(input.projectId, ctx.user);
+      const database = await db.getDb();
+      if (!database) return [];
+      const projectId = input.projectId ?? null;
+      const projectMatch = projectId == null ? isNull(iphanKnowledge.projectId) : eq(iphanKnowledge.projectId, projectId);
+      return database.select().from(iphanKnowledge).where(projectMatch).orderBy(desc(iphanKnowledge.createdAt));
     }),
 });

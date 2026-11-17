@@ -822,3 +822,32 @@ export const studioProducts = mysqlTable("studio_products", {
 
 export type StudioProduct = typeof studioProducts.$inferSelect;
 export type InsertStudioProduct = typeof studioProducts.$inferInsert;
+
+// ============================================================================
+// Acervo de sítios do IPHAN — sítios consultados e "guardados com a Atena"
+// ============================================================================
+
+export const iphanKnowledge = mysqlTable("iphan_knowledge", {
+  id: int("id").autoincrement().primaryKey(),
+  // Projeto a que o sítio foi associado; nulo = acervo global (mapa sem projeto).
+  projectId: int("projectId"),
+  // Identificador do bem no IPHAN (id_bem do SICG).
+  siteId: int("siteId").notNull(),
+  codigo: varchar("codigo", { length: 100 }),
+  nome: varchar("nome", { length: 300 }),
+  classificacao: varchar("classificacao", { length: 150 }),
+  tipoBem: varchar("tipoBem", { length: 150 }),
+  sintese: text("sintese"),
+  fonte: varchar("fonte", { length: 150 }),
+  camada: varchar("camada", { length: 100 }),
+  savedById: int("savedById"),
+  savedByName: varchar("savedByName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  projectIdx: index("iphan_knowledge_project_idx").on(table.projectId),
+  siteIdx: index("iphan_knowledge_site_idx").on(table.siteId),
+}));
+
+export type IphanKnowledge = typeof iphanKnowledge.$inferSelect;
+export type InsertIphanKnowledge = typeof iphanKnowledge.$inferInsert;

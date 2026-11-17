@@ -665,7 +665,7 @@ export default function GlobeViewer({
           <ConnectionWmsLayers />
           <ArcGisRestLayers />
           <IbgeLocalLayers />
-          <IphanSitesLayer />
+          <IphanSitesLayer projectId={projectId} />
           <ConnectionLayersControl />
           <WmsFeatureInfo />
           <InstitutionalMapLayers />
