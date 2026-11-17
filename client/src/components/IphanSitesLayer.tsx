@@ -1,84 +1,149 @@
 import { useEffect, useRef, useState } from "react";
-import { GeoJSON, useMap } from "react-leaflet";
+import { Popup, WMSTileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
-import { Landmark } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 import { trpc } from "@/lib/trpc";
 
-const MIN_ZOOM = 11;
-
 /**
- * Sítios arqueológicos do IPHAN (SICG) dentro da vista, como camada consultável.
- * Porte da prévia do Codex (iphanRecords) via router iphanSites.inView.
+ * Ferramenta "Consultar sítios IPHAN" (SICG) — botão rotulado no mapa que liga
+ * a base WMS dos sítios arqueológicos do IPHAN e ativa o modo identificar: ao
+ * clicar sobre um sítio, consulta o IPHAN no ponto e abre um popup com os dados
+ * do bem (código, classificação, síntese…), link para o SICG e "Guardar com a
+ * Atena". Porte fiel do PreviewIphanSites da prévia do Codex, ligado ao tRPC
+ * real (iphanSites.inView) e à auth de produção.
+ *
+ * Quando a camada do IPHAN já está visível pelo painel "Camadas do mapa", o
+ * botão se esconde e o identificar continua ativo (sem duplicar a base).
  */
+
+type Site = {
+  id: number;
+  nome?: string;
+  codigo?: string;
+  classificacao?: string;
+  tipoBem?: string;
+  sintese?: string;
+  cadastro?: string;
+};
+
 export default function IphanSitesLayer() {
   const map = useMap();
   const utils = trpc.useUtils();
-  const controlRef = useRef<HTMLDetailsElement>(null);
-  const [enabled, setEnabled] = useState(false);
-  const [result, setResult] = useState<FeatureCollection>();
-  const [status, setStatus] = useState("");
+  const { data: connections = [] } = trpc.connections.list.useQuery(undefined, {
+    refetchOnWindowFocus: true,
+  });
+  // Base do IPHAN já ligada pelo painel "Camadas do mapa"?
+  const layerAlreadyVisible = connections.some(
+    (c) => c.enabled && c.type === "WMS" && /SICG:sitios/.test(c.layer ?? ""),
+  );
+
+  const [consult, setConsult] = useState(false);
+  const active = consult || layerAlreadyVisible;
+  const [result, setResult] = useState<{ point: L.LatLng; status: string; sites: Site[] }>();
+  const current = useRef<AbortController | undefined>(undefined);
+  const control = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const control = controlRef.current;
-    if (control) { L.DomEvent.disableClickPropagation(control); L.DomEvent.disableScrollPropagation(control); }
-  }, [map]);
+    if (control.current) L.DomEvent.disableClickPropagation(control.current);
+  }, [layerAlreadyVisible]);
 
   useEffect(() => {
-    if (!enabled) { setResult(undefined); setStatus(""); return; }
-    let cancelled = false;
-    const update = async () => {
-      if (map.getZoom() < MIN_ZOOM) { setResult(undefined); setStatus("Aproxime o mapa para consultar os sítios"); return; }
-      setStatus("Consultando IPHAN…");
+    if (!active) return;
+    const identify = async (event: L.LeafletMouseEvent) => {
+      // Deixa o clique em feições vetoriais (desenho/edição) passar quando o
+      // modo não foi ligado explicitamente pelo botão.
+      if ((event.originalEvent.target as Element | null)?.closest?.(".leaflet-interactive") && !consult) return;
+      current.current?.abort();
+      const point = event.latlng;
+      if (map.getZoom() < 10) {
+        setResult({ point, status: "Aproxime o mapa e clique sobre um sítio.", sites: [] });
+        return;
+      }
+      const container = map.latLngToContainerPoint(point);
+      const sw = map.containerPointToLatLng(container.add([-9, 9]));
+      const ne = map.containerPointToLatLng(container.add([9, -9]));
+      const bbox = [sw.lng, sw.lat, ne.lng, ne.lat].join(",");
+      const controller = new AbortController();
+      current.current = controller;
+      setResult({ point, status: "Consultando o IPHAN…", sites: [] });
       try {
-        const data = await utils.iphanSites.inView.fetch({ bbox: map.getBounds().toBBoxString() });
-        if (cancelled) return;
-        const collection = data as unknown as FeatureCollection;
-        setResult(collection);
-        setStatus(collection.features.length ? "" : "Nenhum sítio nesta vista");
+        const data = await utils.iphanSites.inView.fetch({ bbox });
+        if (controller.signal.aborted) return;
+        const sites = (data as unknown as FeatureCollection).features.map((feature) => feature.properties as Site);
+        setResult({ point, sites, status: sites.length ? "" : "Nenhum sítio retornado neste ponto do mapa." });
       } catch (error: any) {
-        if (!cancelled) { setResult(undefined); setStatus(error?.message || "IPHAN indisponível"); }
+        if (!controller.signal.aborted) {
+          setResult({ point, sites: [], status: error?.message || "Consulta ao IPHAN indisponível." });
+        }
       }
     };
-    void update();
-    map.on("moveend", update);
-    return () => { cancelled = true; map.off("moveend", update); };
-  }, [enabled, map, utils]);
+    map.on("click", identify);
+    return () => { map.off("click", identify); current.current?.abort(); };
+  }, [active, consult, map, utils]);
 
   return (
-    <details ref={controlRef} className="preview-ibge-control" style={{ top: "3.75rem" }}>
-      <summary aria-label="Sítios do IPHAN" title="Sítios arqueológicos do IPHAN (SICG)">
-        <Landmark size={20} aria-hidden="true" />
-      </summary>
-      <div className="preview-ibge-panel rounded-lg border bg-white p-2 text-xs shadow-lg">
-        <label className="flex cursor-pointer items-center gap-2 px-1 py-1">
-          <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
-          <span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: "#b84c1b" }} />
-          Sítios IPHAN (SICG)
-        </label>
-        {status && <p role="status" className="px-1 pt-1 text-[11px] text-slate-600">{status}</p>}
-      </div>
-      {enabled && result && (
-        <GeoJSON
-          key={JSON.stringify(result.features.map((feature) => feature.properties?.id))}
-          data={result}
-          style={{ color: "#b84c1b", weight: 1, fillOpacity: 0.15 }}
-          pointToLayer={(_, point) => L.circleMarker(point, { radius: 4, color: "#b84c1b", fillOpacity: 0.85 })}
-          onEachFeature={(feature, item) => {
-            const p = feature.properties || {};
-            const el = document.createElement("div");
-            el.innerHTML = "";
-            const strong = document.createElement("strong");
-            strong.textContent = String(p.nome || "Sítio arqueológico");
-            const info = document.createElement("div");
-            info.className = "text-xs";
-            info.textContent = [p.codigo && ("Código: " + p.codigo), p.classificacao, p.tipoBem].filter(Boolean).join(" · ");
-            el.appendChild(strong); el.appendChild(info);
-            item.bindPopup(el);
-            item.bindTooltip(String(p.nome || p.codigo || "Sítio"), { sticky: true });
-          }}
+    <>
+      {!layerAlreadyVisible && (
+        <div ref={control} className="absolute bottom-8 right-3 z-[1000]">
+          <button
+            type="button"
+            aria-pressed={active}
+            className="rounded-md border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow hover:bg-slate-50 aria-pressed:bg-emerald-100"
+            onClick={() => { setConsult((value) => !value); setResult(undefined); }}
+          >
+            Consultar sítios IPHAN
+          </button>
+          {active && <p className="mt-1 rounded bg-white px-2 py-1 text-xs text-slate-800 shadow">Clique sobre um sítio no mapa.</p>}
+        </div>
+      )}
+
+      {consult && !layerAlreadyVisible && (
+        <WMSTileLayer
+          url="https://geoserver.iphan.gov.br/geoserver/SICG/wms"
+          layers="SICG:sitios_pol,SICG:sitios"
+          format="image/png"
+          transparent
+          version="1.1.1"
         />
       )}
-    </details>
+
+      {active && result && (
+        <Popup
+          position={result.point}
+          closeOnClick={false}
+          maxWidth={360}
+          maxHeight={320}
+          eventHandlers={{ remove: () => { current.current?.abort(); setResult(undefined); } }}
+        >
+          {result.status && <div role="status">{result.status}</div>}
+          {result.sites.map((site) => (
+            <article key={site.id} className="space-y-2 border-b pb-3 pt-2">
+              <strong className="block">{site.nome || "Sítio arqueológico sem nome informado"}</strong>
+              <div>Tipo: {site.tipoBem || site.classificacao || "Não informado"}</div>
+              <details className="space-y-1">
+                <summary className="cursor-pointer font-semibold">Ver dados do sítio</summary>
+                <div>Código IPHAN: {site.codigo || "Não informado"}</div>
+                <div>Classificação: {site.classificacao || "Não informada"}</div>
+                {site.cadastro && <div>Cadastro: {site.cadastro}</div>}
+                <div><b>Síntese:</b> {site.sintese || "Não publicada"}</div>
+                <div>Fonte: IPHAN / SICG</div>
+              </details>
+              <div className="flex flex-wrap items-center gap-2">
+                <a href="https://sicg.iphan.gov.br/sicg/pesquisarBem" target="_blank" rel="noreferrer" className="underline">
+                  Consultar fonte no SICG
+                </a>
+                <button
+                  type="button"
+                  className="rounded border px-2 py-1"
+                  onClick={() => window.dispatchEvent(new CustomEvent("studio-open-atena", { detail: "Guardar sítio IPHAN " + site.id }))}
+                >
+                  Guardar com a Atena
+                </button>
+              </div>
+            </article>
+          ))}
+        </Popup>
+      )}
+    </>
   );
 }
