@@ -84,7 +84,7 @@ export default function IphanSitesLayer() {
   return (
     <>
       {!layerAlreadyVisible && (
-        <div ref={control} className="absolute bottom-8 right-3 z-[1000]">
+        <div ref={control} className="absolute bottom-24 right-3 z-[1000] flex flex-col items-end">
           <button
             type="button"
             aria-pressed={active}
