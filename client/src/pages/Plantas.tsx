@@ -165,7 +165,6 @@ export default function Plantas({ projectId: projectIdProp }: { projectId?: numb
             {current?.versions.map((v, i) => <option key={i} value={i + 1}>V{i + 1} · {new Date(v.createdAt).toLocaleString("pt-BR")}</option>)}
           </select>
         </label>
-        <button className={button} onClick={() => choose()}>Nova</button>
         <button className={button} disabled={busy || (!dirty && !!id)} onClick={() => void save(false)}>Salvar versão</button>
         <button className={button} disabled={busy || !id} onClick={() => void save(true)}>Salvar cópia</button>
         <a className={button} href={"/projects/" + projectId + "?tab=files"}>Arquivos CAD do projeto</a>

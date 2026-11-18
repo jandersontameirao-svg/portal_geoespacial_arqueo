@@ -193,7 +193,7 @@ export default function Estudio({ projectId: projectIdProp }: { projectId?: numb
             </SelectContent>
           </Select>
           <div className="flex flex-wrap gap-1 pt-1">
-            <Button size="sm" variant="outline" onClick={() => openProduct(undefined)}>Nova</Button>
+            {/* "+ Nova prancha" já está no seletor acima; evita ação duplicada. */}
             <Button size="sm" variant="outline" disabled={save.isPending || !layerIds.length}
               onClick={() => save.mutate({ projectId, productKey: newKey(), title: title + " (cópia)", config: { ...currentConfig(), title: title + " (cópia)" } })}>Duplicar</Button>
             <Button size="sm" variant="outline" disabled={!productKey || remove.isPending}
