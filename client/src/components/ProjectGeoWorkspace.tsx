@@ -553,7 +553,7 @@ export default function ProjectGeoWorkspace({ projectId, canEdit, projectName, c
 
   return (
     <div className="grid min-h-[480px] gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
-      <Card className="flex min-h-[480px] min-w-0 flex-col overflow-hidden lg:min-h-0">
+      <Card className="flex min-h-[480px] min-w-0 flex-col overflow-hidden pb-0 lg:min-h-0">
         <CardHeader className="border-b bg-slate-50 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-2"><CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5 text-blue-600" />Mapa e análise do projeto</CardTitle><Button size="sm" variant="outline" onClick={() => setPrintOpen(true)}><Printer className="mr-2 h-4 w-4" />Imprimir mapa</Button></div>
           <CardDescription>Desenhe, edite, selecione e gere resultados espaciais persistidos com proveniência.</CardDescription>
