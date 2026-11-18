@@ -42,10 +42,14 @@ async function startServer() {
   app.set("trust proxy", 1);
 
   // Rate limiting para endpoints sensíveis
+  // SPA autenticada faz muitas chamadas tRPC (listas, polling de notificações,
+  // troca de abas). O limite anterior (100/15min ≈ 7/min) estourava em uso
+  // normal e devolvia 429 em rotas comuns. Janela curta com teto generoso:
+  // protege contra abuso sem penalizar a navegação legítima.
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // Máximo 100 requisições por IP
-    message: "Muitas requisições deste IP, tente novamente em 15 minutos.",
+    windowMs: 60 * 1000, // 1 minuto
+    max: 300, // Até 300 requisições por IP por minuto
+    message: "Muitas requisições deste IP, tente novamente em instantes.",
     standardHeaders: true,
     legacyHeaders: false,
   });

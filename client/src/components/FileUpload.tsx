@@ -9,7 +9,7 @@ import { effectiveUploadMime, resolveTiffUpload, type TiffUploadMode } from "@sh
 
 interface FileUploadProps {
   projectId: number;
-  onUploadComplete?: () => void;
+  onUploadComplete?: (result: { succeeded: number; failed: number }) => void;
   maxSizeMB?: number;
   acceptedTypes?: string[];
 }
@@ -51,7 +51,9 @@ export default function FileUpload({
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [tiffMode, setTiffMode] = useState<TiffUploadMode>("raster");
+  // Padrão seguro: guardar o TIFF original. O processamento raster/COG depende
+  // de serviço opcional no servidor; o usuário escolhe "raster" quando disponível.
+  const [tiffMode, setTiffMode] = useState<TiffUploadMode>("original");
 
   const uploadMutation = trpc.files.upload.useMutation();
   const rasterIngestMutation = trpc.raster.ingestGeoTiff.useMutation();
@@ -102,6 +104,9 @@ export default function FileUpload({
     if (newFiles.length === 0) return;
 
     setUploadingFiles((prev) => [...prev, ...newFiles]);
+
+    let succeeded = 0;
+    let failed = 0;
 
     // Upload real via tRPC
     for (const uploadFile of newFiles) {
@@ -198,10 +203,12 @@ export default function FileUpload({
           )
         );
 
+        succeeded += 1;
         toast.success(policy.isTiff && policy.route === "generic"
           ? `${uploadFile.file.name}: original armazenado; raster/COG não processado.`
           : `${uploadFile.file.name} enviado com sucesso!`);
       } catch (error) {
+        failed += 1;
         const message = error instanceof Error ? error.message : "Erro ao enviar arquivo";
         setUploadingFiles((prev) =>
           prev.map((f) =>
@@ -214,10 +221,14 @@ export default function FileUpload({
       }
     }
 
-    // Limpar arquivos concluídos após 2 segundos
+    // Notifica o resultado real (sucessos e falhas) para o componente pai decidir
+    // o que mostrar — nunca declarar sucesso quando o servidor recusou o envio.
+    if (onUploadComplete) onUploadComplete({ succeeded, failed });
+
+    // Limpar apenas os arquivos que terminaram com sucesso; manter os que falharam
+    // visíveis com a mensagem de erro para o usuário.
     setTimeout(() => {
-      setUploadingFiles((prev) => prev.filter((f) => f.status === "uploading"));
-      if (onUploadComplete) onUploadComplete();
+      setUploadingFiles((prev) => prev.filter((f) => f.status !== "success"));
     }, 2000);
   };
 
@@ -274,8 +285,8 @@ export default function FileUpload({
       <div className="rounded border p-3 space-y-2">
         <label className="text-sm font-medium" htmlFor={`tiff-mode-${projectId}`}>Tratamento dos arquivos TIFF / GeoTIFF</label>
         <select id={`tiff-mode-${projectId}`} data-testid="tiff-upload-mode" className="block w-full rounded border bg-background text-foreground p-2 text-sm" value={tiffMode} onChange={(event) => setTiffMode(event.target.value as TiffUploadMode)} disabled={uploadingFiles.some((file) => file.status === "uploading")}>
-          <option value="raster">Processar como raster / COG (requer serviço disponível)</option>
           <option value="original">Guardar somente o TIFF original (sem camada raster / COG)</option>
+          <option value="raster">Processar como raster / COG (requer serviço disponível)</option>
         </select>
         <p className="text-xs text-muted-foreground">{tiffMode === "original"
           ? "O original é armazenado como imagem, com scanner e controle de acesso normais. Não cria camada, tiles nem georreferenciamento."

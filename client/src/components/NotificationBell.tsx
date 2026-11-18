@@ -52,19 +52,22 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
 
   // Queries
+  // A lista completa só é buscada/atualizada quando o painel está aberto.
   const { data: notifications, refetch: refetchNotifications } = trpc.notifications.list.useQuery(
     { limit: 20 },
-    { 
-      refetchInterval: 30000, // Polling a cada 30 segundos
-      enabled: true,
+    {
+      refetchInterval: isOpen ? 30000 : false,
+      refetchOnWindowFocus: false,
     }
   );
 
+  // Fora do painel, só o contador é consultado — a cada 60s e pausado quando a
+  // aba está em segundo plano (padrão do react-query) para não gerar 429.
   const { data: unreadData, refetch: refetchUnread } = trpc.notifications.unreadCount.useQuery(
     undefined,
-    { 
-      refetchInterval: 15000, // Polling a cada 15 segundos
-      enabled: true,
+    {
+      refetchInterval: 60000, // Polling a cada 60 segundos
+      refetchOnWindowFocus: true,
     }
   );
 

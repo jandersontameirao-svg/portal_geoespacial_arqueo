@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye, Map, Sparkles, Layers, Ruler } from "lucide-react";
+import { Loader2, ArrowLeft, Users, FileText, History, Settings, UserPlus, Trash2, Upload, Download, Eye, Map, Layers, Ruler } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import FileList from "@/components/FileList";
 import ProjectGeoWorkspace from "@/components/ProjectGeoWorkspace";
@@ -27,7 +27,7 @@ function tabFromLocation(location: string): string {
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id || "0");
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const [activeTab, setActiveTab] = useState(() => tabFromLocation(search));
@@ -41,6 +41,7 @@ export default function ProjectDetail() {
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isMapWorkspace = activeTab === "map";
+  const utils = trpc.useUtils();
 
   // Queries
   const { data: project, isLoading: projectLoading, refetch: refetchProject } = trpc.projects.get.useQuery(
@@ -124,10 +125,30 @@ export default function ProjectDetail() {
     if (location !== target) setLocation(target);
   };
 
-  if (projectLoading) {
+  // Enquanto a sessão é verificada (ex.: após recarregar a página), aguarda
+  // antes de decidir "não encontrado" ou "acesso restrito".
+  if (authLoading || (isAuthenticated && projectLoading)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Sessão expirada</CardTitle>
+            <CardDescription>Sua sessão não está mais ativa. Faça login novamente para acessar o projeto.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/">Ir para o login</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -182,9 +203,8 @@ export default function ProjectDetail() {
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Button variant="outline" asChild className="gap-2">
-                <Link href={`/atena?projectId=${projectId}`}><Sparkles className="w-4 h-4" />Atena</Link>
-              </Button>
+              {/* A Atena tem um único ponto de entrada: o assistente flutuante no
+                  canto inferior direito (presente em todo o app). */}
             {canEdit && (
               <Button variant="outline" className="gap-2">
                 <Settings className="w-4 h-4" />
@@ -197,7 +217,7 @@ export default function ProjectDetail() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className={isMapWorkspace ? "flex min-h-0 flex-1 flex-col space-y-2" : "space-y-6"}>
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 sm:grid-cols-4 lg:w-auto lg:grid-cols-7">
             <TabsTrigger value="overview" className="gap-2">
               <FileText className="w-4 h-4" />
               Visão Geral
@@ -431,10 +451,20 @@ export default function ProjectDetail() {
               <CardContent>
                 <FileUpload
                   projectId={projectId}
-                  onUploadComplete={() => {
-                    toast.success("Arquivos enviados com sucesso!");
-                    // Recarregar lista de arquivos
-                    setTimeout(() => window.location.reload(), 1000);
+                  onUploadComplete={({ succeeded, failed }) => {
+                    if (succeeded > 0) {
+                      toast.success(
+                        succeeded === 1
+                          ? "Arquivo enviado com sucesso!"
+                          : `${succeeded} arquivos enviados com sucesso!`
+                      );
+                      // Atualiza a lista de arquivos sem recarregar a página
+                      // (evita perder o estado da sessão/aba).
+                      utils.files.list.invalidate({ projectId });
+                    }
+                    if (failed > 0 && succeeded === 0) {
+                      toast.error("Nenhum arquivo foi enviado. Verifique os erros e tente novamente.");
+                    }
                   }}
                 />
 

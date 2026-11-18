@@ -37,7 +37,11 @@ function publicIngestionResult(result: Awaited<ReturnType<typeof ingestRasterWit
 }
 
 export const rasterRouter = router({
-  ingestionAvailability: protectedProcedure.query(() => rasterIngestionAvailability()),
+  ingestionAvailability: protectedProcedure.query(() => {
+    // Não expor `detail` (config do servidor) ao cliente.
+    const { available, mode, reason } = rasterIngestionAvailability();
+    return { available, mode, reason };
+  }),
 
   ingestGeoTiff: protectedProcedure.input(z.object({
     projectId: z.number().int().positive(),

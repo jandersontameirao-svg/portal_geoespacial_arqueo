@@ -481,18 +481,8 @@ const projectsRouter = router({
         }
       }
 
-      await logAudit(
-        ctx.user.id,
-        ctx.user.email || undefined,
-        ctx.user.name || undefined,
-        "project.view",
-        "project",
-        project.id,
-        project.id,
-        undefined,
-        ctx.req
-      );
-
+      // Visualização não é alteração de dados: não gera registro de auditoria
+      // (evita poluir o histórico a cada abertura/troca de aba do projeto).
       return project;
     }),
 

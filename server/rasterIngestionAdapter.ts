@@ -15,8 +15,15 @@ export type RasterIngestionInput = {
 export type RasterIngestionAvailability = {
   available: boolean;
   mode: "worker" | "direct-local" | "unconfigured";
+  /** Mensagem amigável ao usuário (sem detalhes de configuração do servidor). */
   reason: string;
+  /** Detalhe técnico para log/documentação interna; nunca exibir ao usuário. */
+  detail?: string;
 };
+
+/** Texto mostrado ao usuário quando o raster/COG não pode ser processado. */
+const RASTER_UNAVAILABLE_MESSAGE =
+  "O processamento de raster/COG não está disponível neste servidor. Escolha guardar somente o GeoTIFF original.";
 
 function configuredWorkerUrl(environment = process.env): URL | null {
   const raw = environment.ARQUEO_RASTER_WORKER_URL;
@@ -32,10 +39,14 @@ export function rasterIngestionAvailability(environment = process.env): RasterIn
   const worker = configuredWorkerUrl(environment);
   if (worker) return { available: true, mode: "worker", reason: "Worker raster configurado por variável de ambiente do servidor." };
   if (environment.ARQUEO_RASTER_INGESTION_MODE === "direct-local") {
-    try { getLocalRasterRoot(environment.ARQUEO_LOCAL_RASTER_ROOT); return { available: true, mode: "direct-local", reason: "Processamento raster local explicitamente habilitado no servidor." }; }
-    catch (error) { return { available: false, mode: "unconfigured", reason: error instanceof Error ? error.message : "Volume raster local inválido" }; }
+    try { getLocalRasterRoot(environment.ARQUEO_LOCAL_RASTER_ROOT); return { available: true, mode: "direct-local", reason: "Processamento raster local habilitado no servidor." }; }
+    catch (error) {
+      const detail = error instanceof Error ? error.message : "Volume raster local inválido";
+      console.warn("[Raster] Ingestão local indisponível:", detail);
+      return { available: false, mode: "unconfigured", reason: RASTER_UNAVAILABLE_MESSAGE, detail };
+    }
   }
-  return { available: false, mode: "unconfigured", reason: "Ingestão raster indisponível: configure ARQUEO_RASTER_WORKER_URL ou habilite ARQUEO_RASTER_INGESTION_MODE=direct-local com ARQUEO_LOCAL_RASTER_ROOT absoluto." };
+  return { available: false, mode: "unconfigured", reason: RASTER_UNAVAILABLE_MESSAGE, detail: "Configure ARQUEO_RASTER_WORKER_URL ou ARQUEO_RASTER_INGESTION_MODE=direct-local com ARQUEO_LOCAL_RASTER_ROOT absoluto." };
 }
 
 function jsonToResult(value: unknown): RasterIngestionResult {

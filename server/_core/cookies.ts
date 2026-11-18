@@ -39,10 +39,14 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  // App de login próprio (first-party): SameSite=Lax é o correto. O cookie é
+  // enviado em navegações de topo (inclusive recarregar a página), ao contrário
+  // de SameSite=None, que exige Secure e é descartado pelo navegador quando o
+  // Secure não é reconhecido — causa de a sessão não sobreviver ao reload.
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }
